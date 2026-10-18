@@ -1,0 +1,27 @@
+{
+  "name": "mfec-icebreaker-arena",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MFEC IceBreaker Arena: live quiz and icebreaker game for MFEC teams",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"npm run dev -w @icebreaker/server\" \"npm run dev -w @icebreaker/web\"",
+    "build": "npm run build -w @icebreaker/web",
+    "start": "concurrently -k -n server,web -c cyan,magenta \"npm run start -w @icebreaker/server\" \"npm run start -w @icebreaker/web\"",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "bots": "npm run bots -w @icebreaker/server --"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3"
+  }
+}

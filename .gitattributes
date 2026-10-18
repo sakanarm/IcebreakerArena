@@ -1,0 +1,5 @@
+# LF in the repository; shell scripts and nginx config stay LF on every checkout, since they run on Linux
+* text=auto
+*.sh text eol=lf
+*.conf text eol=lf
+*.png binary

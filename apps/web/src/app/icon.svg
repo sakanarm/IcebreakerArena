@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#16133f"/>
+  <g transform="rotate(-6 32 32)">
+    <rect x="7" y="7" width="24" height="24" rx="5" fill="#ff7a1a"/>
+    <rect x="33" y="7" width="24" height="24" rx="5" fill="#00a99d"/>
+    <rect x="7" y="33" width="24" height="24" rx="5" fill="#e0388b"/>
+    <rect x="33" y="33" width="24" height="24" rx="5" fill="#6c4bf4"/>
+    <g fill="#fff" stroke="#fff" stroke-width="1.2" stroke-linejoin="round">
+      <path transform="translate(10.6 10.6) scale(0.7)" d="M12 2.5 L14.47 9.1 L21.51 9.41 L15.99 13.8 L17.88 20.59 L12 16.7 L6.12 20.59 L8.01 13.8 L2.49 9.41 L9.53 9.1 Z"/>
+      <path transform="translate(36.6 10.6) scale(0.7)" d="M12 2 L21 7 V17 L12 22 L3 17 V7 Z"/>
+      <path transform="translate(10.6 36.6) scale(0.7)" d="M12 21 C12 21 3 14.5 3 8.8 C3 5.9 5.2 4 7.7 4 C9.6 4 11.1 5.1 12 6.6 C12.9 5.1 14.4 4 16.3 4 C18.8 4 21 5.9 21 8.8 C21 14.5 12 21 12 21 Z"/>
+      <path transform="translate(36.6 36.6) scale(0.7)" d="M13 2 L4 14 H11 L10 22 L20 9 H13 Z"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+{
+  "name": "@icebreaker/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc -p .",
+    "test": "tsx --test src/flow.test.ts",
+    "bots": "tsx scripts/bots.ts"
+  },
+  "dependencies": {
+    "@icebreaker/shared": "*",
+    "socket.io": "^4.8.4",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4"
+  }
+}
