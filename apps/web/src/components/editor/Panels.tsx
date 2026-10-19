@@ -7,8 +7,6 @@ import { ANSWER_BG } from '../shapes';
 import type { Edit, Selection } from './model';
 import { Counter, FieldLabel, IconButton, Issues, Segmented, Toggle } from './ui';
 
-const DESCRIPTION_MAX = 300;
-
 /** Name, description and scoring options for the whole game. */
 export function GameSettings({ game, issues, edit, onDelete }: { game: Game; issues: string[]; edit: Edit; onDelete: (() => void) | null }) {
   const stats = [
@@ -35,14 +33,14 @@ export function GameSettings({ game, issues, edit, onDelete }: { game: Game; iss
           />
         </div>
         <div>
-          <FieldLabel htmlFor="game-desc" extra={<Counter length={game.description?.length ?? 0} max={DESCRIPTION_MAX} />}>
+          <FieldLabel htmlFor="game-desc" extra={<Counter length={game.description?.length ?? 0} max={LIMITS.descriptionMax} />}>
             คำอธิบาย <span className="font-normal text-slate-400">(ไม่บังคับ)</span>
           </FieldLabel>
           <textarea
             id="game-desc"
             value={game.description ?? ''}
             onChange={(e) => edit((d) => void (d.description = e.target.value))}
-            maxLength={DESCRIPTION_MAX}
+            maxLength={LIMITS.descriptionMax}
             rows={2}
             placeholder="เกมนี้เกี่ยวกับอะไร ใช้ในงานไหน"
             className="field resize-none"

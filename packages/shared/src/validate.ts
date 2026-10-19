@@ -9,6 +9,9 @@ export const LIMITS = {
   timeMinS: 5,
   timeMaxS: 240,
   roundMultiplierMax: 4,
+  /** signed SharePoint or CDN links run long; the server refuses to keep more than this */
+  imageUrlMax: 4096,
+  descriptionMax: 300,
 } as const;
 
 export const TIME_CHOICES_S = [5, 10, 20, 30, 45, 60, 90, 120] as const;
@@ -109,6 +112,7 @@ function checkQuestion(q: unknown, where: string, id: string, errors: string[]):
 
   const imageUrl = str(qq.imageUrl);
   if (imageUrl && !/^https:\/\/\S+$/.test(imageUrl)) errors.push(`${where}: ลิงก์รูปต้องขึ้นต้นด้วย https://`);
+  else if (imageUrl.length > LIMITS.imageUrlMax) errors.push(`${where}: ลิงก์รูปยาวเกิน ${LIMITS.imageUrlMax} ตัวอักษร`);
 
   return { id, type, prompt, options, correct, timeLimitS, multiplier, ...(imageUrl ? { imageUrl } : {}) };
 }

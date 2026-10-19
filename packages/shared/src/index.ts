@@ -2,6 +2,7 @@ export * from './types';
 export * from './events';
 export * from './scoring';
 export * from './validate';
+export * from './text';
 export * from './nicknames';
 export * from './sample-games';
 

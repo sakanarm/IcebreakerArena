@@ -11,3 +11,9 @@ next-env.d.ts
 .DS_Store
 npm-debug.log*
 .qodo/
+
+# runtime data and secrets (database, keys); never in git
+var/
+*.db
+*.db-wal
+*.db-shm

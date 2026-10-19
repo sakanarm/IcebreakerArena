@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
   // the normalized values are what the browser code sees (lib/paths.ts, lib/socket.ts)
   env: { NEXT_PUBLIC_BASE_PATH: basePath, NEXT_PUBLIC_GAME_PORT: gamePort },
   transpilePackages: ['@icebreaker/shared'],
+  // the dev/test database loads its WASM from its own folder at run time; `pg` is external by default
+  serverExternalPackages: ['@electric-sql/pglite'],
   allowedDevOrigins: lanHosts,
   poweredByHeader: false,
   // the dev badge sits on top of the phone's answer buttons and the host dock

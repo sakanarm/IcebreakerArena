@@ -308,6 +308,12 @@ function ImageField({ question: q, onChange }: { question: Question; onChange: (
         <img src={url} alt="" referrerPolicy="no-referrer" onError={() => setBroken(url)} className="mt-3 max-h-48 rounded-2xl object-contain" />
       )}
       {valid && broken === url && <p className="mt-2 text-sm text-bad">โหลดรูปจากลิงก์นี้ไม่ได้ ลองตรวจลิงก์อีกครั้ง</p>}
+      {/* no maxLength: a pasted link that is too long would be cut silently into a broken one */}
+      {url.length > LIMITS.imageUrlMax && (
+        <p role="alert" className="mt-2 text-sm font-semibold text-bad">
+          ลิงก์ยาว {url.length.toLocaleString()} ตัวอักษร เกิน {LIMITS.imageUrlMax.toLocaleString()} ที่บันทึกได้ ใช้ลิงก์ที่สั้นกว่านี้ (เช่น ลิงก์รูปจากเว็บโดยตรง ไม่ใช่รูปที่ฝังเป็นข้อความ)
+        </p>
+      )}
     </div>
   );
 }

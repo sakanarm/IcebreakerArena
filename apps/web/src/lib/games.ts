@@ -1,4 +1,4 @@
-import { SAMPLE_GAMES, leadInMs, type Game, type Question, type Round } from '@icebreaker/shared';
+import { SAMPLE_GAMES, copyTitle, leadInMs, type Game, type Question, type Round } from '@icebreaker/shared';
 import { keys, load, save } from './storage';
 
 /** Games made in the editor live in this browser until the Phase 2 database arrives. */
@@ -46,7 +46,7 @@ export function blankGame(): Game {
 export function copyGame(game: Game): Game {
   const copy = structuredClone(game);
   copy.id = newId('g');
-  copy.title = `${game.title} (สำเนา)`.slice(0, 120);
+  copy.title = copyTitle(game.title);
   return copy;
 }
 

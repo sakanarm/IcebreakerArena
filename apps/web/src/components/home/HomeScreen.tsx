@@ -4,6 +4,7 @@ import { motion, useAnimate } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { AccountChip } from '../AccountChip';
 import { ANSWER_BG, AnswerShape, FloatingShapes, Logo } from '../shapes';
 
 const FEATURES = [
@@ -31,13 +32,15 @@ export function HomeScreen() {
       <div className="relative mx-auto flex max-w-6xl flex-col px-5 pt-6 pb-16">
         <header className="flex items-center justify-between gap-4">
           <Logo small />
-          <nav className="flex gap-2">
+          <nav className="flex min-w-0 gap-2">
             <Link href="/host" className="btn btn-ghost px-4 text-base">
               จัดเกม
             </Link>
             <Link href="/editor" className="btn btn-ghost hidden px-4 text-base sm:inline-flex">
               สร้างเกม
             </Link>
+            {/* players come here for the PIN and never log in, so no login link here: only who is logged in */}
+            <AccountChip loginLink={false} />
           </nav>
         </header>
 
@@ -99,6 +102,7 @@ export function HomeScreen() {
                 <p className="mt-2 text-white/70">{f.body}</p>
               </motion.div>
             ))}
+            <PrivacyCard />
           </div>
         </section>
 
@@ -133,6 +137,46 @@ export function HomeScreen() {
         </footer>
       </div>
     </div>
+  );
+}
+
+// each line must stay true: no third-party scripts or fonts, rooms live in server memory and close after 1–2 idle hours
+const PRIVACY = [
+  { emoji: '🏢', text: 'ทำงานบนเซิร์ฟเวอร์ของ MFEC เข้าได้จาก Wi-Fi บริษัทหรือ VPN เท่านั้น' },
+  { emoji: '🚫', text: 'ไม่มีโฆษณา ไม่มีตัวติดตาม ไม่ส่งข้อมูลให้บริการภายนอก' },
+  { emoji: '🙈', text: 'ผู้เล่นใช้แค่ชื่อเล่น ไม่ต้องสมัคร คะแนนในห้องหายไปเองเมื่อห้องปิด' },
+];
+
+/** Why it is safe to play with work topics: everything stays inside the company. */
+function PrivacyCard() {
+  return (
+    <motion.div
+      initial={{ y: 30, opacity: 0 }}
+      whileInView={{ y: 0, opacity: 1 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ delay: 0.32, type: 'spring', stiffness: 220, damping: 22 }}
+      className="glass flex flex-col gap-5 p-6 ring-1 ring-good/30 sm:col-span-2 lg:col-span-4 lg:flex-row lg:items-center lg:gap-8"
+    >
+      <div className="flex items-center gap-4 lg:w-[38%] lg:shrink-0">
+        <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-good text-2xl" aria-hidden>
+          🔒
+        </div>
+        <div>
+          <h3 className="text-xl font-bold">
+            ข้อมูลอยู่ใน MFEC <span className="whitespace-nowrap">ไม่ออกไปไหน</span>
+          </h3>
+          <p className="mt-1 text-white/70">เล่นเรื่องงานในทีมได้สบายใจ ทุกอย่างอยู่ในระบบของบริษัทเอง</p>
+        </div>
+      </div>
+      <ul className="grid flex-1 gap-2 text-white/80 sm:grid-cols-3 sm:gap-4">
+        {PRIVACY.map((p) => (
+          <li key={p.emoji} className="flex gap-2 rounded-2xl bg-white/5 px-4 py-3 text-sm leading-relaxed">
+            <span aria-hidden>{p.emoji}</span>
+            <span>{p.text}</span>
+          </li>
+        ))}
+      </ul>
+    </motion.div>
   );
 }
 
