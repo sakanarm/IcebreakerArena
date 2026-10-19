@@ -13,10 +13,15 @@ const FEATURES = [
   { title: 'รายงานผลทันที', body: 'ดูว่าข้อไหนยาก ใครตอบไวสุด แล้วส่งออกเป็น CSV ได้', emoji: '📊' },
 ];
 
-const STEPS = [
+const STEPS: { title: string; body: string; note?: string }[] = [
   { title: 'เลือกหรือสร้างเกม', body: 'ใช้เกมตัวอย่าง หรือเขียนคำถามของทีมเองใน Editor' },
   { title: 'เปิดห้อง ขึ้นจอใหญ่', body: 'กดเริ่มห้อง ได้ PIN และ QR Code บนโปรเจกเตอร์' },
-  { title: 'ทุกคนเข้าเล่นจากมือถือ', body: 'ตอบให้ถูกและไว เก็บคะแนน ลุ้นขึ้นโพเดียม' },
+  {
+    title: 'ทุกคนเข้าเล่นจากมือถือ หรือ Laptop',
+    body: 'ตอบให้ถูกและไว เก็บคะแนน ลุ้นขึ้นโพเดียม',
+    // the app is only reachable inside the company network
+    note: '📶 ต้องต่อ Wi-Fi MFEC-Internet หรือต่อ VPN ก่อนนะ',
+  },
 ];
 
 export function HomeScreen() {
@@ -115,13 +120,17 @@ export function HomeScreen() {
                 <div>
                   <h3 className="text-lg font-bold">{s.title}</h3>
                   <p className="mt-1 text-white/70">{s.body}</p>
+                  {s.note && <p className="mt-3 inline-flex rounded-full bg-gold/15 px-3 py-1 text-sm font-semibold text-gold">{s.note}</p>}
                 </div>
               </motion.li>
             ))}
           </ol>
         </section>
 
-        <footer className="mt-20 text-center text-sm text-white/40">MFEC IceBreaker Arena · ใช้ภายในองค์กร</footer>
+        <footer className="mt-20 text-center text-sm text-white/40">
+          <p>MFEC IceBreaker Arena · ใช้ภายในองค์กร</p>
+          <p className="mt-1">By Sakan Punyanon</p>
+        </footer>
       </div>
     </div>
   );

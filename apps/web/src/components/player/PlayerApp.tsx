@@ -1,9 +1,10 @@
 'use client';
 
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PlayerState } from '@icebreaker/shared';
 import { withBase } from '@/lib/paths';
+import { sfx } from '@/lib/sfx';
 import { keys } from '@/lib/storage';
 import { usePlayer } from '@/lib/use-player';
 import { useSound, type SoundControl } from '@/lib/use-sound';
@@ -71,6 +72,13 @@ function InGame({ state, player, sound }: { state: PlayerState; player: Player; 
   const sceneKey =
     phase === 'question' || phase === 'reveal' ? `${phase}-${q?.id}` : phase === 'round' ? `round-${state.round?.index}` : phase;
 
+  // the same music as the big screen; it only plays once the player turns sound on
+  useEffect(() => {
+    if (phase !== 'lobby' && phase !== 'question') return;
+    sfx.music(phase);
+    return () => sfx.music(null);
+  }, [phase]);
+
   return (
     <div className="flex min-h-dvh flex-col">
       <OfflineBanner online={player.online} />
@@ -84,15 +92,7 @@ function InGame({ state, player, sound }: { state: PlayerState; player: Player; 
             ข้อ {q.number}/{q.total}
           </span>
         )}
-        <button
-          type="button"
-          onClick={sound.toggle}
-          aria-pressed={sound.on}
-          aria-label={sound.on ? 'ปิดเสียง' : 'เปิดเสียง'}
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-black/25 text-lg"
-        >
-          {sound.on ? '🔊' : '🔇'}
-        </button>
+        <SoundButton sound={sound} />
       </header>
 
       <main className="relative flex flex-1 flex-col px-4 py-3">
@@ -130,6 +130,32 @@ function InGame({ state, player, sound }: { state: PlayerState; player: Player; 
         </footer>
       )}
     </div>
+  );
+}
+
+/**
+ * Phones start muted so a room full of them stays quiet; whoever wants the music
+ * turns it on here. Spelled out while off, since a bare 🔇 is easy to miss.
+ */
+function SoundButton({ sound }: { sound: SoundControl }) {
+  // on, but the browser still waits for a tap (a reload remembers "on" but not the tap)
+  if (sound.blocked) {
+    return (
+      <button type="button" onClick={sound.unlock} className="shrink-0 animate-pulse rounded-full bg-gold px-3 py-1 text-sm font-semibold text-ink">
+        🔈 แตะเพื่อเปิดเสียง
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={sound.toggle}
+      aria-pressed={sound.on}
+      aria-label={sound.on ? 'ปิดเพลงและเสียง' : 'เปิดเพลงและเสียง'}
+      className={`flex h-9 shrink-0 items-center justify-center gap-1 rounded-full bg-black/25 text-lg ${sound.on ? 'w-9' : 'px-3'}`}
+    >
+      {sound.on ? '🔊' : <>🔇<span className="text-sm font-semibold">เปิดเพลง</span></>}
+    </button>
   );
 }
 

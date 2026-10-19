@@ -30,9 +30,14 @@ export function HostScreen({ pin }: { pin: string }) {
         emoji="🚪"
         title="ห้องนี้ปิดแล้ว"
         actions={
-          <Link href="/host" className="btn btn-gold">
-            สร้างห้องใหม่
-          </Link>
+          <>
+            <Link href="/host" className="btn btn-gold">
+              สร้างห้องใหม่
+            </Link>
+            <Link href="/" className="btn btn-ghost">
+              หน้าแรก
+            </Link>
+          </>
         }
       >
         ห้อง {pin} ไม่มีอยู่แล้ว (ห้องจะปิดเองเมื่อไม่มีการใช้งานนาน หรือเซิร์ฟเวอร์ถูกรีสตาร์ต)

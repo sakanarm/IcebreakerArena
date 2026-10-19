@@ -138,6 +138,10 @@ class SoundEngine {
       }
       const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!Ctor) return null;
+      // iPhones mute web audio with the silent switch unless the page says it plays media (Safari 16.4+);
+      // only reached once someone turned sound on, so taking over the speaker is what they asked for
+      const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = 'playback';
       const ctx = new Ctor();
       const master = ctx.createGain();
       master.gain.value = 0.7;

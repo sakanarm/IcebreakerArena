@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
+import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import type { StageState } from '@icebreaker/shared';
 import { fmt } from '@/lib/format';
@@ -51,6 +52,11 @@ export function HostDock({ state, onReport, blocked }: { state: StageState; onRe
     if (confirm('จบเกมตอนนี้แล้วไปประกาศผลเลยไหม?')) getSocket().emit('host:end');
   };
 
+  // leaving does not close the room, but nobody can move the game on until the Host comes back
+  const leave = (e: React.MouseEvent) => {
+    if (canEnd && !confirm('เกมยังเล่นอยู่ ออกจากหน้านี้ไหม?\nผู้เล่นจะค้างอยู่ที่ข้อนี้ จนกว่าคุณจะกดย้อนกลับมา')) e.preventDefault();
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (blocked || e.repeat || e.altKey || e.ctrlKey || e.metaKey || !NEXT_KEYS.includes(e.code)) return;
@@ -71,6 +77,9 @@ export function HostDock({ state, onReport, blocked }: { state: StageState; onRe
       className="fixed inset-x-0 bottom-0 z-40 px-4 pb-3"
     >
       <div className="glass mx-auto flex max-w-6xl items-center gap-3 bg-night/70 px-4 py-3">
+        <Link href="/" onClick={leave} className="btn btn-ghost shrink-0 px-3 text-xl" aria-label="กลับหน้าแรก" title="กลับหน้าแรก">
+          🏠
+        </Link>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm lg:text-base">
           <span className="rounded-full bg-white px-3 py-1 font-display font-extrabold tracking-wider text-ink">PIN {state.pin}</span>
           <span className="rounded-full bg-white/10 px-3 py-1">👥 {fmt(state.playerCount)}</span>
@@ -89,6 +98,11 @@ export function HostDock({ state, onReport, blocked }: { state: StageState; onRe
           <button type="button" onClick={end} className="btn btn-ghost px-4 text-base" title="จบเกมแล้วประกาศผลทันที">
             ⏹ จบเกม
           </button>
+        )}
+        {state.phase === 'podium' && (
+          <Link href="/host" className="btn btn-ghost px-4 text-base" title="กลับไปเลือกเกม แล้วเปิดห้องใหม่">
+            🎮 เล่นเกมอื่น
+          </Link>
         )}
         <button
           type="button"
