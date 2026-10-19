@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
+import crypto from 'node:crypto';
+import { syncBuiltinESMExports } from 'node:module';
+import { after, before, mock, test } from 'node:test';
 import { io, type Socket } from 'socket.io-client';
 import type { ClientToServerEvents, Game, PlayerState, ServerToClientEvents, StageState } from '@icebreaker/shared';
 import { startGameServer, type GameServer } from './server';
@@ -206,6 +208,9 @@ test('bad games, unknown rooms, stolen host controls and junk payloads are refus
   raw.emit('player:join', null);
   raw.emit('player:answer');
   raw.emit('host:create', 42, 'not a function');
+  raw.emit('host:close', null);
+  raw.emit('host:close', { pin: created.pin }, 'not a function');
+  raw.emit('stage:leave', 'junk');
   const alive = await s.emitWithAck('room:check', created.pin);
   assert.ok(alive.ok, 'the server survives malformed events');
 });
@@ -238,4 +243,112 @@ test('leaving from the lobby takes the name off the big screen for good', async 
   assert.equal(after.players.length, 0);
   const back = await p.emitWithAck('player:resume', { pin: created.pin, token: joined.token });
   assert.deepEqual(back, { ok: false, error: 'not_allowed' });
+});
+
+test('the host can close the room: everyone in it is told, and the PIN stops working', async () => {
+  const host = await connect();
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  const screen = await connect();
+  assert.ok((await screen.emitWithAck('stage:attach', created.pin)).ok);
+  const p = await connect();
+  const joined = await p.emitWithAck('player:join', { pin: created.pin, nickname: 'Stayer', avatar: '🐸' });
+  assert.ok(joined.ok);
+
+  // only with the token of the host who made it
+  const forged = { pin: created.pin, hostToken: 'x'.repeat(created.hostToken.length) };
+  assert.deepEqual(await p.emitWithAck('host:close', forged), { ok: false, error: 'not_allowed' });
+  assert.deepEqual(await screen.emitWithAck('host:close', { pin: created.pin, hostToken: '' }), { ok: false, error: 'not_allowed' });
+  assert.ok((await p.emitWithAck('room:check', created.pin)).ok);
+
+  // a reconnect can send it before the host attaches again: the new connection only has the token
+  const reconnected = await connect();
+  const told = (s: Client) => new Promise<void>((resolve) => s.once('room:closed', () => resolve()));
+  const everyone = Promise.all([told(host), told(screen), told(p)]);
+  assert.deepEqual(await reconnected.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken }), { ok: true });
+  await everyone;
+  assert.deepEqual(await p.emitWithAck('room:check', created.pin), { ok: false, error: 'room_not_found' });
+  assert.deepEqual(await p.emitWithAck('player:resume', { pin: created.pin, token: joined.token }), { ok: false, error: 'room_not_found' });
+  const again = await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken });
+  assert.deepEqual(again, { ok: false, error: 'room_not_found' }, 'twice says it is gone, not a crash');
+});
+
+test('a PIN handed out again after its room closed belongs to the new room alone', async () => {
+  // the next two rooms get the same PIN, as a busy server eventually would
+  const pins = mock.method(crypto, 'randomInt', (() => 424_242) as typeof crypto.randomInt, { times: 2 });
+  syncBuiltinESMExports();
+  try {
+    const oldHost = await connect();
+    const first = await oldHost.emitWithAck('host:create', { game: GAME });
+    assert.ok(first.ok);
+    const oldScreen = await connect();
+    assert.ok((await oldScreen.emitWithAck('stage:attach', first.pin)).ok);
+    const oldPlayer = await connect();
+    assert.ok((await oldPlayer.emitWithAck('player:join', { pin: first.pin, nickname: 'Old', avatar: '🐸' })).ok);
+    assert.deepEqual(await oldHost.emitWithAck('host:close', { pin: first.pin, hostToken: first.hostToken }), { ok: true });
+
+    const newHost = await connect();
+    const second = await newHost.emitWithAck('host:create', { game: GAME });
+    assert.ok(second.ok);
+    assert.equal(second.pin, first.pin);
+
+    const leaked: string[] = [];
+    oldScreen.on('stage:state', () => leaked.push('old screen saw the new room'));
+    oldPlayer.on('player:state', () => leaked.push('old player saw the new room'));
+    const p = await connect();
+    assert.ok((await p.emitWithAck('player:join', { pin: second.pin, nickname: 'New', avatar: '🦊' })).ok);
+
+    assert.deepEqual(await oldHost.emitWithAck('host:report'), { ok: false, error: 'not_allowed' });
+    assert.deepEqual(await oldHost.emitWithAck('host:close', { pin: first.pin, hostToken: first.hostToken }), { ok: false, error: 'not_allowed' });
+    assert.deepEqual(await oldPlayer.emitWithAck('player:answer', { questionId: 'a', choice: 1 }), { ok: false, error: 'not_allowed' });
+    assert.ok((await p.emitWithAck('room:check', second.pin)).ok, 'the new room is still open');
+    assert.deepEqual(leaked, []);
+  } finally {
+    pins.mock.restore();
+    syncBuiltinESMExports();
+  }
+});
+
+test('a finished room nobody has open does not hold up a deploy; anything else does', async () => {
+  const health = async () => {
+    const h = (await (await fetch(`http://127.0.0.1:${server.port}/health`)).json()) as { rooms: number; inUse: number };
+    return { rooms: h.rooms, inUse: h.inUse };
+  };
+  const eventually = async (want: { rooms: number; inUse: number }, what: string) => {
+    const end = Date.now() + 5000;
+    let got = await health();
+    while (JSON.stringify(got) !== JSON.stringify(want) && Date.now() < end) {
+      await new Promise((r) => setTimeout(r, 50));
+      got = await health();
+    }
+    assert.deepEqual(got, want, what);
+  };
+  const before = await health();
+
+  // a lobby nobody is in still counts: the Host may be on the way back with the PIN already handed out
+  const idle = await connect();
+  assert.ok((await idle.emitWithAck('host:create', { game: GAME })).ok);
+  idle.close();
+  await eventually({ rooms: before.rooms + 1, inUse: before.inUse + 1 }, 'an empty lobby');
+
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  const p = await connect();
+  assert.ok((await p.emitWithAck('player:join', { pin: created.pin, nickname: 'Last', avatar: '🐸' })).ok);
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'round');
+  host.emit('host:end');
+  await stage.until((s) => s.phase === 'podium');
+  await eventually({ rooms: before.rooms + 2, inUse: before.inUse + 2 }, 'the podium is on screen');
+  host.emit('stage:leave'); // the host page went elsewhere in the same tab
+  p.emit('stage:leave'); // not a screen: ignored
+  await eventually({ rooms: before.rooms + 2, inUse: before.inUse + 2 }, 'a player still looks at the podium');
+  p.close();
+  await eventually({ rooms: before.rooms + 2, inUse: before.inUse + 1 }, 'the host left the page, the tab still open');
+  assert.ok((await host.emitWithAck('host:attach', { pin: created.pin, hostToken: created.hostToken })).ok);
+  await eventually({ rooms: before.rooms + 2, inUse: before.inUse + 2 }, 'the host came back to the podium');
+  host.close();
+  await eventually({ rooms: before.rooms + 2, inUse: before.inUse + 1 }, 'a finished room nobody has open');
 });

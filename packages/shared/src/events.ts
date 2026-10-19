@@ -32,9 +32,16 @@ export interface ClientToServerEvents {
   'host:kick': (playerId: string) => void;
   'host:end': () => void;
   'host:report': (ack: Ack<Result<{ report: GameReport }>>) => void;
+  /**
+   * Closes the room for good: everyone in it is told, and the PIN stops working. It carries the token
+   * like host:attach, so it still works when a reconnect sends it ahead of the re-attach.
+   */
+  'host:close': (payload: { pin: string; hostToken: string }, ack: Ack<Result>) => void;
 
   /** read-only big screen (a second display next to the Host Console) */
   'stage:attach': (pin: string, ack: Ack<Result>) => void;
+  /** the Host or Stage page went away but the tab, and its connection, stays: stop watching the room */
+  'stage:leave': () => void;
 
   'player:join': (
     payload: { pin: string; nickname: string; avatar: string },

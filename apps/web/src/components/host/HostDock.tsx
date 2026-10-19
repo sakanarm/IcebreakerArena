@@ -33,7 +33,17 @@ function primaryLabel(state: StageState): string {
  * The Host's controls, docked under the big screen: one "Next" button that
  * always does the obvious thing, plus the keyboard (Space, Enter, →, a clicker).
  */
-export function HostDock({ state, onReport, blocked }: { state: StageState; onReport: () => void; blocked: boolean }) {
+export function HostDock({
+  state,
+  onReport,
+  onClose,
+  blocked,
+}: {
+  state: StageState;
+  onReport: () => void;
+  onClose: () => void;
+  blocked: boolean;
+}) {
   const lastPress = useRef(0);
   const waiting = state.phase === 'lobby' && state.playerCount === 0;
   const canEnd = state.phase !== 'lobby' && state.phase !== 'podium';
@@ -81,7 +91,7 @@ export function HostDock({ state, onReport, blocked }: { state: StageState; onRe
           🏠
         </Link>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm lg:text-base">
-          <span className="rounded-full bg-white px-3 py-1 font-display font-extrabold tracking-wider text-ink">PIN {state.pin}</span>
+          <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 font-display font-extrabold tracking-wider text-ink">PIN {state.pin}</span>
           <span className="rounded-full bg-white/10 px-3 py-1">👥 {fmt(state.playerCount)}</span>
           {state.phase === 'question' && (
             <span className="rounded-full bg-white/10 px-3 py-1">
@@ -100,9 +110,14 @@ export function HostDock({ state, onReport, blocked }: { state: StageState; onRe
           </button>
         )}
         {state.phase === 'podium' && (
-          <Link href="/host" className="btn btn-ghost px-4 text-base" title="กลับไปเลือกเกม แล้วเปิดห้องใหม่">
-            🎮 เล่นเกมอื่น
-          </Link>
+          <>
+            <Link href="/host" className="btn btn-ghost px-4 text-base" title="กลับไปเลือกเกม แล้วเปิดห้องใหม่">
+              🎮 เล่นเกมอื่น
+            </Link>
+            <button type="button" onClick={onClose} className="btn btn-ghost px-4 text-base" title="ปิดห้องนี้ ผู้เล่นทุกคนจะออกจากห้อง">
+              🚪 ปิดห้อง
+            </button>
+          </>
         )}
         <button
           type="button"

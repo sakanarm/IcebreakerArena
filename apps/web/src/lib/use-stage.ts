@@ -54,6 +54,8 @@ export function useStage(pin: string, role: 'host' | 'stage') {
       socket.off('room:closed', onClosed);
       socket.off('connect', attach);
       socket.off('disconnect', onDown);
+      // moving to another page keeps the tab's connection, which would otherwise keep watching the room
+      socket.emit('stage:leave');
     };
   }, [pin, role]);
 

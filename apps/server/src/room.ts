@@ -167,7 +167,7 @@ export class Room {
     }
   }
 
-  private connectedCount(): number {
+  connectedCount(): number {
     let n = 0;
     for (const p of this.players.values()) if (p.socketId) n++;
     return n;

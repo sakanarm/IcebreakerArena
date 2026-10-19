@@ -24,9 +24,15 @@ export interface GameServer {
 export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameServer> {
   const httpServer = createServer((req, res) => {
     const path = (req.url ?? '/').split('?')[0];
-    // deploy/deploy.sh refuses to restart while rooms are open: they live only in this process
+    // deploy/deploy.sh refuses to restart while rooms are in use: they live only in this process
     if (path === '/health') {
-      return json(res, 200, { ok: true, rooms: rooms.size, clients: io.engine.clientsCount, uptimeS: Math.round(process.uptime()) });
+      return json(res, 200, {
+        ok: true,
+        rooms: rooms.size,
+        inUse: rooms.inUse,
+        clients: io.engine.clientsCount,
+        uptimeS: Math.round(process.uptime()),
+      });
     }
     // the Stage builds the join QR code from these when the Host opened the app on localhost
     if (path === '/info') return json(res, 200, { lanAddresses: lanAddresses() });
@@ -109,6 +115,16 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
       reply(ack)(room ? { ok: true, report: room.report() } : { ok: false, error: 'not_allowed' });
     });
 
+    on('host:close', (payload, ack) => {
+      const done = reply(ack);
+      const room = rooms.get(payload?.pin);
+      if (!room) return done({ ok: false, error: 'room_not_found' });
+      if (!sameSecret(payload.hostToken, room.hostToken)) return done({ ok: false, error: 'not_allowed' });
+      rooms.close(room);
+      console.log(`[room ${room.pin}] closed by the host`);
+      done({ ok: true });
+    });
+
     // ---------- Stage (read-only second screen) ----------
 
     on('stage:attach', (pin, ack) => {
@@ -120,6 +136,11 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
       socket.join(room.stageChannel);
       done({ ok: true });
       socket.emit('stage:state', room.stageState());
+    });
+
+    // a finished room nobody is looking at must not hold up a deploy just because the tab is still open
+    on('stage:leave', () => {
+      if (socket.data.role === 'host' || socket.data.role === 'stage') detach(socket);
     });
 
     // ---------- Player ----------

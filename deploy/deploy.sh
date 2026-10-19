@@ -2,7 +2,7 @@
 # Installs, tests, builds and (re)starts MFEC IceBreaker Arena under pm2, behind nginx at /icebreaker.
 #
 #   bash deploy/deploy.sh          the first install, and every update (it runs `git pull` itself)
-#   FORCE=1 bash deploy/deploy.sh  even while rooms are open: every live game ends
+#   FORCE=1 bash deploy/deploy.sh  even while rooms are in use: every live game ends
 #
 # The site is down while an update builds the web app (a minute or two), so update between events.
 # If the build fails, the previous build goes back and the site runs as it did before.
@@ -36,14 +36,15 @@ main() {
     port_is_ours "$port" "$root" || die "port $port is already used by another program; pick another with WEB_PORT/GAME_PORT"
   done
 
-  # rooms live only in the game server's memory, so a restart ends every game in progress
-  step "Checking for open rooms"
+  # rooms live only in the game server's memory, so a restart ends every game in progress. A finished
+  # game nobody has open any more does not count (inUse); a game server too old to say counts every room.
+  step "Checking for rooms in use"
   local health rooms
   health=$(curl -fsS --max-time 3 "http://127.0.0.1:$GAME_PORT/health" 2>/dev/null || true)
-  rooms=$(node -p 'try { JSON.parse(process.argv[1]).rooms ?? 0 } catch { 0 }' "$health")
+  rooms=$(node -p 'try { const h = JSON.parse(process.argv[1]); h.inUse ?? h.rooms ?? 0 } catch { 0 }' "$health")
   echo "${health:-game server not running}"
   if [ "$rooms" != 0 ] && [ "${FORCE:-}" != 1 ]; then
-    die "$rooms room(s) still open, and a restart would end them. Wait until they expire, or run again with FORCE=1"
+    die "$rooms room(s) in use, and a restart would end them. Wait until they finish or expire, or run again with FORCE=1"
   fi
 
   local from=
