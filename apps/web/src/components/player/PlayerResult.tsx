@@ -8,6 +8,7 @@ import { fmt } from '@/lib/format';
 import { sfx, vibrate } from '@/lib/sfx';
 import { CountUp } from '../motion-bits';
 import { ANSWER_BG, AnswerShape } from '../shapes';
+import { untimed } from './PlayerQuestion';
 
 type Kind = 'right' | 'wrong' | 'poll' | 'missed';
 
@@ -75,6 +76,12 @@ export function PlayerResult({ state }: { state: PlayerState }) {
         >
           +<CountUp to={r.points} duration={0.9} delay={0.55} />
         </motion.div>
+      )}
+
+      {kind === 'right' && state.question && untimed(state.question) && (
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }} className="rounded-full bg-white/20 px-4 py-1 text-sm">
+          ⏱️ ไม่นับความเร็ว ตอบถูกได้เต็ม
+        </motion.p>
       )}
 
       {kind === 'right' && r && r.streak >= 2 && (

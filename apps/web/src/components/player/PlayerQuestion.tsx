@@ -11,6 +11,9 @@ import { ANSWER_BG, ANSWER_NAMES, AnswerShape } from '../shapes';
 
 const WAITING_LINES = ['ใจเย็นๆ รอเฉลยแป๊บ', 'มั่นใจแค่ไหนเนี่ย?', 'ตอบไวแบบนี้ มีลุ้น!', 'ดูเฉลยบนจอใหญ่ได้เลย', 'ลุ้นๆๆ'];
 
+/** a right answer gets full points however late it comes, so the timer is only the deadline */
+export const untimed = (q: QuestionPublic) => !q.timed && q.type !== 'poll' && q.multiplier > 0;
+
 /** One question on the phone: read it, 3-2-1, tap an answer, wait for the reveal. */
 export function PlayerQuestion({
   q,
@@ -44,6 +47,7 @@ function LeadIn({ q, now }: { q: QuestionPublic; now: number }) {
         <span className="rounded-full bg-white/15 px-3 py-1">{TYPE_LABEL[q.type]}</span>
         {q.multiplier > 1 && <span className="rounded-full bg-gold px-3 py-1 font-semibold text-ink">คะแนน ×{q.multiplier}</span>}
         {q.multiplier === 0 && <span className="rounded-full bg-white/15 px-3 py-1">ไม่คิดคะแนน</span>}
+        {untimed(q) && <span className="rounded-full bg-white/15 px-3 py-1">⏱️ ไม่นับความเร็ว</span>}
       </div>
       <motion.h2
         initial={{ scale: 0.7, opacity: 0 }}
@@ -89,7 +93,10 @@ function AnswerPad({ q, onAnswer }: { q: QuestionPublic; onAnswer: (choice: numb
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.97 }} className="flex flex-1 flex-col gap-3">
       <div className="flex items-center gap-3">
         <TimerRing startsAt={q.startsAt} endsAt={q.endsAt} size={56} />
-        <p className="line-clamp-3 flex-1 font-semibold leading-snug">{q.prompt}</p>
+        <div className="flex-1">
+          <p className="line-clamp-3 font-semibold leading-snug">{q.prompt}</p>
+          {untimed(q) && <span className="mt-1 inline-block rounded-full bg-white/15 px-2.5 py-0.5 text-xs">⏱️ ไม่นับความเร็ว</span>}
+        </div>
       </div>
       <div className={`grid flex-1 gap-3 ${two ? 'grid-cols-1' : 'grid-cols-2'}`}>
         {q.options.map((text, i) => (
