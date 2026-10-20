@@ -251,6 +251,29 @@ test('leaving from the lobby takes the name off the big screen for good', async 
   assert.deepEqual(back, { ok: false, error: 'not_allowed' });
 });
 
+test('the big screens get the cover, cleaned; phones do not need it', async () => {
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game: { ...GAME, cover: { color: 'teal', emoji: '🎯', art: 'bogus' } } as unknown as Game });
+  assert.ok(created.ok);
+  assert.deepEqual((await stage.until(() => true)).cover, { color: 'teal', emoji: '🎯' });
+
+  const screen = await connect();
+  const second = track<StageState>(screen, 'stage:state');
+  assert.ok((await screen.emitWithAck('stage:attach', created.pin)).ok);
+  assert.deepEqual((await second.until(() => true)).cover, { color: 'teal', emoji: '🎯' });
+
+  const p = await connect();
+  const phone = track<PlayerState>(p, 'player:state');
+  assert.ok((await p.emitWithAck('player:join', { pin: created.pin, nickname: 'Cover', avatar: '🐸' })).ok);
+  assert.equal('cover' in (await phone.until(() => true)), false);
+
+  const plain = await connect();
+  const plainStage = track<StageState>(plain, 'stage:state');
+  assert.ok((await plain.emitWithAck('host:create', { game: GAME })).ok);
+  assert.equal((await plainStage.until(() => true)).cover, null, 'no cover: the screen draws one from the title');
+});
+
 test('the host can close the room: everyone in it is told, and the PIN stops working', async () => {
   const host = await connect();
   const created = await host.emitWithAck('host:create', { game: GAME });

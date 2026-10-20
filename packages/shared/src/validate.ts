@@ -1,4 +1,5 @@
 import { normalizeTyped, onScale } from './answers';
+import { cleanCover } from './cover';
 import type { Game, Question, QuestionMultiplier, QuestionType, Round, SliderSpec } from './types';
 
 export const LIMITS = {
@@ -87,6 +88,7 @@ export function validateGame(input: unknown): ValidateResult {
 
   if (errors.length > 0) return { ok: false, errors };
   const description = str(input.description);
+  const cover = cleanCover(input.cover);
   return {
     ok: true,
     game: {
@@ -95,6 +97,7 @@ export function validateGame(input: unknown): ValidateResult {
       ...(description ? { description } : {}),
       rounds,
       settings: { streakBonus: isObj(input.settings) && input.settings.streakBonus === true },
+      ...(cover ? { cover } : {}),
     },
   };
 }

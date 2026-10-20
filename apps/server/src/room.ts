@@ -394,6 +394,7 @@ export class Room {
     return {
       pin: this.pin,
       gameTitle: this.game.title,
+      cover: this.game.cover ?? null,
       phase: this.phase,
       playerCount: this.players.size,
       players: inPhase('lobby') ? [...this.players.values()].slice(-LOBBY_LIST_CAP).map(toLite) : [],

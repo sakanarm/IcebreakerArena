@@ -4,6 +4,7 @@ import { Reorder, useDragControls } from 'motion/react';
 import { LIMITS, type Game, type Question } from '@icebreaker/shared';
 import { TYPE_ICON } from '@/lib/format';
 import { blankQuestion, blankRound, countQuestions } from '@/lib/games';
+import { GameCover } from '../cover/GameCover';
 import { ANSWER_BG } from '../shapes';
 import { issuesAt, type Edit, type Selection } from './model';
 
@@ -50,6 +51,9 @@ export function Outline({
         className={`flex w-full items-center gap-2 rounded-2xl px-3 py-2.5 text-left font-semibold transition-colors ${sel.kind === 'game' ? 'bg-white text-ink' : 'bg-white/5 hover:bg-white/10'}`}
       >
         <span aria-hidden>⚙️</span> ตั้งค่าเกม
+        <span className="ml-auto aspect-video w-10 shrink-0 overflow-hidden rounded-md" aria-hidden>
+          <GameCover game={game} />
+        </span>
       </button>
 
       {game.rounds.map((r, ri) => {

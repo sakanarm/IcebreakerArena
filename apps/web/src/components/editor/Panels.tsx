@@ -4,10 +4,11 @@ import { motion } from 'motion/react';
 import { LIMITS, type Game } from '@icebreaker/shared';
 import { blankQuestion, countQuestions, estimateMinutes } from '@/lib/games';
 import { ANSWER_BG } from '../shapes';
+import { CoverPicker } from './CoverPicker';
 import type { Edit, Selection } from './model';
 import { Counter, FieldLabel, IconButton, Issues, Segmented, Toggle } from './ui';
 
-/** Name, description and scoring options for the whole game. */
+/** Name, description, cover and scoring options for the whole game. */
 export function GameSettings({ game, issues, edit, onDelete }: { game: Game; issues: string[]; edit: Edit; onDelete: (() => void) | null }) {
   const stats = [
     { label: 'ด่าน', value: game.rounds.length },
@@ -46,6 +47,7 @@ export function GameSettings({ game, issues, edit, onDelete }: { game: Game; iss
             className="field resize-none"
           />
         </div>
+        <CoverPicker game={game} edit={edit} />
         <Toggle
           on={!!game.settings?.streakBonus}
           onChange={(on) => edit((d) => void (d.settings = { ...d.settings, streakBonus: on }))}

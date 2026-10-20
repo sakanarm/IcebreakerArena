@@ -11,8 +11,9 @@ import { cloud, settled, type CatalogEntry, type GameRecord, type ReportReason }
 import { copyGame, countQuestions, deleteMyGame, dropBlankOptions, listMyGames, saveMyGame } from '@/lib/games';
 import { createRoom } from '@/lib/host';
 import { AccountChip, switchedText } from '../AccountChip';
+import { GameCover } from '../cover/GameCover';
 import { WaitingDots } from '../motion-bits';
-import { ANSWER_BG, AnswerShape, FloatingShapes, Logo } from '../shapes';
+import { FloatingShapes, Logo } from '../shapes';
 import { OpenRooms } from './OpenRooms';
 
 type Toast = { text: string; tone: 'bad' | 'good' };
@@ -688,23 +689,25 @@ function GameCard({
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const color = index % 4;
   return (
     <motion.article
       initial={{ y: 24, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay: Math.min(index, 8) * 0.06, type: 'spring', stiffness: 260, damping: 24 }}
       whileHover={{ y: -6 }}
-      className="card flex flex-col overflow-hidden"
+      className="card group flex flex-col overflow-hidden"
     >
-      <div className={`relative flex h-24 items-end justify-between gap-2 overflow-hidden px-5 pb-3 ${ANSWER_BG[color]}`}>
-        <AnswerShape index={color} className="absolute -top-6 -right-4 size-32 rotate-12 text-white/20" />
-        <span className="relative shrink-0 rounded-full bg-black/20 px-3 py-1 text-sm font-semibold text-white">
+      <div className="relative aspect-[16/7] overflow-hidden">
+        <GameCover game={game} className="absolute inset-0 size-full motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-105" />
+        {(tag || fixHref) && (
+          <span className="absolute inset-x-3 top-3 flex flex-wrap gap-1">
+            {/* a white pill even when it's bad news: the red 🚩 vanishes on a red one */}
+            {tag && <span className={`rounded-full bg-white px-3 py-1 text-xs font-bold shadow-md ${tagTone === 'bad' ? 'text-bad ring-2 ring-bad' : 'text-ink'}`}>{tag}</span>}
+            {fixHref && <span className="rounded-full bg-gold px-3 py-1 text-xs font-bold text-ink shadow-md">⚠️ ยังไม่ครบ</span>}
+          </span>
+        )}
+        <span className="absolute right-3 bottom-3 rounded-full bg-white px-3 py-1 text-sm font-semibold text-ink shadow-md">
           {game.rounds.length} ด่าน · {countQuestions(game)} ข้อ
-        </span>
-        <span className="relative flex flex-wrap justify-end gap-1">
-          {tag && <span className={`rounded-full px-3 py-1 text-xs font-bold ${tagTone === 'bad' ? 'bg-bad text-white' : 'bg-white text-ink'}`}>{tag}</span>}
-          {fixHref && <span className="rounded-full bg-gold px-3 py-1 text-xs font-bold text-ink">⚠️ ยังไม่ครบ</span>}
         </span>
       </div>
       <div className="flex flex-1 flex-col p-5">

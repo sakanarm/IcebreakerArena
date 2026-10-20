@@ -2,7 +2,7 @@
  * Our own answer symbols: color + shape, so the answers stay readable for
  * color-blind players and on washed-out projectors.
  */
-const PATHS = [
+export const ANSWER_PATHS = [
   // star
   'M12 2.5 L14.47 9.1 L21.51 9.41 L15.99 13.8 L17.88 20.59 L12 16.7 L6.12 20.59 L8.01 13.8 L2.49 9.41 L9.53 9.1 Z',
   // hexagon
@@ -20,7 +20,7 @@ export const ANSWER_TEXT = ['text-ans-0', 'text-ans-1', 'text-ans-2', 'text-ans-
 export function AnswerShape({ index, className }: { index: number; className?: string }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={className}>
-      <path d={PATHS[index % 4]} fill="currentColor" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
+      <path d={ANSWER_PATHS[index % 4]} fill="currentColor" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
     </svg>
   );
 }

@@ -65,6 +65,7 @@ export const SAMPLE_GAMES: Game[] = [
     id: 'tpl-icebreaker',
     title: 'MFEC Icebreaker: อุ่นเครื่องก่อนลุย',
     description: '3 ด่าน 11 ข้อ: โหวตรู้จักกัน, Tech Trivia และ Final Round คะแนน ×2',
+    cover: { art: 'icebreaker' },
     rounds: [
       {
         id: 'r1',
@@ -105,6 +106,7 @@ export const SAMPLE_GAMES: Game[] = [
     id: 'tpl-security',
     title: 'Security Awareness 101',
     description: '2 ด่าน 7 ข้อ: ภัยออนไลน์ และสถานการณ์จริงแบบไม่นับเวลา',
+    cover: { art: 'security' },
     rounds: [
       {
         id: 'r1',
@@ -154,6 +156,7 @@ export const SAMPLE_GAMES: Game[] = [
     id: 'tpl-party',
     title: 'ปาร์ตี้รวมมิตร: ครบทุกลูกเล่น',
     description: '3 ด่าน 10 ข้อ: ครบทั้ง 6 แบบ ทั้งเรียงลำดับ พิมพ์ตอบ และทายตัวเลข พร้อมโบนัสตอบถูกติดกัน',
+    cover: { art: 'party' },
     settings: { streakBonus: true },
     rounds: [
       {
@@ -194,6 +197,7 @@ export const SAMPLE_GAMES: Game[] = [
     id: 'tpl-emoji',
     title: 'ทายจากอีโมจิ',
     description: '3 ด่าน 10 ข้อ: ดูอีโมจิแล้วพิมพ์คำตอบ ทั้งเมนูอาหาร ศัพท์ไอที และสำนวนไทย',
+    cover: { art: 'emoji' },
     rounds: [
       {
         id: 'r1',
@@ -233,6 +237,7 @@ export const SAMPLE_GAMES: Game[] = [
     id: 'tpl-numbers',
     title: 'ตัวเลขและลำดับ: ทายให้ใกล้ เรียงให้ถูก',
     description: '3 ด่าน 10 ข้อ: เลื่อนทายตัวเลข ยิ่งใกล้ยิ่งได้เยอะ เรียงลำดับให้ถูก และ Final Round ×2',
+    cover: { art: 'numbers' },
     rounds: [
       {
         id: 'r1',

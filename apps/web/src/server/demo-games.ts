@@ -21,6 +21,7 @@ export const DEMO_GAMES: Game[] = [
     id: 'demo-townhall',
     title: 'Townhall ประจำเดือน: เปิดประชุมให้ตื่น',
     description: '3 ด่าน 10 ข้อ ครบทั้ง 6 แบบ: เช็กอินพลังทีม, Tech Facts และ Final Round ×2 พร้อมโบนัสตอบถูกติดกัน',
+    cover: { art: 'townhall' },
     settings: { streakBonus: true },
     rounds: [
       {
@@ -61,6 +62,7 @@ export const DEMO_GAMES: Game[] = [
     id: 'demo-onboarding',
     title: 'Onboarding Day: ต้อนรับน้องใหม่',
     description: '3 ด่าน 9 ข้อ: โหวตรู้จักกัน, ทริกชีวิตออฟฟิศแบบไม่นับเวลา และปิดท้ายคะแนน ×2',
+    cover: { art: 'onboarding' },
     rounds: [
       {
         id: 'r1',
@@ -100,6 +102,7 @@ export const DEMO_GAMES: Game[] = [
     id: 'demo-thailand',
     title: 'รู้จักเมืองไทยแค่ไหน',
     description: '3 ด่าน 9 ข้อ: เที่ยวทั่วไทย ย้อนเวลา ของกินขึ้นชื่อ และ Final Round ×2',
+    cover: { art: 'thailand' },
     rounds: [
       {
         id: 'r1',

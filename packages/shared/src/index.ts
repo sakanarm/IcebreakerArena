@@ -3,6 +3,7 @@ export * from './events';
 export * from './scoring';
 export * from './answers';
 export * from './validate';
+export * from './cover';
 export * from './text';
 export * from './nicknames';
 export * from './sample-games';

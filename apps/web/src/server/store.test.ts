@@ -363,6 +363,33 @@ test('drafts lose NULs and half emoji; fields over what is kept are refused, not
   assert.equal(normalizeDraft({ rounds: [{ questions: [{ imageUrl: '' }] }] })!.rounds[0]!.questions[0]!.imageUrl, undefined);
 });
 
+test('a cover keeps only known colors, pictures and one emoji, and goes along with saves, shares and copies', async () => {
+  assert.deepEqual(normalizeDraft({ cover: { color: 'sky', emoji: ' 🚀 ', art: 'nope' } })!.cover, { color: 'sky', emoji: '🚀' });
+  assert.deepEqual(normalizeDraft({ cover: { emoji: '👩🏽\u{200D}💻', art: 'party' } })!.cover, { emoji: '👩🏽\u{200D}💻', art: 'party' });
+  for (const junk of ['sky', [], {}, { color: 'SKY', emoji: 'a', art: 1 }, { emoji: '🚀🚀' }, { emoji: '🚀x' }]) {
+    assert.equal('cover' in normalizeDraft({ cover: junk })!, false, JSON.stringify(junk));
+  }
+  assert.deepEqual(sample().cover, { art: 'icebreaker' }, 'the built-in games come with a drawing');
+
+  const [a, b] = [await newUser(), await newUser()];
+  const g = await createGame(db, a.id, { ...sample(), cover: { color: 'pink', emoji: '🎉' } }, 'new');
+  assert.deepEqual((await getGame(db, a.id, g.id))!.game.cover, { color: 'pink', emoji: '🎉' });
+  const saved = await saveGame(db, a.id, g.id, { ...g.game, cover: { art: 'thailand' } }, g.version);
+  assert.ok(saved.ok);
+  assert.deepEqual((await getGame(db, a.id, g.id))!.game.cover, { art: 'thailand' });
+  assert.deepEqual((await copyGame(db, a.id, g.id))!.game.cover, { art: 'thailand' });
+
+  const shared = await shareGame(db, a, g.id);
+  assert.ok(shared.ok);
+  assert.deepEqual(shared.entry.game.cover, { art: 'thailand' });
+  assert.deepEqual((await copyEntry(db, b.id, shared.entry.id))!.game.cover, { art: 'thailand' });
+
+  // taking the cover off leaves no trace of it
+  const { cover: _, ...bare } = g.game;
+  assert.ok((await saveGame(db, a.id, g.id, bare, saved.version)).ok);
+  assert.equal('cover' in (await getGame(db, a.id, g.id))!.game, false);
+});
+
 test('clip cuts between characters', () => {
   assert.equal(clip('abc', 5), 'abc');
   assert.equal(clip('a😀b', 2), 'a');

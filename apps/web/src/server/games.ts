@@ -1,4 +1,4 @@
-import { LIMITS, QUESTION_TYPES, clip, copyTitle, type Game, type Question, type QuestionType, type Round, type SliderSpec } from '@icebreaker/shared';
+import { LIMITS, QUESTION_TYPES, cleanCover, clip, copyTitle, type Game, type Question, type QuestionType, type Round, type SliderSpec } from '@icebreaker/shared';
 import { lockWrites, type Db, type Sql } from './db';
 import { newId } from './session';
 
@@ -103,12 +103,15 @@ export function normalizeDraft(input: unknown): Game | null {
           };
         }),
     }));
+  // only known colors and pictures and one emoji, so nothing in it needs cleaning or a size cap
+  const cover = cleanCover(input.cover);
   return {
     id: '',
     title: text(input.title, CAP.title),
     description: text(input.description, CAP.description),
     rounds,
     settings: { streakBonus: isObj(input.settings) && input.settings.streakBonus === true },
+    ...(cover ? { cover } : {}),
   };
 }
 

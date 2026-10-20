@@ -1,3 +1,5 @@
+import type { CoverArt, CoverColor } from './cover';
+
 // ---------- Game content (what a Host authors) ----------
 
 /**
@@ -56,12 +58,25 @@ export interface GameSettings {
   streakBonus?: boolean;
 }
 
+/**
+ * How the game's cover looks. Without a picture it is a pattern drawn from the title, in the
+ * color picked (or one that comes from the title), with the emoji in the middle.
+ */
+export interface GameCover {
+  color?: CoverColor;
+  /** a single emoji */
+  emoji?: string;
+  /** a drawn picture instead of the pattern */
+  art?: CoverArt;
+}
+
 export interface Game {
   id: string;
   title: string;
   description?: string;
   rounds: Round[];
   settings?: GameSettings;
+  cover?: GameCover;
 }
 
 // ---------- Live session ----------
@@ -169,6 +184,8 @@ export interface Award {
 export interface StageState {
   pin: string;
   gameTitle: string;
+  /** for the lobby; null when the game has none, so it gets the pattern made from its title */
+  cover: GameCover | null;
   phase: Phase;
   playerCount: number;
   /** lobby only, capped to the newest players */
