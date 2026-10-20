@@ -29,9 +29,15 @@ export function HostScreen({ pin }: { pin: string }) {
   const statusNow = useRef(status);
   statusNow.current = status;
 
-  // without this a finished room stays open for two hours, holding the PIN and blocking a deploy
+  // without this a room left behind stays open, holding the PIN and blocking a deploy
   const closeRoom = async () => {
-    if (!confirm('ปิดห้องนี้เลยไหม?\nผู้เล่นทุกคนจะออกจากห้อง และเปิดรายงานของเกมนี้ไม่ได้อีก (ดูหรือดาวน์โหลดก่อนได้ที่ 📊 ดูรายงาน)')) return;
+    const ask =
+      state?.phase === 'podium'
+        ? 'ปิดห้องนี้เลยไหม?\nผู้เล่นทุกคนจะออกจากห้อง และเปิดรายงานของเกมนี้ไม่ได้อีก (ดูหรือดาวน์โหลดก่อนได้ที่ 📊 ดูรายงาน)'
+        : state?.phase === 'lobby'
+          ? 'ปิดห้องนี้เลยไหม?\nผู้เล่นที่เข้ามารอจะออกจากห้อง และ PIN นี้จะใช้ไม่ได้อีก'
+          : 'เกมยังไม่จบ ปิดห้องเลยไหม?\nผู้เล่นทุกคนจะออกจากห้องทันที และจะไม่มีรายงานของเกมนี้ (ถ้าอยากเห็นผล กด ⏹ จบเกม ก่อน)';
+    if (!confirm(ask)) return;
     stopConfetti();
     setClosing(true);
     try {

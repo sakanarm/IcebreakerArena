@@ -13,6 +13,7 @@ import { createRoom } from '@/lib/host';
 import { AccountChip, switchedText } from '../AccountChip';
 import { WaitingDots } from '../motion-bits';
 import { ANSWER_BG, AnswerShape, FloatingShapes, Logo } from '../shapes';
+import { OpenRooms } from './OpenRooms';
 
 type Toast = { text: string; tone: 'bad' | 'good' };
 
@@ -63,6 +64,8 @@ export function GamePicker() {
           <h1 className="text-4xl font-extrabold md:text-5xl">เลือกเกมที่จะเล่น</h1>
           <p className="mt-2 text-lg text-white/70">กด “เริ่มห้อง” แล้วเปิดจอนี้ขึ้นโปรเจกเตอร์ ให้ทุกคนสแกน QR หรือใส่ PIN</p>
         </motion.div>
+
+        <OpenRooms say={say} />
 
         {account.status === 'loading' ? (
           <p className="mt-10 flex items-center gap-3 text-white/70">

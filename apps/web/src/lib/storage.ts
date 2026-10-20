@@ -27,6 +27,20 @@ export function remove(key: string) {
   }
 }
 
+/** PINs of the rooms this browser opened and still holds the host token for */
+export function hostedPins(): string[] {
+  try {
+    const pins: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const pin = localStorage.key(i)?.match(/^ib\.host\.(\d{6})$/)?.[1];
+      if (pin) pins.push(pin);
+    }
+    return pins;
+  } catch {
+    return [];
+  }
+}
+
 export const keys = {
   myGames: 'ib.games',
   hostToken: (pin: string) => `ib.host.${pin}`,

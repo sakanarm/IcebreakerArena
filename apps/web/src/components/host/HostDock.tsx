@@ -86,7 +86,7 @@ export function HostDock({
       transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 26 }}
       className="fixed inset-x-0 bottom-0 z-40 px-4 pb-3"
     >
-      <div className="glass mx-auto flex max-w-6xl items-center gap-3 bg-night/70 px-4 py-3">
+      <div className="glass mx-auto flex max-w-6xl items-center gap-2 bg-night/70 px-3 py-3 sm:gap-3 sm:px-4">
         <Link href="/" onClick={leave} className="btn btn-ghost shrink-0 px-3 text-xl" aria-label="กลับหน้าแรก" title="กลับหน้าแรก">
           🏠
         </Link>
@@ -109,7 +109,7 @@ export function HostDock({
             ⏹ จบเกม
           </button>
         )}
-        {state.phase === 'podium' && (
+        {state.phase === 'podium' ? (
           <>
             <Link href="/host" className="btn btn-ghost px-4 text-base" title="กลับไปเลือกเกม แล้วเปิดห้องใหม่">
               🎮 เล่นเกมอื่น
@@ -118,13 +118,18 @@ export function HostDock({
               🚪 ปิดห้อง
             </button>
           </>
+        ) : (
+          // leaving the page keeps the room open (a refresh must not end the game), so closing is its own button
+          <button type="button" onClick={onClose} className="btn btn-ghost shrink-0 px-3 text-xl" aria-label="ปิดห้อง" title="ปิดห้องนี้ ผู้เล่นทุกคนจะออกจากห้อง">
+            🚪
+          </button>
         )}
         <button
           type="button"
           onClick={next}
           disabled={waiting}
           title={waiting ? 'รอผู้เล่นอย่างน้อย 1 คน' : undefined}
-          className="btn btn-gold min-w-48 px-8 py-4 text-xl"
+          className="btn btn-gold shrink-0 px-5 py-4 text-lg sm:min-w-48 sm:px-8 sm:text-xl"
         >
           <motion.span key={label} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
             {waiting ? 'รอผู้เล่น…' : label}
