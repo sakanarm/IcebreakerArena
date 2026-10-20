@@ -22,6 +22,19 @@ export async function syncClock(socket: GameClient, samples = 5) {
   if (best.rtt !== Infinity) offsetMs = best.offset;
 }
 
+/**
+ * Syncs now and again every 30 s while connected: a device that corrects its own clock mid-game
+ * (Windows and phones do, by a second or more) would otherwise open and close questions at the wrong time.
+ */
+export function keepClockSynced(socket: GameClient, everyMs = 30_000) {
+  const run = () => {
+    if (socket.connected) void syncClock(socket);
+  };
+  run();
+  const id = setInterval(run, everyMs);
+  return () => clearInterval(id);
+}
+
 /** Server time that re-renders every `intervalMs` while `active`. */
 export function useServerNow(active = true, intervalMs = 100) {
   const [now, setNow] = useState(serverNow);

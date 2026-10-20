@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { StageState } from '@icebreaker/shared';
-import { syncClock } from './clock';
+import { keepClockSynced, syncClock } from './clock';
 import { BASE_PATH } from './paths';
 import { gameServer, getSocket } from './socket';
 import { keys, load } from './storage';
@@ -48,8 +48,10 @@ export function useStage(pin: string, role: 'host' | 'stage') {
     socket.on('connect', attach);
     socket.on('disconnect', onDown);
     if (socket.connected) void attach();
+    const stopSync = keepClockSynced(socket);
     return () => {
       alive = false;
+      stopSync();
       socket.off('stage:state', onState);
       socket.off('room:closed', onClosed);
       socket.off('connect', attach);

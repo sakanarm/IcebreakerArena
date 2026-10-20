@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AnswerSent, PlayerState, Result } from '@icebreaker/shared';
-import { syncClock } from './clock';
+import { keepClockSynced, syncClock } from './clock';
 import { withBase } from './paths';
 import { getSocket } from './socket';
 import { keys, load, remove, save, type PlayerSession } from './storage';
@@ -84,8 +84,9 @@ export function usePlayer(initialPin: string | null) {
     socket.on('room:closed', onClosed);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDown);
-    if (socket.connected) void syncClock(socket);
+    const stopSync = keepClockSynced(socket);
     return () => {
+      stopSync();
       socket.off('player:state', onState);
       socket.off('player:kicked', onKicked);
       socket.off('room:closed', onClosed);
