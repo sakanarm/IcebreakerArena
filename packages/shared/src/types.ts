@@ -247,6 +247,9 @@ export interface ReportPlayer {
   avatar: string;
   score: number;
   correctCount: number;
+  /** questions with a right answer (not polls) the player was in the game for, answered or not */
+  gradedCount: number;
+  /** every answer sent, polls included */
   answeredCount: number;
   avgMs: number | null;
   bestStreak: number;

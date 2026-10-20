@@ -184,10 +184,10 @@ function PlayersTable({ players }: { players: ReportPlayer[] }) {
             <td className="py-2 pl-6">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-good" style={{ width: `${percent(p.correctCount, p.answeredCount)}%` }} />
+                  <div className="h-full rounded-full bg-good" style={{ width: `${percent(p.correctCount, p.gradedCount)}%` }} />
                 </div>
                 <span className="text-sm tabular-nums text-slate-600">
-                  {p.correctCount}/{p.answeredCount}
+                  {p.gradedCount ? `${p.correctCount}/${p.gradedCount}` : '–'}
                 </span>
               </div>
             </td>
@@ -387,8 +387,8 @@ function SliderChart({ q, spec }: { q: ReportQuestion; spec: SliderSpec }) {
 
 function playerRows(players: ReportPlayer[]) {
   return [
-    ['อันดับ', 'ชื่อเล่น', 'คะแนน', 'ตอบถูก', 'ตอบทั้งหมด', 'เวลาเฉลี่ย (วินาที)', 'ตอบถูกติดกันสูงสุด'],
-    ...players.map((p) => [p.rank, p.nickname, p.score, p.correctCount, p.answeredCount, seconds(p.avgMs), p.bestStreak]),
+    ['อันดับ', 'ชื่อเล่น', 'คะแนน', 'ตอบถูก', 'ข้อที่มีคำตอบถูก', 'ตอบทั้งหมด (รวมโหวต)', 'เวลาเฉลี่ย (วินาที)', 'ตอบถูกติดกันสูงสุด'],
+    ...players.map((p) => [p.rank, p.nickname, p.score, p.correctCount, p.gradedCount, p.answeredCount, seconds(p.avgMs), p.bestStreak]),
   ];
 }
 

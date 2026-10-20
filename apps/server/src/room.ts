@@ -538,6 +538,8 @@ export class Room {
           avatar: p.avatar,
           score: p.score,
           correctCount: results.filter((r) => r.correct).length,
+          // polls have no right answer (correct is null), so they don't count against anyone
+          gradedCount: results.filter((r) => r.correct !== null).length,
           answeredCount: answered.length,
           avgMs: answered.length ? Math.round(msSum / answered.length) : null,
           bestStreak: p.bestStreak,

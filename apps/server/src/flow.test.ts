@@ -189,6 +189,12 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
   assert.equal(report.report.questions.length, 3);
   assert.equal(report.report.questions[0]?.correctCount, 1);
   assert.equal(report.report.players[0]?.nickname, 'Bob');
+  // the poll is in the answers sent but not in the questions that can be right or wrong
+  const row = (n: string) => report.report.players.find((p) => p.nickname === n);
+  assert.deepEqual(
+    ['Bob', 'Alice', 'alice 2'].map((n) => [row(n)?.correctCount, row(n)?.gradedCount, row(n)?.answeredCount]),
+    [[1, 2, 3], [1, 2, 3], [0, 2, 2]],
+  );
 });
 
 test('bad games, unknown rooms, stolen host controls and junk payloads are refused', async () => {
