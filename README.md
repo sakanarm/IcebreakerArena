@@ -171,6 +171,7 @@ npm run users -- add <username> "<ชื่อที่แสดง>" --admin   
 npm run users -- reset <username>                       # password ใหม่ และหลุดจากทุกเครื่อง
 npm run users -- disable <username>                     # ล็อกอินไม่ได้ และหลุดจากทุกเครื่องทันที (enable เพื่อคืน)
 npm run users -- list
+npm run users -- demo <username> --share                # ใส่เกมเดโม 3 เกมในบัญชีนั้น รันซ้ำก็ไม่ซ้ำ --share แชร์ 1 เกมขึ้นคลังเกมด้วย
 ```
 
 `add` กับ `reset` พิมพ์ password ให้ครั้งเดียว ถ้าใส่ `--out=<ไฟล์>` จะเก็บลงไฟล์ใหม่ (mode 600) แทน ไม่ค้างอยู่ในหน้าจอหรือ log ปิดบัญชีกลับเป็นแบบเดิมด้วย `echo off > var/auth-mode` แล้ว `pm2 restart icebreaker-web` ข้อมูลในฐานข้อมูลยังอยู่ครบ

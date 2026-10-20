@@ -3,11 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { LIMITS, SAMPLE_GAMES, type Game } from '@icebreaker/shared';
+import { LIMITS, QUESTION_TYPES, SAMPLE_GAMES, TIME_CHOICES_S, sliderStart, validateGame, type Game } from '@icebreaker/shared';
 import { requireUser, upsertUser } from './auth';
 import { copyEntry, getEntry, listCatalog, reportEntry, shareGame, withdrawEntry } from './catalog';
 import { authMode, authModeProblem, authModeSource, dbSchema } from './config';
 import { SCHEMA_VERSION, checkSchemaName, connectPostgres, migrate, openPglite, type Db } from './db';
+import { DEMO_GAMES, SHARED_DEMO, addDemoGames } from './demo-games';
 import {
   MAX_GAMES_PER_USER,
   TooLong,
@@ -168,6 +169,40 @@ test('other reasons hide an entry only after three different people report it', 
   assert.deepEqual(await reportEntry(db, reporters[0]!.id, shared.entry.id, 'other', 'again'), { ok: true, hidden: false }, 'one person counts once');
   assert.deepEqual(await reportEntry(db, reporters[1]!.id, shared.entry.id, 'inappropriate', ''), { ok: true, hidden: false });
   assert.deepEqual(await reportEntry(db, reporters[2]!.id, shared.entry.id, 'other', ''), { ok: true, hidden: true });
+});
+
+test('the demo games are complete, each shows every question type, and adding them again adds nothing', async () => {
+  assert.equal(new Set(DEMO_GAMES.map((g) => g.id)).size, DEMO_GAMES.length);
+  for (const g of DEMO_GAMES) {
+    const res = validateGame(g);
+    assert.equal(res.ok, true, res.ok ? '' : `${g.id}: ${res.errors.join('; ')}`);
+    const questions = g.rounds.flatMap((r) => r.questions);
+    assert.ok(g.description?.startsWith(`${g.rounds.length} ด่าน ${questions.length} ข้อ`), `${g.id}: ${g.description}`);
+    assert.deepEqual([...new Set(questions.map((q) => q.type))].sort(), [...QUESTION_TYPES].sort(), g.id);
+    for (const q of questions) {
+      assert.ok((TIME_CHOICES_S as readonly number[]).includes(q.timeLimitS), `${g.id} ${q.id}: ${q.timeLimitS} s is not in the editor's list`);
+      // a player who never touches the slider must not score
+      if (q.slider) assert.ok(Math.abs(sliderStart(q.slider) - q.slider.answer) > q.slider.margin, `${g.id} ${q.id}: the slider starts inside the margin`);
+    }
+  }
+
+  const a = await newUser('Demo maker');
+  const first = await addDemoGames(db, a, { share: true });
+  assert.deepEqual(first, { made: DEMO_GAMES.map((g) => g.title), kept: [], shared: 'listed' });
+  assert.deepEqual(await addDemoGames(db, a, { share: true }), { made: [], kept: DEMO_GAMES.map((g) => g.title), shared: 'already' });
+  const games = await listGames(db, a.id);
+  assert.equal(games.length, DEMO_GAMES.length);
+  assert.ok(games.every((g) => g.origin === 'sample' && validateGame(g.game).ok));
+  assert.deepEqual(games.filter((g) => g.sharedStatus === 'listed').map((g) => g.game.title), [DEMO_GAMES.find((g) => g.id === SHARED_DEMO)!.title]);
+  const listed = (await listCatalog(db, (await newUser()).id)).filter((e) => e.authorName === 'Demo maker');
+  assert.equal(listed.length, 1, 'shared once, not once per run');
+
+  // a game the account already has by a demo's title is left alone, and the rest still come in
+  const b = await newUser();
+  const mine = await createGame(db, b.id, { ...draft(DEMO_GAMES[0]!.title) }, 'new');
+  const res = await addDemoGames(db, b);
+  assert.deepEqual(res, { made: DEMO_GAMES.slice(1).map((g) => g.title), kept: [DEMO_GAMES[0]!.title], shared: null });
+  assert.equal((await getGame(db, b.id, mine.id))!.version, 1);
 });
 
 test('moving browser games into the account is safe to repeat', async () => {

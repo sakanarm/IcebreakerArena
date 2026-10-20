@@ -5,6 +5,7 @@
 //   npm run users -- add <username> "<display name>" [--admin]   prints a new password, once
 //   npm run users -- reset <username>                             new password, logs the account out everywhere
 //   npm run users -- disable <username> | enable <username>
+//   npm run users -- demo <username> [--share]                    adds the demo games; --share also lists one in the catalog
 //
 // add and reset take --out=<file> to save the password in a new file only this account can read, instead of
 // printing it. On the server, prefix NODE_ENV=production so it uses the database in var/secrets/database-url.
@@ -14,6 +15,7 @@ import { closeSync, mkdirSync, openSync, rmSync, statSync, writeSync } from 'nod
 import path from 'node:path';
 import { authModeProblem, authModeSource, dataDir, databaseUrl, dbSchema, readSecret } from '../src/server/config';
 import { SCHEMA_VERSION, checkSchemaName, connectPostgres, getDb } from '../src/server/db';
+import { DEMO_GAMES, SHARED_DEMO, addDemoGames } from '../src/server/demo-games';
 import { HttpError } from '../src/server/http';
 import { LOCAL_ISSUER, createLocalUser, generatePassword, normalizeUsername, setLocalPassword } from '../src/server/local-users';
 
@@ -26,13 +28,13 @@ const out = outArg ? path.resolve(process.env.INIT_CWD ?? process.cwd(), outArg)
 
 function usage(): never {
   console.error(
-    'usage: users check | list | add <username> "<display name>" [--admin] [--out=<file>] | reset <username> [--out=<file>] | disable <username> | enable <username>',
+    'usage: users check | list | add <username> "<display name>" [--admin] [--out=<file>] | reset <username> [--out=<file>] | disable <username> | enable <username> | demo <username> [--share]',
   );
   process.exit(2);
 }
 
 // a mistyped flag (--admn) must not quietly make a different account
-const FLAGS: Record<string, string[]> = { add: ['--admin', '--out='], reset: ['--out='] };
+const FLAGS: Record<string, string[]> = { add: ['--admin', '--out='], reset: ['--out='], demo: ['--share'] };
 for (const f of flags) {
   if (!(FLAGS[cmd ?? ''] ?? []).some((ok) => (ok.endsWith('=') ? f.startsWith(ok) && f.length > ok.length : f === ok))) usage();
 }
@@ -124,7 +126,7 @@ async function check(): Promise<boolean> {
       [schema],
     );
     if (!ns) {
-      say(`schema ${schema}: not there yet, the app makes it at its first start`);
+      say(`schema ${schema}: not there yet, made the first time the database is used (a login, or users add)`);
       if (!me!.may_make_schema) problems.push(`schema ${schema} is missing and ${me!.user} may not create schemas in ${me!.db}: ask for one owned by ${me!.user}`);
     } else {
       say(`schema ${schema}: owner ${ns.owner}`);
@@ -132,10 +134,10 @@ async function check(): Promise<boolean> {
     }
 
     const tables = ns ? await db.query<{ name: string }>("SELECT tablename AS name FROM pg_tables WHERE schemaname = $1 AND tablename LIKE 'ib\\_%'", [schema]) : [];
-    if (!tables.some((t) => t.name === 'ib_schema')) say(`tables: none yet, the app makes them (v${SCHEMA_VERSION}) at its first start`);
+    if (!tables.some((t) => t.name === 'ib_schema')) say(`tables: none yet, made (v${SCHEMA_VERSION}) the first time the database is used (a login, or users add)`);
     else {
       const version = (await db.query<{ version: number }>(`SELECT version FROM ${schema}.ib_schema`))[0]?.version ?? 0;
-      say(`tables: ${tables.length}, v${version}${version < SCHEMA_VERSION ? `, upgraded to v${SCHEMA_VERSION} at the next start` : ''}`);
+      say(`tables: ${tables.length}, v${version}${version < SCHEMA_VERSION ? `, upgraded to v${SCHEMA_VERSION} the first time this app uses the database` : ''}`);
       if (version > SCHEMA_VERSION) problems.push(`the tables are v${version}, newer than this app (v${SCHEMA_VERSION}): deploy the newer app`);
       if (version >= 1) {
         const [acc] = await db.query<{ n: number; admins: number }>(
@@ -170,7 +172,7 @@ async function main() {
     if (!(await check())) process.exitCode = 1;
     return;
   }
-  if (!['list', 'add', 'reset', 'disable', 'enable'].includes(cmd ?? '')) usage();
+  if (!['list', 'add', 'reset', 'disable', 'enable', 'demo'].includes(cmd ?? '')) usage();
   const db = await getDb();
   try {
     switch (cmd) {
@@ -221,6 +223,22 @@ async function main() {
         });
         if (!changed) throw new Error(`no local account "${username}"`);
         console.log(`${off ? 'disabled' : 'enabled'} "${normalizeUsername(username)}"`);
+        return;
+      }
+      case 'demo': {
+        const [username] = args;
+        if (!username) usage();
+        const [u] = await db.query<{ id: string; display_name: string; email: string | null; is_curator: boolean; disabled: boolean }>(
+          'SELECT id, display_name, email, is_curator, disabled FROM ib_users WHERE issuer = $1 AND subject = $2',
+          [LOCAL_ISSUER, normalizeUsername(username)],
+        );
+        if (!u) throw new Error(`no local account "${username}"`);
+        if (u.disabled) throw new Error(`"${normalizeUsername(username)}" is disabled`);
+        const res = await addDemoGames(db, { id: u.id, name: u.display_name, email: u.email, isCurator: u.is_curator }, { share: flags.has('--share') });
+        for (const t of res.made) console.log(`made  ${t}`);
+        for (const t of res.kept) console.log(`kept  ${t} (the account has a game by this title)`);
+        const shared = DEMO_GAMES.find((g) => g.id === SHARED_DEMO)!.title;
+        if (res.shared) console.log(res.shared === 'listed' ? `shared ${shared} in the catalog` : `${shared} was already in the catalog`);
         return;
       }
     }
