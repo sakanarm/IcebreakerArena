@@ -1,4 +1,4 @@
-import { SAMPLE_GAMES, copyTitle, leadInMs, type Game, type Question, type Round } from '@icebreaker/shared';
+import { OPTION_COUNT, SAMPLE_GAMES, copyTitle, leadInMs, type Game, type Question, type Round } from '@icebreaker/shared';
 import { keys, load, save } from './storage';
 
 /** Games made in the editor live in this browser until the Phase 2 database arrives. */
@@ -55,7 +55,8 @@ export function countQuestions(game: Game) {
 }
 
 /**
- * Blank 3rd / 4th answers are unused slots in the editor (as in Kahoot): drop them before
+ * Blank answers past the ones a type needs (a quiz's 3rd and 4th, a puzzle's 4th, a typed
+ * question's other spellings) are unused slots in the editor, as in Kahoot: drop them before
  * checking or playing. A blank answer that is marked correct stays, so the check can flag it.
  */
 export function dropBlankOptions(game: Game): Game {
@@ -64,8 +65,9 @@ export function dropBlankOptions(game: Game): Game {
     rounds: game.rounds.map((r) => ({
       ...r,
       questions: r.questions.map((q) => {
-        if (q.type === 'truefalse') return q;
-        const keep = q.options.map((o, i) => i < 2 || o.trim() !== '' || q.correct.includes(i));
+        if (q.type === 'truefalse' || q.type === 'slider') return q;
+        const { min } = OPTION_COUNT[q.type];
+        const keep = q.options.map((o, i) => i < min || o.trim() !== '' || q.correct.includes(i));
         if (keep.every(Boolean)) return q;
         const moved = new Map<number, number>();
         const options: string[] = [];

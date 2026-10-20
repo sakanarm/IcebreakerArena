@@ -1,4 +1,4 @@
-import type { Game, GameReport, Phase, PlayerState, StageState } from './types';
+import type { AnswerSent, Game, GameReport, Phase, PlayerState, StageState } from './types';
 
 export type ErrorCode =
   | 'bad_request'
@@ -48,7 +48,8 @@ export interface ClientToServerEvents {
     ack: Ack<Result<{ playerId: string; token: string; nickname: string }>>,
   ) => void;
   'player:resume': (payload: { pin: string; token: string }, ack: Ack<Result>) => void;
-  'player:answer': (payload: { questionId: string; choice: number }, ack: Ack<Result>) => void;
+  /** flat, so older phones that only send `choice` keep working; the server reads the field the question's type takes */
+  'player:answer': (payload: { questionId: string } & AnswerSent, ack: Ack<Result>) => void;
   /** "change name" in the lobby: drops the old entry instead of leaving a ghost on the big screen */
   'player:leave': (ack: Ack<Result>) => void;
 }

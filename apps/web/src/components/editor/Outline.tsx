@@ -1,12 +1,11 @@
 'use client';
 
 import { Reorder, useDragControls } from 'motion/react';
-import { LIMITS, type Game, type Question, type QuestionType } from '@icebreaker/shared';
+import { LIMITS, type Game, type Question } from '@icebreaker/shared';
+import { TYPE_ICON } from '@/lib/format';
 import { blankQuestion, blankRound, countQuestions } from '@/lib/games';
 import { ANSWER_BG } from '../shapes';
 import { issuesAt, type Edit, type Selection } from './model';
-
-const TYPE_ICON: Record<QuestionType, string> = { quiz: '❓', truefalse: '⚖️', poll: '🗳️' };
 
 /** The game at a glance, like a slide list: rounds, their questions, and what still needs work. */
 export function Outline({

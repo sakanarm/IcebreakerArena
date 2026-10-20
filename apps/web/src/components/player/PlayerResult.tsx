@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import type { PlayerMe, PlayerState } from '@icebreaker/shared';
 import { burst } from '@/lib/confetti';
-import { fmt } from '@/lib/format';
+import { fmt, fmtValue } from '@/lib/format';
 import { sfx, vibrate } from '@/lib/sfx';
 import { CountUp } from '../motion-bits';
 import { ANSWER_BG, AnswerShape } from '../shapes';
@@ -25,9 +25,15 @@ const CHEERS = ['ไม่เป็นไร ข้อหน้าเอาใ�
 export function PlayerResult({ state }: { state: PlayerState }) {
   const r = state.result;
   const kind: Kind = !r || !r.answered ? 'missed' : r.correct === null ? 'poll' : r.correct ? 'right' : 'wrong';
-  const look = LOOK[kind];
+  const q = state.question;
+  const slider = q?.type === 'slider' && state.key?.answer !== undefined;
+  const exact = slider && state.myAnswer?.value === state.key!.answer;
+  const look = kind === 'right' && slider ? { ...LOOK.right, title: exact ? 'เป๊ะ! ตรงเลย' : 'ใกล้เคียง!' } : LOOK[kind];
   const [cheer] = useState(() => CHEERS[Math.floor(Math.random() * CHEERS.length)]);
-  const showAnswer = (kind === 'wrong' || kind === 'missed') && state.question && state.correctChoices?.length;
+  const missedIt = kind === 'wrong' || kind === 'missed';
+  const showAnswer = missedIt && q && state.correctChoices?.length;
+  // the order or the accepted words after a miss; the slider's answer always, since close is only part of the points
+  const showKey = q && state.key && (slider || missedIt);
 
   useEffect(() => {
     if (kind === 'right') {
@@ -115,8 +121,60 @@ export function PlayerResult({ state }: { state: PlayerState }) {
         </motion.div>
       )}
 
+      {showKey && <KeyView state={state} />}
+
       <RankLine me={state.me} />
     </div>
+  );
+}
+
+/** what the right answer was, for the question types that have no right tile */
+function KeyView({ state }: { state: PlayerState }) {
+  const q = state.question!;
+  const key = state.key!;
+  const mine = state.myAnswer;
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="w-full max-w-sm">
+      {q.type === 'puzzle' && key.texts && (
+        <>
+          <p className="mb-2 text-sm text-white/80">ลำดับที่ถูก</p>
+          <ol className="flex flex-col gap-1.5">
+            {key.texts.map((t, i) => (
+              <li key={i} className="flex items-center gap-3 rounded-xl bg-black/25 px-3 py-2 text-left font-semibold">
+                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white text-sm text-ink">{i + 1}</span>
+                <span className="truncate">{t}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+      {q.type === 'type' && key.texts && (
+        <>
+          <p className="mb-2 text-sm text-white/80">{key.texts.length > 1 ? 'คำตอบที่ยอมรับ' : 'คำตอบที่ถูก'}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {key.texts.map((t, i) => (
+              <span key={i} className="rounded-full bg-white px-4 py-1.5 font-semibold text-ink">
+                {t}
+              </span>
+            ))}
+          </div>
+          {mine?.text && <p className="mt-2 text-sm text-white/80">คุณตอบ “{mine.text}”</p>}
+        </>
+      )}
+      {q.type === 'slider' && key.answer !== undefined && (
+        <div className="rounded-2xl bg-black/25 px-4 py-3">
+          <div className="text-sm text-white/80">เฉลย</div>
+          <div className="font-display text-4xl font-extrabold">{fmtValue(key.answer, q.slider?.unit)}</div>
+          {mine?.value !== undefined && (
+            <div className="mt-1 text-white/85">
+              คุณตอบ {fmtValue(mine.value, q.slider?.unit)}
+              {mine.value !== key.answer && ` (ห่าง ${fmtValue(Math.abs(mine.value - key.answer))})`}
+            </div>
+          )}
+          {!!key.margin && <div className="mt-1 text-xs text-white/65">ห่างไม่เกิน ±{fmtValue(key.margin)} ยังได้คะแนน ยิ่งใกล้ยิ่งได้มาก</div>}
+        </div>
+      )}
+    </motion.div>
   );
 }
 

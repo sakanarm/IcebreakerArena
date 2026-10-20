@@ -16,6 +16,7 @@ import {
   randomNickname,
   type ClientToServerEvents,
   type PlayerState,
+  type QuestionPublic,
   type ServerToClientEvents,
 } from '@icebreaker/shared';
 
@@ -87,7 +88,7 @@ function startBot(i: number) {
       const sent = Date.now();
       const r = await socket
         .timeout(5000)
-        .emitWithAck('player:answer', { questionId: q.id, choice: Math.floor(Math.random() * q.options.length) })
+        .emitWithAck('player:answer', { questionId: q.id, ...randomAnswer(q) })
         .catch(() => ({ ok: false as const, error: 'timeout' }));
       if (r.ok) ackMs.push(Date.now() - sent);
       else errors.set(`answer:${r.error}`, (errors.get(`answer:${r.error}`) ?? 0) + 1);
@@ -97,6 +98,18 @@ function startBot(i: number) {
   socket.on('player:kicked', () => socket.close());
   socket.on('room:closed', () => socket.close());
   return socket;
+}
+
+/** a guess of the right shape for any question type */
+function randomAnswer(q: QuestionPublic) {
+  const pick = (n: number) => Math.floor(Math.random() * n);
+  if (q.type === 'puzzle') return { order: [...q.options.keys()].sort(() => Math.random() - 0.5) };
+  if (q.type === 'type') return { text: ['ต้มยำกุ้ง', 'แมว', '42', 'ไม่รู้'][pick(4)]! };
+  if (q.type === 'slider' && q.slider) {
+    const { min, max, step } = q.slider;
+    return { value: min + pick(Math.floor((max - min) / step) + 1) * step };
+  }
+  return { choice: pick(q.options.length) };
 }
 
 console.log(`Starting ${count} bots for room ${pin} on ${url.origin}${socketPath} (${ramp}/s)`);

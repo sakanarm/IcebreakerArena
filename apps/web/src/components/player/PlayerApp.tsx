@@ -109,7 +109,7 @@ function InGame({ state, player, sound }: { state: PlayerState; player: Player; 
             {phase === 'lobby' && <PlayerLobby me={me} onLeave={() => void player.leave(true)} />}
             {phase === 'round' && state.round && <PlayerRound round={state.round} />}
             {phase === 'question' && q && (
-              <PlayerQuestion q={q} myAnswer={player.myAnswer} late={player.late} onAnswer={(choice) => void player.answer(q.id, choice)} />
+              <PlayerQuestion q={q} myAnswer={player.myAnswer} late={player.late} onAnswer={(sent) => void player.answer(q.id, sent)} />
             )}
             {phase === 'reveal' && <PlayerResult state={state} />}
             {phase === 'leaderboard' && <PlayerRank me={me} />}

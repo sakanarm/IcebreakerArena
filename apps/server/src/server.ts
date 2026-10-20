@@ -177,7 +177,7 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
       const done = reply(ack);
       const room = socket.data.role === 'player' ? rooms.get(socket.data.pin) : undefined;
       if (!room || !socket.data.playerId) return done({ ok: false, error: 'not_allowed' });
-      done(room.answer(socket.data.playerId, String(payload?.questionId), Number(payload?.choice)));
+      done(room.answer(socket.data.playerId, String(payload?.questionId), payload));
     });
 
     // only the lobby frees the spot: once the game runs, a score stays on the board even if its owner wanders off

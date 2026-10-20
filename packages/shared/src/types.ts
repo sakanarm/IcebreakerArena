@@ -1,6 +1,22 @@
 // ---------- Game content (what a Host authors) ----------
 
-export type QuestionType = 'quiz' | 'truefalse' | 'poll';
+/**
+ * quiz / truefalse / poll: tap one of the tiles.
+ * puzzle: put the items in the right order. type: type the answer. slider: guess a number.
+ */
+export type QuestionType = 'quiz' | 'truefalse' | 'poll' | 'puzzle' | 'type' | 'slider';
+
+/** A slider question's scale and answer. Whole numbers only, so "exactly right" means what it says. */
+export interface SliderSpec {
+  min: number;
+  max: number;
+  step: number;
+  answer: number;
+  /** guesses this far from the answer still score, less the further off; 0 = exact only */
+  margin: number;
+  /** shown after the number, e.g. "ปี" or "เมตร" */
+  unit?: string;
+}
 
 /** 0 = no points, 1 = standard, 2 = double points */
 export type QuestionMultiplier = 0 | 1 | 2;
@@ -9,13 +25,19 @@ export interface Question {
   id: string;
   type: QuestionType;
   prompt: string;
-  /** 2–4 options; truefalse always has exactly 2 */
+  /**
+   * quiz / poll: 2–4 options; truefalse: exactly 2.
+   * puzzle: 3–4 items in the right order (players see them shuffled).
+   * type: 1–4 accepted answers. slider: empty.
+   */
   options: string[];
-  /** indices of the correct options; empty for poll */
+  /** indices of the correct options; empty for every type but quiz and truefalse */
   correct: number[];
   timeLimitS: number;
   multiplier?: QuestionMultiplier;
   imageUrl?: string;
+  /** slider only */
+  slider?: SliderSpec;
 }
 
 export interface Round {
@@ -72,7 +94,10 @@ export interface QuestionPublic {
   roundIndex: number;
   type: QuestionType;
   prompt: string;
+  /** puzzle: shuffled, the same for everyone; type and slider: empty, so nothing gives the answer away */
   options: string[];
+  /** slider: the scale, without the answer */
+  slider?: Omit<SliderSpec, 'answer' | 'margin'>;
   timeLimitS: number;
   /** effective multiplier = question × round */
   multiplier: number;
@@ -84,10 +109,38 @@ export interface QuestionPublic {
   endsAt: number;
 }
 
+/** The answer to a question that isn't a pick from the tiles, sent once answering has closed. */
+export interface AnswerKey {
+  /** puzzle: the items in the right order; type: every accepted answer */
+  texts?: string[];
+  /** slider */
+  answer?: number;
+  margin?: number;
+}
+
+/** What a player sent: the one field that fits the question type. */
+export interface AnswerSent {
+  /** quiz, truefalse, poll: the tile */
+  choice?: number;
+  /** puzzle: indices into the shuffled options, first to last */
+  order?: number[];
+  /** type */
+  text?: string;
+  /** slider */
+  value?: number;
+}
+
 export interface RevealInfo {
-  /** empty for poll */
+  /** tiles that were right (quiz, truefalse); empty for every other type */
   correct: number[];
+  /**
+   * quiz / truefalse / poll: votes per tile. type: players per accepted answer.
+   * slider: guesses per stretch of the scale (see sliderBins). puzzle: empty.
+   */
   counts: number[];
+  key?: AnswerKey;
+  /** slider: the average guess */
+  average?: number | null;
   answered: number;
   totalPlayers: number;
   correctCount: number;
@@ -161,11 +214,13 @@ export interface PlayerState {
   me: PlayerMe;
   round: RoundInfo | null;
   question: QuestionPublic | null;
-  /** the choice this player sent for the current question */
-  myAnswer: number | null;
+  /** what this player sent for the current question */
+  myAnswer: AnswerSent | null;
   /** this player's result for the current question, after reveal */
   result: PlayerResult | null;
   correctChoices: number[] | null;
+  /** after reveal, for puzzle, type and slider */
+  key: AnswerKey | null;
 }
 
 // ---------- Report ----------
@@ -178,6 +233,9 @@ export interface ReportQuestion {
   options: string[];
   correct: number[];
   counts: number[];
+  slider?: SliderSpec;
+  /** slider: the average guess */
+  average?: number | null;
   answered: number;
   correctCount: number;
   avgMs: number | null;

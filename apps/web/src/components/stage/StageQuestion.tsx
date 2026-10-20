@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { leadInMs, type QuestionPublic, type StageState } from '@icebreaker/shared';
 import { useServerNow } from '@/lib/clock';
-import { fmt } from '@/lib/format';
+import { fmt, fmtValue } from '@/lib/format';
 import { sfx } from '@/lib/sfx';
 import { PopNumber, TimerRing } from '../motion-bits';
 import { AnswerGrid, PromptBar, QuestionImage, QuestionMeta } from './parts';
@@ -96,7 +96,65 @@ function Answering({ q, answered, players }: { q: QuestionPublic; answered: numb
           <span className="text-lg text-white/75">ตอบแล้ว{players ? ` / ${fmt(players)}` : ''}</span>
         </div>
       </div>
-      <AnswerGrid options={q.options} />
+      {q.type === 'type' ? (
+        <PhoneHint emoji="⌨️" text="พิมพ์คำตอบในมือถือ" />
+      ) : q.type === 'slider' && q.slider ? (
+        <ScaleHint slider={q.slider} />
+      ) : (
+        <>
+          {q.type === 'puzzle' && <p className="text-center text-2xl text-white/80">🧩 เรียงลำดับให้ถูกในมือถือ</p>}
+          <AnswerGrid options={q.options} />
+        </>
+      )}
+    </motion.div>
+  );
+}
+
+/** in place of the answer tiles when the answer isn't one of them */
+function PhoneHint({ emoji, text }: { emoji: string; text: string }) {
+  return (
+    <motion.div
+      initial={{ y: 48, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.1, type: 'spring', stiffness: 380, damping: 26 }}
+      className="glass mx-auto flex min-h-40 w-full max-w-6xl items-center justify-center gap-5 px-8 py-6"
+    >
+      <motion.span className="text-7xl" animate={{ y: [0, -10, 0] }} transition={{ duration: 1.4, repeat: Infinity }} aria-hidden>
+        {emoji}
+      </motion.span>
+      <span className="font-display text-4xl font-semibold">{text}</span>
+      <motion.span
+        className="h-12 w-1.5 rounded-full bg-white"
+        animate={{ opacity: [1, 0, 1] }}
+        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        aria-hidden
+      />
+    </motion.div>
+  );
+}
+
+/** the slider's scale with a knob drifting back and forth: "pick a number between these" */
+function ScaleHint({ slider }: { slider: NonNullable<QuestionPublic['slider']> }) {
+  return (
+    <motion.div
+      initial={{ y: 48, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.1, type: 'spring', stiffness: 380, damping: 26 }}
+      className="glass mx-auto flex w-full max-w-6xl flex-col gap-5 px-10 py-6"
+    >
+      <div className="text-center font-display text-3xl font-semibold">🎚️ เลื่อนเลือกตัวเลขในมือถือ</div>
+      <div className="relative h-4 rounded-full bg-white/25">
+        <motion.span
+          className="absolute top-1/2 size-10 -translate-1/2 rounded-full border-[6px] border-gold bg-white shadow-xl"
+          animate={{ left: ['15%', '85%', '15%'] }}
+          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          aria-hidden
+        />
+      </div>
+      <div className="flex justify-between font-display text-3xl font-semibold tabular-nums">
+        <span>{fmtValue(slider.min, slider.unit)}</span>
+        <span>{fmtValue(slider.max, slider.unit)}</span>
+      </div>
     </motion.div>
   );
 }

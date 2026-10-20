@@ -1,4 +1,4 @@
-import { LIMITS, clip, copyTitle, type Game, type Question, type QuestionType, type Round } from '@icebreaker/shared';
+import { LIMITS, QUESTION_TYPES, clip, copyTitle, type Game, type Question, type QuestionType, type Round, type SliderSpec } from '@icebreaker/shared';
 import { lockWrites, type Db, type Sql } from './db';
 import { newId } from './session';
 
@@ -24,7 +24,6 @@ export const MAX_GAMES_PER_USER = 300;
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
-const TYPES: QuestionType[] = ['quiz', 'truefalse', 'poll'];
 
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 
@@ -40,7 +39,7 @@ export class TooLong extends Error {}
  * What a saved draft may hold: well above what the editor allows (LIMITS), so any draft the editor
  * makes saves, while junk can't fill the database. Image links share their limit with validateGame.
  */
-const CAP = { title: 300, prompt: 1000, option: 500, imageUrl: LIMITS.imageUrlMax, description: 2000, rounds: 40, questions: 200, options: 6 };
+const CAP = { title: 300, prompt: 1000, option: 500, imageUrl: LIMITS.imageUrlMax, description: 2000, rounds: 40, questions: 200, options: 6, unit: 100 };
 
 function text(v: unknown, max: number): string {
   if (typeof v !== 'string') return '';
@@ -53,6 +52,16 @@ function list(v: unknown, max: number): unknown[] {
   const a = Array.isArray(v) ? v : [];
   if (a.length > max) throw new TooLong();
   return a;
+}
+
+/**
+ * A slider's numbers as the editor left them. A box still being typed in is NaN, which saves as
+ * null; the editor shows it empty and the full check asks for it.
+ */
+function draftSlider(v: Obj): SliderSpec {
+  const num = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? n : NaN);
+  const unit = text(v.unit, CAP.unit);
+  return { min: num(v.min), max: num(v.max), step: num(v.step), answer: num(v.answer), margin: num(v.margin), ...(unit ? { unit } : {}) };
 }
 
 /** the editor's own id when it is a sensible one, else one made from the position */
@@ -80,15 +89,17 @@ export function normalizeDraft(input: unknown): Game | null {
         .filter(isObj)
         .map((q, qi): Question => {
           const imageUrl = text(q.imageUrl, CAP.imageUrl);
+          const type = QUESTION_TYPES.includes(q.type as QuestionType) ? (q.type as QuestionType) : 'quiz';
           return {
             id: idOr(q.id, `q${ri + 1}-${qi + 1}`),
-            type: TYPES.includes(q.type as QuestionType) ? (q.type as QuestionType) : 'quiz',
+            type,
             prompt: text(q.prompt, CAP.prompt),
             options: list(q.options, CAP.options).map((o) => text(o, CAP.option)),
             correct: (Array.isArray(q.correct) ? q.correct : []).filter((c): c is number => Number.isInteger(c) && c >= 0 && c < 6).slice(0, 6),
             timeLimitS: typeof q.timeLimitS === 'number' && Number.isFinite(q.timeLimitS) ? q.timeLimitS : 20,
             ...(q.multiplier === 0 || q.multiplier === 1 || q.multiplier === 2 ? { multiplier: q.multiplier } : {}),
             ...(imageUrl ? { imageUrl } : {}),
+            ...(type === 'slider' ? { slider: draftSlider(isObj(q.slider) ? q.slider : {}) } : {}),
           };
         }),
     }));

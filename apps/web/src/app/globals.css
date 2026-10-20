@@ -148,6 +148,40 @@
     border-color: var(--color-brand);
   }
 
+  /* The phone's number slider: a fat track and a thumb big enough for a thumb */
+  .range-big {
+    @apply h-14 w-full cursor-pointer appearance-none bg-transparent;
+    touch-action: pan-y;
+  }
+  .range-big::-webkit-slider-runnable-track {
+    height: 1rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-gold) var(--fill, 50%), rgb(255 255 255 / 0.2) var(--fill, 50%));
+  }
+  .range-big::-moz-range-track {
+    height: 1rem;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--color-gold) var(--fill, 50%), rgb(255 255 255 / 0.2) var(--fill, 50%));
+  }
+  .range-big::-webkit-slider-thumb {
+    appearance: none;
+    margin-top: -1rem;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    background: white;
+    border: 6px solid var(--color-gold);
+    box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+  }
+  .range-big::-moz-range-thumb {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 999px;
+    background: white;
+    border: 6px solid var(--color-gold);
+    box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
+  }
+
   .shine {
     @apply pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/25;
   }

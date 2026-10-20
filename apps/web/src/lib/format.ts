@@ -10,7 +10,23 @@ export const TYPE_LABEL: Record<QuestionType, string> = {
   quiz: 'ควิซ',
   truefalse: 'จริงหรือเท็จ',
   poll: 'โพล',
+  puzzle: 'เรียงลำดับ',
+  type: 'พิมพ์คำตอบ',
+  slider: 'ทายตัวเลข',
 };
+
+export const TYPE_ICON: Record<QuestionType, string> = {
+  quiz: '❓',
+  truefalse: '⚖️',
+  poll: '🗳️',
+  puzzle: '🧩',
+  type: '⌨️',
+  slider: '🎚️',
+};
+
+/** a slider number as players read it: years and heights without a comma (2007, not 2,007), big numbers with one */
+export const fmtValue = (n: number, unit?: string) =>
+  `${Math.abs(n) >= 10_000 ? n.toLocaleString('th-TH') : String(n)}${unit ? ` ${unit}` : ''}`;
 
 export const ordinal = (rank: number) => `อันดับที่ ${rank}`;
 

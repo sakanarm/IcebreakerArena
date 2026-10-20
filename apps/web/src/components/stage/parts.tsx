@@ -3,6 +3,7 @@
 import { motion } from 'motion/react';
 import type { QuestionPublic } from '@icebreaker/shared';
 import { TYPE_LABEL } from '@/lib/format';
+import { untimed } from '../player/PlayerQuestion';
 import { ANSWER_BG, AnswerShape } from '../shapes';
 
 export function PromptBar({ q }: { q: QuestionPublic }) {
@@ -24,7 +25,7 @@ export function QuestionMeta({ q }: { q: QuestionPublic }) {
       <span className="rounded-full bg-white/15 px-4 py-1.5 font-semibold">{TYPE_LABEL[q.type]}</span>
       {q.multiplier > 1 && <span className="rounded-full bg-gold px-4 py-1.5 font-display font-extrabold text-ink">คะแนน ×{q.multiplier}</span>}
       {q.multiplier === 0 && <span className="rounded-full bg-white/15 px-4 py-1.5">ข้อนี้ไม่คิดคะแนน</span>}
-      {!q.timed && q.type !== 'poll' && <span className="rounded-full bg-white/15 px-4 py-1.5">⏱️ ไม่นับความเร็ว</span>}
+      {untimed(q) && <span className="rounded-full bg-white/15 px-4 py-1.5">⏱️ ไม่นับความเร็ว</span>}
     </div>
   );
 }

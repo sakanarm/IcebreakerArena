@@ -31,6 +31,8 @@ export interface ScoreInput {
   multiplier: number;
   streakBefore: number;
   streakBonus: boolean;
+  /** slider: how close the guess was (sliderCloseness), 1 = exact; every other type is 1 */
+  closeness?: number;
 }
 
 export interface ScoreOutput {
@@ -46,7 +48,7 @@ export function scoreAnswer(i: ScoreInput): ScoreOutput {
   if (!i.answered || !i.correct) return { points: 0, streak: 0 };
 
   const streak = i.streakBefore + 1;
-  const base = i.timed ? speedPoints(i.responseMs, i.timeLimitS) : FULL_POINTS;
+  const base = (i.timed ? speedPoints(i.responseMs, i.timeLimitS) : FULL_POINTS) * (i.closeness ?? 1);
   const bonus =
     i.streakBonus && i.multiplier > 0 ? Math.min(STREAK_STEP * (streak - 1), STREAK_MAX_BONUS) : 0;
   return { points: Math.round(base * i.multiplier) + bonus, streak };

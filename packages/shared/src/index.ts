@@ -1,6 +1,7 @@
 export * from './types';
 export * from './events';
 export * from './scoring';
+export * from './answers';
 export * from './validate';
 export * from './text';
 export * from './nicknames';

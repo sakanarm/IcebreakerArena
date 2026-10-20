@@ -50,6 +50,20 @@ test('poll gives 100 to everyone who votes and keeps the streak', () => {
   assert.deepEqual(scoreAnswer({ ...poll, answered: false }), { points: 0, streak: 3 });
 });
 
+test('puzzle and typed answers score like a quiz', () => {
+  assert.deepEqual(scoreAnswer({ ...quiz, type: 'puzzle' }), { points: 967, streak: 1 });
+  assert.deepEqual(scoreAnswer({ ...quiz, type: 'type', correct: false, streakBefore: 2 }), { points: 0, streak: 0 });
+});
+
+test('a slider guess scores by closeness, and the streak bonus is not cut by it', () => {
+  const slider: ScoreInput = { ...quiz, type: 'slider', timed: false };
+  assert.deepEqual(scoreAnswer({ ...slider, closeness: 1 }), { points: 1000, streak: 1 });
+  assert.deepEqual(scoreAnswer({ ...slider, closeness: 0.5 }), { points: 500, streak: 1 });
+  assert.equal(scoreAnswer({ ...slider, timed: true, closeness: 0.75 }).points, Math.round(967 * 0.75));
+  assert.equal(scoreAnswer({ ...slider, closeness: 0.5, multiplier: 2 }).points, 1000);
+  assert.equal(scoreAnswer({ ...slider, closeness: 0.5, streakBefore: 2, streakBonus: true }).points, 700);
+});
+
 test('streak bonus is off by default, and capped at +500 when the Host turns it on', () => {
   assert.equal(scoreAnswer({ ...quiz, streakBefore: 5 }).points, 967);
   assert.equal(scoreAnswer({ ...quiz, streakBefore: 1, streakBonus: true }).points, 1067);

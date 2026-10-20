@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PlayerState, Result } from '@icebreaker/shared';
+import type { AnswerSent, PlayerState, Result } from '@icebreaker/shared';
 import { syncClock } from './clock';
 import { withBase } from './paths';
 import { getSocket } from './socket';
@@ -28,7 +28,7 @@ async function ack<T extends object>(p: Promise<Result<T>>): Promise<Result<T>> 
 
 export interface Picked {
   questionId: string;
-  choice: number;
+  sent: AnswerSent;
   late: boolean;
 }
 
@@ -148,10 +148,13 @@ export function usePlayer(initialPin: string | null) {
     [pin],
   );
 
-  const answer = useCallback(async (questionId: string, choice: number) => {
-    setPicked({ questionId, choice, late: false });
-    const res = await ack(getSocket().timeout(5000).emitWithAck('player:answer', { questionId, choice }));
-    if (!res.ok && (res.error === 'too_late' || res.error === 'not_open')) setPicked({ questionId, choice, late: true });
+  const answer = useCallback(async (questionId: string, sent: AnswerSent) => {
+    setPicked({ questionId, sent, late: false });
+    const res = await ack(getSocket().timeout(5000).emitWithAck('player:answer', { questionId, ...sent }));
+    if (res.ok) return;
+    if (res.error === 'too_late' || res.error === 'not_open') setPicked({ questionId, sent, late: true });
+    // refused (a value the question can't take): back to the answer pad rather than a stuck "sent"
+    else if (res.error === 'bad_request') setPicked((p) => (p?.questionId === questionId ? null : p));
   }, []);
 
   /** back to the PIN screen, or with `rejoin` straight to this room's name screen ("change name" in the lobby) */
@@ -169,7 +172,7 @@ export function usePlayer(initialPin: string | null) {
   // the server's record wins; the local pick covers the moment before it arrives
   const q = state?.question;
   const localPick = q && picked?.questionId === q.id ? picked : null;
-  const myAnswer = state?.myAnswer ?? localPick?.choice ?? null;
+  const myAnswer = state?.myAnswer ?? localPick?.sent ?? null;
 
   return { pin, roomTitle, status, state, error, online, myAnswer, late: !!localPick?.late, checkPin, join, answer, leave };
 }

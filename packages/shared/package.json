@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "test": "tsx --test src/scoring.test.ts src/validate.test.ts"
+    "test": "tsx --test src/answers.test.ts src/scoring.test.ts src/validate.test.ts"
   },
   "sideEffects": false
 }

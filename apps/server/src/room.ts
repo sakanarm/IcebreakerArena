@@ -1,8 +1,18 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import {
+  isOrder,
+  isRightOrder,
   leadInMs,
+  LIMITS,
+  matchTyped,
   MAX_PLAYERS_PER_ROOM,
+  onScale,
   scoreAnswer,
+  sliderBin,
+  sliderBins,
+  sliderCloseness,
+  type AnswerKey,
+  type AnswerSent,
   type Award,
   type Game,
   type GameReport,
@@ -31,8 +41,15 @@ const ROUND_INTRO_MS = 3500;
 const ALL_ANSWERED_DELAY_MS = 400;
 
 interface Answer {
-  choice: number;
+  sent: AnswerSent;
   responseMs: number;
+}
+
+/** how one answer came out: right or not, how close (slider), and which bar of the reveal chart it adds to */
+interface Judged {
+  correct: boolean | null;
+  closeness: number;
+  bar: number | null;
 }
 
 interface Player {
@@ -76,7 +93,8 @@ export class Room {
   private slots: Slot[];
   private slotIndex = -1;
   private roundIndex = -1;
-  private current: { slot: Slot; startsAt: number; endsAt: number } | null = null;
+  /** `shown` is a puzzle's shuffle: shown[k] = the authored position of the k-th item players see */
+  private current: { slot: Slot; startsAt: number; endsAt: number; shown: number[] | null } | null = null;
   private answeredCount = 0;
   private revealInfo: RevealInfo | null = null;
   private stats = new Map<string, RevealInfo>();
@@ -229,21 +247,20 @@ export class Room {
     const now = Date.now();
     const startsAt = now + leadInMs(slot.q.prompt);
     const endsAt = startsAt + slot.q.timeLimitS * 1000;
-    this.current = { slot, startsAt, endsAt };
+    this.current = { slot, startsAt, endsAt, shown: slot.q.type === 'puzzle' ? shuffled(slot.q.options.length) : null };
     this.answeredCount = 0;
     this.revealInfo = null;
     this.setPhase('question');
     this.schedule(endsAt - now + ANSWER_GRACE_MS, () => this.reveal());
   }
 
-  answer(playerId: string, questionId: string, choice: number): Result {
+  answer(playerId: string, questionId: string, input: unknown): Result {
     const cur = this.current;
     if (this.phase !== 'question' || !cur || cur.slot.q.id !== questionId) return { ok: false, error: 'not_open' };
     const player = this.players.get(playerId);
     if (!player) return { ok: false, error: 'not_allowed' };
-    if (!Number.isInteger(choice) || choice < 0 || choice >= cur.slot.q.options.length) {
-      return { ok: false, error: 'bad_request' };
-    }
+    const sent = readAnswer(cur.slot.q, input);
+    if (!sent) return { ok: false, error: 'bad_request' };
     if (player.answers.has(questionId)) return { ok: false, error: 'already_answered' };
     const now = Date.now();
     if (now < cur.startsAt - 100) return { ok: false, error: 'not_open' };
@@ -251,7 +268,7 @@ export class Room {
 
     // response time is measured on the server only: from when answering opened to when the answer arrived
     const responseMs = Math.min(Math.max(now - cur.startsAt, 0), cur.slot.q.timeLimitS * 1000);
-    player.answers.set(questionId, { choice, responseMs });
+    player.answers.set(questionId, { sent, responseMs });
     this.answeredCount++;
     this.touch();
     this.queueStage();
@@ -266,16 +283,18 @@ export class Room {
     const { q, round } = cur.slot;
     const timed = round.timed !== false;
     const multiplier = (q.multiplier ?? 1) * (round.multiplier ?? 1);
-    const counts = q.options.map(() => 0);
+    const counts = Array.from({ length: barCount(q) }, () => 0);
     let answered = 0;
     let correctCount = 0;
     let correctMsSum = 0;
+    let valueSum = 0;
 
     for (const p of this.players.values()) {
       const a = p.answers.get(q.id);
-      const correct = q.type === 'poll' ? null : a ? q.correct.includes(a.choice) : false;
+      const { correct, closeness, bar } = judge(q, cur.shown, a?.sent);
       if (a) {
-        counts[a.choice] = (counts[a.choice] ?? 0) + 1;
+        if (bar !== null) counts[bar] = (counts[bar] ?? 0) + 1;
+        valueSum += a.sent.value ?? 0;
         answered++;
         if (correct) {
           correctCount++;
@@ -293,6 +312,7 @@ export class Room {
         multiplier,
         streakBefore: p.streak,
         streakBonus: !!this.game.settings?.streakBonus,
+        closeness,
       });
       p.prevScore = p.score;
       p.score += points;
@@ -302,9 +322,12 @@ export class Room {
     }
 
     this.rerank();
+    const key = answerKey(q);
     this.revealInfo = {
       correct: q.correct,
       counts,
+      ...(key ? { key } : {}),
+      ...(q.type === 'slider' ? { average: answered ? Math.round((valueSum / answered) * 10) / 10 : null } : {}),
       answered,
       totalPlayers: this.players.size,
       correctCount,
@@ -406,9 +429,10 @@ export class Room {
       },
       round: this.roundInfo(),
       question,
-      myAnswer: question ? (p.answers.get(question.id)?.choice ?? null) : null,
+      myAnswer: question ? (p.answers.get(question.id)?.sent ?? null) : null,
       result: revealed ? (p.results.get(question.id) ?? null) : null,
       correctChoices: revealed ? this.current!.slot.q.correct : null,
+      key: revealed ? answerKey(this.current!.slot.q) : null,
     };
   }
 
@@ -437,7 +461,9 @@ export class Room {
       roundIndex,
       type: q.type,
       prompt: q.prompt,
-      options: q.options,
+      // nothing here may give the answer away: a puzzle goes out shuffled, typed answers and the slider's answer not at all
+      options: cur.shown ? cur.shown.map((i) => q.options[i]!) : q.type === 'type' || q.type === 'slider' ? [] : q.options,
+      ...(q.slider ? { slider: { min: q.slider.min, max: q.slider.max, step: q.slider.step, ...(q.slider.unit ? { unit: q.slider.unit } : {}) } } : {}),
       timeLimitS: q.timeLimitS,
       multiplier: (q.multiplier ?? 1) * (round.multiplier ?? 1),
       timed: round.timed !== false,
@@ -496,6 +522,7 @@ export class Room {
           options: q.options,
           correct: q.correct,
           counts: s.counts,
+          ...(q.slider ? { slider: q.slider, average: s.average ?? null } : {}),
           answered: s.answered,
           correctCount: s.correctCount,
           avgMs: s.avgCorrectMs,
@@ -525,6 +552,73 @@ export class Room {
     this.io.to(this.stageChannel).emit('room:closed');
     for (const p of this.players.values()) if (p.socketId) this.io.to(p.socketId).emit('room:closed');
   }
+}
+
+/** A fresh shuffle of n items that never leaves them in the authored (right) order. */
+function shuffled(n: number): number[] {
+  const order = Array.from({ length: n }, (_, i) => i);
+  if (n < 2) return order;
+  do {
+    for (let i = n - 1; i > 0; i--) {
+      const j = randomInt(i + 1);
+      [order[i], order[j]] = [order[j]!, order[i]!];
+    }
+  } while (order.every((v, i) => v === i));
+  return order;
+}
+
+/** The player's answer in the shape the question takes, or null when it doesn't fit. */
+function readAnswer(q: Question, input: unknown): AnswerSent | null {
+  if (typeof input !== 'object' || input === null) return null;
+  const a = input as Record<string, unknown>;
+  switch (q.type) {
+    case 'puzzle':
+      return isOrder(a.order, q.options.length) ? { order: [...a.order] } : null;
+    case 'type': {
+      const text = typeof a.text === 'string' ? a.text.trim() : '';
+      return text && text.length <= LIMITS.typedMax ? { text } : null;
+    }
+    case 'slider':
+      return q.slider && onScale(q.slider, a.value) ? { value: a.value } : null;
+    default: {
+      const choice = a.choice;
+      return typeof choice === 'number' && Number.isInteger(choice) && choice >= 0 && choice < q.options.length ? { choice } : null;
+    }
+  }
+}
+
+function judge(q: Question, shown: number[] | null, a: AnswerSent | undefined): Judged {
+  if (q.type === 'poll') return { correct: null, closeness: 1, bar: a?.choice ?? null };
+  if (!a) return { correct: false, closeness: 1, bar: null };
+  switch (q.type) {
+    case 'puzzle':
+      return { correct: !!shown && !!a.order && isRightOrder(shown, a.order), closeness: 1, bar: null };
+    case 'type': {
+      const match = matchTyped(q.options, a.text ?? '');
+      return { correct: match >= 0, closeness: 1, bar: match >= 0 ? match : null };
+    }
+    case 'slider': {
+      if (!q.slider || a.value === undefined) return { correct: false, closeness: 1, bar: null };
+      const closeness = sliderCloseness(q.slider, a.value);
+      return { correct: closeness > 0, closeness, bar: sliderBin(q.slider, a.value) };
+    }
+    default:
+      return { correct: a.choice !== undefined && q.correct.includes(a.choice), closeness: 1, bar: a.choice ?? null };
+  }
+}
+
+/** bars on the reveal chart: one per tile or accepted answer, stretches of a slider's scale, none for a puzzle */
+function barCount(q: Question): number {
+  if (q.type === 'puzzle') return 0;
+  if (q.type === 'slider') return q.slider ? sliderBins(q.slider) : 0;
+  return q.options.length;
+}
+
+/** what a reveal shows besides the right tiles: a puzzle's order, the accepted typed answers, the slider's answer */
+function answerKey(q: Question): AnswerKey | null {
+  if (q.type === 'puzzle' || q.type === 'type') return { texts: q.options };
+  if (q.type === 'slider' && q.slider) return { answer: q.slider.answer, margin: q.slider.margin };
+  return null;
 }
 
 const toLite = (p: Player): PlayerLite => ({

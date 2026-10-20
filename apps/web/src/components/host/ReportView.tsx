@@ -2,9 +2,9 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
-import type { GameReport, ReportPlayer, ReportQuestion } from '@icebreaker/shared';
+import { sliderBinRanges, type GameReport, type QuestionType, type ReportPlayer, type ReportQuestion, type SliderSpec } from '@icebreaker/shared';
 import { downloadText, toCsv } from '@/lib/csv';
-import { fmt, percent, secondsLabel, TYPE_LABEL } from '@/lib/format';
+import { fmt, fmtValue, percent, secondsLabel, TYPE_ICON, TYPE_LABEL } from '@/lib/format';
 import { getSocket } from '@/lib/socket';
 import { ANSWER_BG, AnswerShape } from '../shapes';
 
@@ -213,39 +213,175 @@ function QuestionsList({ questions }: { questions: ReportQuestion[] }) {
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
               <span className="rounded-full bg-ink px-3 py-0.5 font-semibold text-white">ข้อ {q.number}</span>
               <span>{q.roundTitle}</span>
-              <span>· {TYPE_LABEL[q.type]}</span>
+              <span>
+                · <span aria-hidden>{TYPE_ICON[q.type]}</span> {TYPE_LABEL[q.type]}
+              </span>
               <span>· ตอบ {fmt(q.answered)} คน</span>
               {!poll && <span>· เวลาเฉลี่ย {secondsLabel(q.avgMs)}</span>}
               {!poll && q.answered > 0 && (
-                <span className={`ml-auto rounded-full px-3 py-0.5 font-semibold text-white ${tone}`}>ถูก {rate}%</span>
+                <span className={`ml-auto rounded-full px-3 py-0.5 font-semibold text-white ${tone}`}>
+                  {RATE_LABEL[q.type]} {rate}%
+                </span>
               )}
             </div>
             <p className="mt-2 text-lg font-semibold">{q.prompt}</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {q.options.map((o, i) => {
-                const right = q.correct.includes(i);
-                const share = percent(q.counts[i] ?? 0, q.answered);
-                return (
-                  <div key={i} className="relative overflow-hidden rounded-xl bg-slate-100">
-                    <div className={`absolute inset-y-0 left-0 opacity-25 ${ANSWER_BG[i]}`} style={{ width: `${share}%` }} />
-                    <div className="relative flex items-center gap-2 px-3 py-2">
-                      <span className={`grid size-7 shrink-0 place-items-center rounded-lg ${ANSWER_BG[i]}`}>
-                        <AnswerShape index={i} className="size-4 text-white" />
-                      </span>
-                      <span className="min-w-0 flex-1 truncate">{o}</span>
-                      {right && <span className="font-extrabold text-good">✓</span>}
-                      <span className="tabular-nums text-sm text-slate-600">
-                        {fmt(q.counts[i] ?? 0)} ({share}%)
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <QuestionResult q={q} />
           </li>
         );
       })}
     </ol>
+  );
+}
+
+/** what counts as right on each type's badge: a slider guess scores when it is close enough */
+const RATE_LABEL: Record<QuestionType, string> = {
+  quiz: 'ถูก',
+  truefalse: 'ถูก',
+  poll: 'ถูก',
+  puzzle: 'เรียงถูก',
+  type: 'พิมพ์ถูก',
+  slider: 'ได้คะแนน',
+};
+
+function QuestionResult({ q }: { q: ReportQuestion }) {
+  if (q.type === 'puzzle') return <PuzzleOrder items={q.options} />;
+  if (q.type === 'slider') return q.slider ? <SliderChart q={q} spec={q.slider} /> : null;
+  if (q.type === 'type') {
+    const matched = q.counts.reduce((sum, n) => sum + n, 0);
+    return (
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {q.options.map((o, i) => (
+          <CountBar key={i} label={o} count={q.counts[i] ?? 0} total={q.answered} fill="bg-good" badge={i === 0 ? '⌨️' : '＝'} badgeBg="bg-good" right />
+        ))}
+        <CountBar label="พิมพ์คำอื่น" count={Math.max(0, q.answered - matched)} total={q.answered} fill="bg-bad" badge="✗" badgeBg="bg-slate-400" />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {q.options.map((o, i) => (
+        <CountBar
+          key={i}
+          label={o}
+          count={q.counts[i] ?? 0}
+          total={q.answered}
+          fill={ANSWER_BG[i] ?? 'bg-slate-400'}
+          badge={<AnswerShape index={i} className="size-4 text-white" />}
+          badgeBg={ANSWER_BG[i] ?? 'bg-slate-400'}
+          right={q.correct.includes(i)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CountBar({
+  label,
+  count,
+  total,
+  fill,
+  badge,
+  badgeBg,
+  right,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  fill: string;
+  badge: React.ReactNode;
+  badgeBg: string;
+  right?: boolean;
+}) {
+  const share = percent(count, total);
+  return (
+    <div className="relative overflow-hidden rounded-xl bg-slate-100">
+      <div className={`absolute inset-y-0 left-0 opacity-25 ${fill}`} style={{ width: `${share}%` }} />
+      <div className="relative flex items-center gap-2 px-3 py-2">
+        <span aria-hidden className={`grid size-7 shrink-0 place-items-center rounded-lg text-sm text-white ${badgeBg}`}>
+          {badge}
+        </span>
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {right && <span className="font-extrabold text-good">✓</span>}
+        <span className="tabular-nums text-sm text-slate-600">
+          {fmt(count)} ({share}%)
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** A puzzle's answer: its items in the right order. Players order them all and pick none, so there is nothing to count. */
+function PuzzleOrder({ items }: { items: string[] }) {
+  return (
+    <div className="mt-3">
+      <p className="text-sm font-semibold text-slate-500">ลำดับที่ถูก</p>
+      <ol className="mt-1.5 flex flex-wrap items-center gap-2">
+        {items.map((o, i) => (
+          <li key={i} className="flex min-w-0 items-center gap-2">
+            {i > 0 && (
+              <span aria-hidden className="text-slate-400">
+                →
+              </span>
+            )}
+            <span className={`flex min-w-0 items-center gap-2 rounded-xl py-1.5 pr-3 pl-1.5 font-semibold text-white ${ANSWER_BG[i] ?? 'bg-slate-500'}`}>
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white text-sm font-extrabold text-ink">{i + 1}</span>
+              <span className="min-w-0 break-words">{o}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+const rangeLabel = ({ lo, hi }: { lo: number; hi: number }) => (lo === hi ? fmtValue(lo) : `${fmtValue(lo)}–${fmtValue(hi)}`);
+
+/** Where the guesses landed on the scale: green stretches still scored, the gold ring holds the answer. */
+function SliderChart({ q, spec }: { q: ReportQuestion; spec: SliderSpec }) {
+  const ranges = sliderBinRanges(spec);
+  const top = Math.max(1, ...q.counts);
+  const { answer, margin, unit } = spec;
+  const columns = { gridTemplateColumns: `repeat(${ranges.length}, minmax(0, 1fr))` };
+  return (
+    <div className="mt-3">
+      <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        <span className="font-semibold text-good">🎯 คำตอบ {fmtValue(answer, unit)}</span>
+        <span className="text-slate-500">{margin > 0 ? `ห่างไม่เกิน ±${fmtValue(margin)} ยังได้คะแนน` : 'ต้องตรงเป๊ะถึงได้คะแนน'}</span>
+        {q.average != null && <span className="text-slate-600">📊 ค่าเฉลี่ยที่ทาย {fmtValue(q.average, unit)}</span>}
+      </p>
+      <div className="mt-2 grid h-32 gap-1 pt-6" style={columns} role="img" aria-label={`จำนวนคนที่ทายแต่ละช่วง คำตอบ ${fmtValue(answer, unit)}`}>
+        {ranges.map((r, b) => {
+          const count = q.counts[b] ?? 0;
+          const pct = count ? Math.max(6, (count / top) * 100) : 0;
+          const scores = r.lo <= answer + margin && r.hi >= answer - margin;
+          const holds = r.lo <= answer && answer <= r.hi;
+          return (
+            <div key={b} className="relative h-full" title={`${rangeLabel(r)}${unit ? ` ${unit}` : ''}: ${fmt(count)} คน`}>
+              <div className={`absolute inset-x-0 bottom-0 h-1 rounded-full ${scores ? 'bg-good/40' : 'bg-slate-200'}`} />
+              <div
+                className={`absolute inset-x-0 bottom-0 rounded-t-lg ${scores ? 'bg-good' : 'bg-slate-300'} ${holds && count > 0 ? 'ring-3 ring-gold' : ''}`}
+                style={{ height: `${pct}%` }}
+              />
+              {holds && (
+                <span aria-hidden className="absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rounded-full bg-gold ring-2 ring-white" />
+              )}
+              {count > 0 && (
+                <span className="absolute inset-x-0 mb-0.5 text-center text-xs font-bold tabular-nums text-slate-700" style={{ bottom: `${pct}%` }}>
+                  {fmt(count)}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 grid gap-1 text-center text-[11px] leading-tight text-slate-500 tabular-nums" style={columns}>
+        {ranges.map((r, b) => (
+          <span key={b} className="break-words">
+            {rangeLabel(r)}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -258,22 +394,40 @@ function playerRows(players: ReportPlayer[]) {
 
 function questionRows(questions: ReportQuestion[]) {
   return [
-    ['ข้อ', 'ด่าน', 'ประเภท', 'คำถาม', 'ตัวเลือก 1', 'ตัวเลือก 2', 'ตัวเลือก 3', 'ตัวเลือก 4', 'คำตอบที่ถูก', 'จำนวนคนตอบ', 'ตอบถูก', '% ถูก', 'เวลาเฉลี่ย (วินาที)'],
+    ['ข้อ', 'ด่าน', 'ประเภท', 'คำถาม', 'ตัวเลือก 1', 'ตัวเลือก 2', 'ตัวเลือก 3', 'ตัวเลือก 4', 'คำตอบที่ถูก', 'จำนวนคนตอบ', 'ตอบถูก', '% ถูก', 'เวลาเฉลี่ย (วินาที)', 'ค่าเฉลี่ยที่ทาย'],
     ...questions.map((q) => {
       const poll = q.type === 'poll';
-      const options = [0, 1, 2, 3].map((i) => (q.options[i] === undefined ? null : `${q.options[i]} (${q.counts[i] ?? 0} คน)`));
+      // a puzzle's items have no counts: players order all of them, they don't pick one
+      const options = [0, 1, 2, 3].map((i) =>
+        q.options[i] === undefined ? null : q.type === 'puzzle' ? q.options[i] : `${q.options[i]} (${q.counts[i] ?? 0} คน)`,
+      );
       return [
         q.number,
         q.roundTitle,
         TYPE_LABEL[q.type],
         q.prompt,
         ...options,
-        poll ? null : q.correct.map((i) => q.options[i]).join(' / '),
+        poll ? null : rightAnswer(q),
         q.answered,
         poll ? null : q.correctCount,
         poll ? null : percent(q.correctCount, q.answered),
         poll ? null : seconds(q.avgMs),
+        q.type === 'slider' ? (q.average ?? null) : null,
       ];
     }),
   ];
+}
+
+/** the right answer in one cell: the right tiles, a puzzle's order, every accepted spelling, or the number */
+function rightAnswer(q: ReportQuestion): string {
+  switch (q.type) {
+    case 'puzzle':
+      return q.options.join(' → ');
+    case 'type':
+      return q.options.join(' / ');
+    case 'slider':
+      return q.slider ? `${fmtValue(q.slider.answer, q.slider.unit)}${q.slider.margin > 0 ? ` (±${fmtValue(q.slider.margin)})` : ''}` : '';
+    default:
+      return q.correct.map((i) => q.options[i]).join(' / ');
+  }
 }
