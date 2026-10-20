@@ -13,7 +13,8 @@
     "start": "concurrently -k -n server,web -c cyan,magenta \"npm run start -w @icebreaker/server\" \"npm run start -w @icebreaker/web\"",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "bots": "npm run bots -w @icebreaker/server --"
+    "bots": "npm run bots -w @icebreaker/server --",
+    "users": "npm run users -w @icebreaker/web --"
   },
   "engines": {
     "node": ">=20.9"

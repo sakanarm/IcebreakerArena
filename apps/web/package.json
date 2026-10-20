@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "typecheck": "tsc -p . --noEmit",
-    "test": "tsx --test src/server/store.test.ts"
+    "test": "tsx --test src/server/store.test.ts",
+    "users": "tsx scripts/users.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans-thai": "^5.3.0",

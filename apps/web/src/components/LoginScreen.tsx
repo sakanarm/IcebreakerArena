@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { logout, mockLogin, refreshAccount, useAccount } from '@/lib/account';
+import { localLogin, logout, mockLogin, refreshAccount, useAccount } from '@/lib/account';
 import { apiMessage } from '@/lib/api';
 import { WaitingDots } from './motion-bits';
 import { Notice } from './Notice';
@@ -13,6 +13,7 @@ export function LoginScreen({ next }: { next: string }) {
   const router = useRouter();
   const account = useAccount();
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,13 +104,60 @@ export function LoginScreen({ next }: { next: string }) {
     setBusy(true);
     setError(null);
     try {
-      await mockLogin(name);
+      if (account.mode === 'local') await localLogin(name, password);
+      else await mockLogin(name);
       router.replace(next);
     } catch (err) {
       setError(apiMessage(err));
+      setPassword('');
       setBusy(false);
     }
   };
+
+  if (account.mode === 'local') {
+    return (
+      <Notice emoji="🔑" title="เข้าสู่ระบบ">
+        <p>ใช้ชื่อผู้ใช้และรหัสผ่านที่ผู้ดูแลระบบให้ไว้</p>
+        <form onSubmit={submit} className="mt-5 flex flex-col gap-3 text-left">
+          <label htmlFor="login-user" className="text-sm font-semibold text-white/80">
+            ชื่อผู้ใช้
+          </label>
+          <input
+            id="login-user"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={32}
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoFocus
+            className="field font-display text-lg"
+          />
+          <label htmlFor="login-password" className="mt-1 text-sm font-semibold text-white/80">
+            รหัสผ่าน
+          </label>
+          <input
+            id="login-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            maxLength={200}
+            autoComplete="current-password"
+            className="field font-display text-lg"
+          />
+          {error && (
+            <p role="alert" className="text-sm font-semibold text-bad">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={busy || name.trim().length < 3 || !password} className="btn btn-primary mt-1">
+            {busy ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
+          </button>
+        </form>
+      </Notice>
+    );
+  }
 
   return (
     <Notice emoji="🔑" title="เข้าสู่ระบบ">

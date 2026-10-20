@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { Pool, PoolClient } from 'pg';
-import { databaseUrl, dataDir } from './config';
+import { databaseUrl, dataDir, dbSchema } from './config';
 
 export type Row = Record<string, unknown>;
 
@@ -13,15 +13,20 @@ export interface Sql {
 }
 
 export interface Db extends Sql {
+  /** the schema the tables live in, made by migrate() if missing; null: the default one (a laptop's PGlite) */
+  schema: string | null;
   tx<R>(fn: (sql: Sql) => Promise<R>): Promise<R>;
   close(): Promise<void>;
 }
 
-/** Postgres on the network: production. */
-export async function connectPostgres(connectionString: string): Promise<Db> {
+/** Postgres on the network: production. Every connection sees only our own schema, never public or another app's. */
+export async function connectPostgres(connectionString: string, schema = dbSchema()): Promise<Db> {
+  checkSchemaName(schema);
   const { default: pg } = await import('pg');
   const pool = new pg.Pool({
     connectionString,
+    // set as each connection starts, whatever the role's default; the name was checked above
+    options: `-c search_path=${schema}`,
     max: 5,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
@@ -31,6 +36,7 @@ export async function connectPostgres(connectionString: string): Promise<Db> {
   pool.on('error', (e) => console.error('[db] idle connection error:', e.message));
   const run = async <T>(c: Pool | PoolClient, text: string, params?: unknown[]) => (await c.query(text, params)).rows as T[];
   return {
+    schema,
     query: (text, params) => run(pool, text, params),
     exec: async (text) => void (await pool.query(text)),
     async tx(fn) {
@@ -51,19 +57,34 @@ export async function connectPostgres(connectionString: string): Promise<Db> {
   };
 }
 
-/** Postgres compiled to WASM, in this process: local development (a folder) and tests (in memory). */
-export async function openPglite(dir?: string): Promise<Db> {
+/**
+ * Postgres compiled to WASM, in this process: local development (a folder) and tests (in memory). The
+ * tests pass a schema, so they run the way production does; a laptop's dev data stays in the default one.
+ */
+export async function openPglite(dir?: string, schema: string | null = null): Promise<Db> {
+  if (schema !== null) checkSchemaName(schema);
   const { PGlite } = await import('@electric-sql/pglite');
   if (dir) mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = dir ? new PGlite(dir) : new PGlite();
   await db.waitReady;
+  // one connection, so setting it once holds for every query and transaction after
+  if (schema !== null) await db.exec(`SET search_path TO ${schema}`);
   return {
+    schema,
     query: async (text, params) => (await db.query(text, params)).rows as never,
     exec: async (text) => void (await db.exec(text)),
     tx: (fn) =>
       db.transaction((t) => fn({ query: async (text, params) => (await t.query(text, params)).rows as never, exec: async (text) => void (await t.exec(text)) })),
     close: () => db.close(),
   };
+}
+
+/** A schema name safe to put in SQL as it is: lowercase letters, digits and _, and not one Postgres or others use. */
+export function checkSchemaName(name: string): string {
+  if (!/^[a-z_][a-z0-9_]{0,62}$/.test(name) || name === 'public' || name.startsWith('pg_') || name === 'information_schema') {
+    throw new Error(`schema "${name}": use our own, of lowercase letters, digits and _, not public`);
+  }
+  return name;
 }
 
 /** Thrown when accounts are on but no database is set up; routes answer 503. */
@@ -247,13 +268,28 @@ const MIGRATIONS: string[] = [
   CREATE INDEX ib_catalog_source ON ib_catalog_entries (source_game);
   CREATE INDEX ib_catalog_holds ON ib_catalog_entries (id) WHERE hold IS NOT NULL;
   `,
+  // Local accounts (AUTH_MODE=local): the scrypt hash of each one's password, see local-users.ts
+  `
+  CREATE TABLE ib_passwords (
+    user_id text PRIMARY KEY REFERENCES ib_users (id) ON DELETE CASCADE,
+    hash text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+  `,
 ];
+
+/** The version migrate() brings a database to. */
+export const SCHEMA_VERSION = MIGRATIONS.length;
 
 /** `upTo` is for tests that start from an older schema. */
 export async function migrate(db: Db, upTo = MIGRATIONS.length) {
   await db.tx(async (sql) => {
     // two app processes starting at once must not both migrate
     await sql.query('SELECT pg_advisory_xact_lock(4231001)');
+    // our own schema; looked up first, as CREATE SCHEMA IF NOT EXISTS still needs the right to create one
+    if (db.schema && !(await sql.query('SELECT 1 FROM pg_namespace WHERE nspname = $1', [db.schema])).length) {
+      await sql.exec(`CREATE SCHEMA ${checkSchemaName(db.schema)}`);
+    }
     await sql.exec('CREATE TABLE IF NOT EXISTS ib_schema (version integer NOT NULL)');
     const rows = await sql.query<{ version: number }>('SELECT version FROM ib_schema');
     if (rows.length === 0) await sql.query('INSERT INTO ib_schema (version) VALUES (0)');

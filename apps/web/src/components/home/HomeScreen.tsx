@@ -79,7 +79,7 @@ export function HomeScreen() {
 
         <section className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:mt-24">
           <ActionCard href="/host" color={1} title="จัดเกม (Host)" body="เลือกเกม เปิดห้อง แล้วคุมจังหวะบนจอใหญ่ด้วยปุ่มเดียว" cta="ไปหน้าจัดเกม" />
-          <ActionCard href="/editor" color={3} title="สร้างเกมของทีม" body="เขียนคำถาม 4 ตัวเลือก จริง/เท็จ หรือโพลโหวต จัดเป็นด่านๆ" cta="เปิด Editor" />
+          <ActionCard href="/editor" color={3} title="สร้างเกมของทีม" body="คำถาม 6 แบบ ควิซ จริง/เท็จ โพล เรียงลำดับ พิมพ์คำตอบ ทายตัวเลข จัดเป็นด่านๆ" cta="เปิด Editor" />
         </section>
 
         <section className="mt-16 lg:mt-24">

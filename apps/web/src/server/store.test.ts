@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { LIMITS, SAMPLE_GAMES, type Game } from '@icebreaker/shared';
 import { requireUser, upsertUser } from './auth';
 import { copyEntry, getEntry, listCatalog, reportEntry, shareGame, withdrawEntry } from './catalog';
-import { authMode } from './config';
-import { migrate, openPglite, type Db } from './db';
+import { authMode, authModeProblem, authModeSource, dbSchema } from './config';
+import { SCHEMA_VERSION, checkSchemaName, connectPostgres, migrate, openPglite, type Db } from './db';
 import {
   MAX_GAMES_PER_USER,
   TooLong,
@@ -21,13 +24,15 @@ import {
   saveGame,
 } from './games';
 import { HttpError, guardMutation, readJson } from './http';
+import { checkLocalLogin, createLocalUser, generatePassword, hashPassword, normalizeUsername, resetLoginThrottle, setLocalPassword, verifyPassword } from './local-users';
 import { IDLE_MS, createSession, findSession, parseCookies, sessionToken, type SessionUser } from './session';
 
 let db: Db;
 let n = 0;
 
 before(async () => {
-  db = await openPglite();
+  // in our own schema, made by migrate, as on the server
+  db = await openPglite(undefined, 'icebreaker');
   await migrate(db);
   await migrate(db); // a second start changes nothing
 });
@@ -361,8 +366,36 @@ test('an old editor link to a moved browser game finds the saved game', async ()
   assert.equal(await findLocalGame(db, b.id, 'g-moved'), null, "only the owner's");
 });
 
+test('the tables live in our own schema, never in public, and only a safe schema name is used', async () => {
+  const where = await db.query<{ table_schema: string; n: number }>(
+    "SELECT table_schema, count(*)::int AS n FROM information_schema.tables WHERE table_name LIKE 'ib\\_%' GROUP BY 1",
+  );
+  assert.deepEqual(where, [{ table_schema: 'icebreaker', n: 8 }]);
+  const [owner] = await db.query<{ owner: string }>("SELECT pg_get_userbyid(nspowner) AS owner FROM pg_namespace WHERE nspname = 'icebreaker'");
+  assert.ok(owner, 'migrate made the schema');
+
+  // a schema someone already made (the server's) is used as it is, without needing the right to create one
+  const other = await openPglite(undefined, 'icebreaker_other');
+  try {
+    await other.exec('CREATE SCHEMA icebreaker_other; CREATE TABLE public.not_ours (x int)');
+    await migrate(other);
+    assert.deepEqual(await other.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"), [{ table_name: 'not_ours' }]);
+    assert.equal((await other.query('SELECT * FROM ib_schema'))[0]?.version, SCHEMA_VERSION);
+  } finally {
+    await other.close();
+  }
+
+  for (const bad of ['public', 'pg_temp', 'information_schema', 'Icebreaker', 'ice-breaker', 'x;DROP TABLE y', '', '1st']) {
+    assert.throws(() => checkSchemaName(bad), /use our own/, bad);
+    await assert.rejects(openPglite(undefined, bad), /use our own/, bad);
+  }
+  await withEnv({ IB_DB_SCHEMA: 'public' }, () => assert.rejects(connectPostgres('postgres://nobody@127.0.0.1:1/none'), /use our own/));
+  withEnv({ IB_DB_SCHEMA: undefined }, () => assert.equal(dbSchema(), 'icebreaker'));
+  withEnv({ IB_DB_SCHEMA: ' ib_demo ' }, () => assert.equal(dbSchema(), 'ib_demo'));
+});
+
 test('upgrading a v1 database fills in lineage and holds for takedowns made before', async () => {
-  const old = await openPglite();
+  const old = await openPglite(undefined, 'icebreaker');
   try {
     await migrate(old, 1);
     await old.exec(`
@@ -512,7 +545,76 @@ test('a page bound to one account is refused once another login replaced the ses
   }
 });
 
+/** Runs `fn` with these env values (undefined deletes one), then puts the old ones back. */
+/** Runs fn with these environment variables (undefined: unset), then puts them back, after the promise if fn returns one. */
+function withEnv<R>(values: Record<string, string | undefined>, fn: () => R): R {
+  const env = process.env as Record<string, string | undefined>;
+  const saved = Object.fromEntries(Object.keys(values).map((k) => [k, env[k]]));
+  const put = (vals: Record<string, string | undefined>) => {
+    for (const [k, v] of Object.entries(vals)) {
+      if (v === undefined) delete env[k];
+      else env[k] = v;
+    }
+  };
+  put(values);
+  let result: R;
+  try {
+    result = fn();
+  } catch (e) {
+    put(saved);
+    throw e;
+  }
+  if (result instanceof Promise) return result.finally(() => put(saved)) as R;
+  put(saved);
+  return result;
+}
+
+/** A fresh data folder, holding var/auth-mode when `mode` is given. */
+const dataFolders: string[] = [];
+function dataFolder(mode?: string): string {
+  const dir = mkdtempSync(path.join(tmpdir(), 'ib-var-'));
+  dataFolders.push(dir);
+  if (mode !== undefined) writeFileSync(path.join(dir, 'auth-mode'), mode);
+  return dir;
+}
+after(() => dataFolders.forEach((d) => rmSync(d, { recursive: true, force: true })));
+
 test('mock login is refused in production', () => {
+  withEnv({ AUTH_MODE: 'mock', NODE_ENV: 'development', IB_DATA_DIR: dataFolder() }, () => {
+    assert.equal(authMode(), 'mock');
+    (process.env as Record<string, string>).NODE_ENV = 'production';
+    assert.equal(authMode(), 'off');
+    delete process.env.AUTH_MODE;
+    assert.equal(authMode(), 'off', 'off unless asked');
+    assert.deepEqual(authModeSource(), { raw: 'off', from: 'default' });
+  });
+});
+
+test('the login mode can come from var/auth-mode, and AUTH_MODE wins over it', () => {
+  const local = dataFolder(' Local\n');
+  withEnv({ AUTH_MODE: undefined, NODE_ENV: 'production', IB_DATA_DIR: local }, () => {
+    assert.equal(authMode(), 'local');
+    assert.deepEqual(authModeSource(), { raw: 'Local', from: 'var/auth-mode' });
+    process.env.AUTH_MODE = 'off';
+    assert.equal(authMode(), 'off', 'the environment wins');
+    delete process.env.AUTH_MODE;
+    // read once per process: a change applies after a restart
+    writeFileSync(path.join(local, 'auth-mode'), 'off');
+    assert.equal(authMode(), 'local');
+
+    process.env.IB_DATA_DIR = dataFolder('mock');
+    assert.equal(authMode(), 'off', 'mock is refused in production from the file too');
+    assert.match(authModeProblem(authModeSource()) ?? '', /^var\/auth-mode=mock is refused in production$/);
+    process.env.IB_DATA_DIR = dataFolder('lcoal');
+    assert.equal(authMode(), 'off', 'a typo turns accounts off rather than on');
+    assert.match(authModeProblem(authModeSource()) ?? '', /^unknown var\/auth-mode "lcoal"/);
+    process.env.IB_DATA_DIR = dataFolder('');
+    assert.deepEqual(authModeSource(), { raw: 'off', from: 'default' }, 'an empty file is no file');
+    assert.equal(authModeProblem(authModeSource()), null);
+  });
+});
+
+test('mock login: the old env-only checks still hold', () => {
   const env = process.env as Record<string, string | undefined>;
   const saved = { mode: env.AUTH_MODE, node: env.NODE_ENV };
   try {
@@ -521,13 +623,81 @@ test('mock login is refused in production', () => {
     assert.equal(authMode(), 'mock');
     env.NODE_ENV = 'production';
     assert.equal(authMode(), 'off');
-    env.AUTH_MODE = undefined;
-    delete env.AUTH_MODE;
-    assert.equal(authMode(), 'off', 'off unless asked');
   } finally {
     if (saved.mode === undefined) delete env.AUTH_MODE;
     else env.AUTH_MODE = saved.mode;
     if (saved.node === undefined) delete env.NODE_ENV;
     else env.NODE_ENV = saved.node;
   }
+});
+
+test('local passwords: scrypt hashes that differ every time, and a generated password reads clearly', async () => {
+  const h1 = await hashPassword('correct horse battery');
+  const h2 = await hashPassword('correct horse battery');
+  assert.match(h1, /^scrypt\$32768\$8\$1\$[\w-]{22}\$[\w-]{43}$/);
+  assert.notEqual(h1, h2, 'a fresh salt each time');
+  assert.equal(await verifyPassword('correct horse battery', h1), true);
+  assert.equal(await verifyPassword('correct horse batterY', h1), false);
+  assert.equal(await verifyPassword('x', 'garbage'), false);
+  const p = generatePassword();
+  assert.match(p, /^[a-km-np-zA-HJ-KM-NP-Z2-9]{16}$/);
+  assert.equal(normalizeUsername('  Admin.Test '), 'admin.test');
+  for (const bad of ['ab', '-x1', 'มีไทย', 'a b c', 'x'.repeat(33), 42]) assert.equal(normalizeUsername(bad), null, String(bad));
+});
+
+test('local login: right password in any username case, one answer for wrong name or password, a lockout, and disabled accounts', async () => {
+  resetLoginThrottle();
+  const made = await db.tx((sql) => createLocalUser(sql, { username: 'Tester1', name: 'คุณทดสอบ', password: 'a-good-password', curator: true }));
+  assert.equal(made.isCurator, true);
+  await assert.rejects(db.tx((sql) => createLocalUser(sql, { username: 'tester1', name: 'อีกคน', password: 'a-good-password' })), (e: HttpError) => e.code === 'username_taken');
+  await assert.rejects(db.tx((sql) => createLocalUser(sql, { username: 'tester2', name: 'สั้น', password: 'short' })), (e: HttpError) => e.code === 'password_too_short');
+
+  const ok = await checkLocalLogin(db, 'TESTER1', 'a-good-password');
+  assert.deepEqual(ok, { ...made, email: null });
+  for (const [u, p] of [['tester1', 'wrong-password'], ['nobody-here', 'a-good-password'], ['tester1', ''], [null, 'x']] as const) {
+    await assert.rejects(checkLocalLogin(db, u, p), (e: HttpError) => e.status === 401 && e.code === 'bad_login', `${u}/${p}`);
+  }
+  // 5 wrong tries (one above), then even the right password waits
+  for (let i = 0; i < 4; i++) await assert.rejects(checkLocalLogin(db, 'tester1', 'wrong'), (e: HttpError) => e.code === 'bad_login');
+  await assert.rejects(checkLocalLogin(db, 'tester1', 'a-good-password'), (e: HttpError) => e.status === 429 && e.code === 'too_many_tries');
+  // 15 minutes later it lets the right password in again
+  assert.equal((await checkLocalLogin(db, 'tester1', 'a-good-password', Date.now() + 16 * 60_000)).id, made.id);
+
+  // a reset ends every session and only the new password works
+  const token = await createSession(db, made.id);
+  assert.ok(await findSession(db, token));
+  assert.equal(await db.tx((sql) => setLocalPassword(sql, 'Tester1', 'the-new-password')), true);
+  assert.equal(await findSession(db, token), null, 'logged out everywhere');
+  await assert.rejects(checkLocalLogin(db, 'tester1', 'a-good-password'), (e: HttpError) => e.code === 'bad_login');
+  assert.equal((await checkLocalLogin(db, 'tester1', 'the-new-password')).id, made.id);
+  assert.equal(await db.tx((sql) => setLocalPassword(sql, 'nobody-here', 'the-new-password')), false);
+
+  await db.query('UPDATE ib_users SET disabled = true WHERE id = $1', [made.id]);
+  await assert.rejects(checkLocalLogin(db, 'tester1', 'the-new-password'), (e: HttpError) => e.status === 403 && e.code === 'account_disabled');
+  // a mock or company login with the same name is someone else
+  const other = await upsertUser(db, { issuer: 'mock', subject: 'tester1', name: 'tester1' });
+  assert.notEqual(other.id, made.id);
+  resetLoginThrottle();
+});
+
+test('local login is allowed in production, unlike mock', () => {
+  const env = process.env as Record<string, string | undefined>;
+  const saved = { mode: env.AUTH_MODE, node: env.NODE_ENV };
+  try {
+    env.AUTH_MODE = ' Local ';
+    env.NODE_ENV = 'production';
+    assert.equal(authMode(), 'local');
+  } finally {
+    if (saved.mode === undefined) delete env.AUTH_MODE;
+    else env.AUTH_MODE = saved.mode;
+    if (saved.node === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = saved.node;
+  }
+});
+
+test('password hashing runs at most 2 at a time and still answers every caller', async () => {
+  const hashes = await Promise.all(Array.from({ length: 7 }, (_, i) => hashPassword(`password-number-${i}`)));
+  assert.equal(new Set(hashes).size, 7);
+  const checks = await Promise.all(hashes.map((h, i) => verifyPassword(`password-number-${i}`, h)));
+  assert.deepEqual(checks, Array(7).fill(true));
 });

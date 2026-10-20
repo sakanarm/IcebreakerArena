@@ -53,14 +53,22 @@ export interface Identity {
 }
 
 /** Creates or updates the user, ends the session this browser had, and starts a new one (a fresh id at every login). */
-export async function logIn(req: Request, identity: Identity): Promise<{ user: SessionUser; setCookie: string }> {
+export const logIn = (req: Request, identity: Identity) => startSession(req, identity.issuer, (sql) => upsertUser(sql, identity));
+
+/** Logs in the user `pick` finds (or throws for), in place of the session this browser had. */
+export async function startSession(
+  req: Request,
+  issuer: string,
+  pick: (sql: Sql) => Promise<SessionUser>,
+): Promise<{ user: SessionUser; setCookie: string }> {
   const db = await getDb();
   const { token: old } = sessionToken(req);
   const { user, token } = await db.tx(async (sql) => {
-    const user = await upsertUser(sql, identity);
+    const user = await pick(sql);
     if (old) await deleteSession(sql, old);
     const token = await createSession(sql, user.id);
-    await audit(sql, user.id, 'login', null, { issuer: identity.issuer });
+    await sql.query('UPDATE ib_users SET last_login_at = now() WHERE id = $1', [user.id]);
+    await audit(sql, user.id, 'login', null, { issuer });
     return { user, token };
   });
   await pruneSessions(db).catch((e) => console.error('[auth] prune sessions:', e));

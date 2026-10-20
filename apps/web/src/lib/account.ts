@@ -3,8 +3,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { api, setPageUser } from './api';
 
-/** off: no accounts, games stay in the browser (today's behaviour). mock: name-only login for development. oidc: company login. */
-export type AuthMode = 'off' | 'mock' | 'oidc';
+/** off: no accounts, games stay in the browser. mock: name-only login for development. local: username and password. oidc: company login. */
+export type AuthMode = 'off' | 'mock' | 'local' | 'oidc';
 
 export interface AccountUser {
   id: string;
@@ -112,6 +112,12 @@ export const usesAccounts = (a: Account) => a.status === 'ready' && a.mode !== '
 export async function mockLogin(name: string) {
   const r = await api<{ user: AccountUser }>('/auth/mock', { method: 'POST', body: { name } });
   become('mock', r.user);
+}
+
+/** Username and password, for accounts an admin made. The server only allows it when AUTH_MODE=local. */
+export async function localLogin(username: string, password: string) {
+  const r = await api<{ user: AccountUser }>('/auth/login', { method: 'POST', body: { username, password } });
+  become('local', r.user);
 }
 
 export async function logout() {

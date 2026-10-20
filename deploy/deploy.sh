@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Installs, tests, builds and (re)starts MFEC IceBreaker Arena under pm2, behind nginx at /icebreaker.
 #
-#   bash deploy/deploy.sh          the first install, and every update (it runs `git pull` itself)
-#   FORCE=1 bash deploy/deploy.sh  even while rooms are in use: every live game ends
+#   bash deploy/deploy.sh                  the first install, and every update (it runs `git pull` itself)
+#   FORCE=1 bash deploy/deploy.sh          even while rooms are in use: every live game ends
+#   SKIP_DB_CHECK=1 bash deploy/deploy.sh  without first checking the login mode and database
 #
+# Accounts: the login mode is the one word in var/auth-mode (off or local) and the database's connection
+# string is in var/secrets/database-url (mode 600); see "บัญชีผู้สร้างเกม" in README.md.
 # The site is down while an update builds the web app (a minute or two), so update between events.
 # If the build fails, the previous build goes back and the site runs as it did before.
 # Another server can override NEXT_PUBLIC_BASE_PATH, BIND_HOST, WEB_PORT and GAME_PORT.
@@ -62,6 +65,16 @@ main() {
 
   step "Running tests"
   npm test
+
+  # the login mode and, when accounts are on, the database: a problem stops the deploy here, before the site changes
+  step "Checking the login mode and database"
+  [ -z "$(git ls-files var)" ] || die "files under var/ are in git, and secrets must never be: git rm --cached them"
+  if [ "${SKIP_DB_CHECK:-}" = 1 ]; then
+    warn "SKIP_DB_CHECK=1: not checked"
+  else
+    NODE_ENV=production npm run --silent users -- check ||
+      die "fix the problem above, or deploy without this check: SKIP_DB_CHECK=1 bash deploy/deploy.sh"
+  fi
 
   step "Building the web app for ${NEXT_PUBLIC_BASE_PATH:-/}"
   set_aside_build
