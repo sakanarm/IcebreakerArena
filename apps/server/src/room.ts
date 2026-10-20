@@ -555,7 +555,7 @@ export class Room {
 }
 
 /** A fresh shuffle of n items that never leaves them in the authored (right) order. */
-function shuffled(n: number): number[] {
+export function shuffled(n: number): number[] {
   const order = Array.from({ length: n }, (_, i) => i);
   if (n < 2) return order;
   do {
