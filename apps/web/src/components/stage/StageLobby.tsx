@@ -33,21 +33,22 @@ export function StageLobby({
   const cover = { title: state.gameTitle, cover: state.cover ?? undefined };
 
   return (
-    <div className="flex h-full flex-col gap-5">
+    // a phone on its side: everything a size down, so the players' names still get some of the height
+    <div className="flex h-full flex-col gap-5 short:gap-2">
       <motion.div
         initial={{ y: -40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-        className="mx-auto flex w-full max-w-5xl items-stretch gap-4"
+        className="mx-auto flex w-full max-w-5xl items-stretch gap-4 short:gap-3"
       >
-        <div className="card flex min-w-0 flex-1 flex-col justify-center px-5 py-5 sm:px-8">
-          <p className="text-lg text-slate-500 lg:text-xl">
+        <div className="card flex min-w-0 flex-1 flex-col justify-center px-5 py-5 sm:px-8 short:py-2">
+          <p className="text-lg text-slate-500 lg:text-xl short:text-base">
             ใช้มือถือเข้า <span className="font-semibold text-ink">{join?.label ?? '…'}</span>
             {join && <span className="max-sm:hidden"> หรือสแกน QR</span>}
           </p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-5">
-            <span className="font-display text-2xl font-semibold text-slate-500">PIN เกม</span>
-            <span className="flex font-display text-6xl font-extrabold tracking-wider text-ink sm:text-7xl lg:text-8xl" aria-label={`PIN ${state.pin}`}>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-5 short:mt-0">
+            <span className="font-display text-2xl font-semibold text-slate-500 short:text-lg">PIN เกม</span>
+            <span className="flex font-display text-6xl font-extrabold tracking-wider text-ink sm:text-7xl lg:text-8xl short:text-5xl" aria-label={`PIN ${state.pin}`}>
               {state.pin.split('').map((d, i) => (
                 <motion.span
                   key={i}
@@ -67,20 +68,20 @@ export function StageLobby({
             initial={{ scale: 0.5, opacity: 0, rotate: 8 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
             transition={{ delay: 0.55, type: 'spring', stiffness: 300, damping: 18 }}
-            className="card grid place-items-center p-3 max-sm:hidden"
+            className="card grid place-items-center p-3 max-sm:hidden short:p-2"
           >
-            <QRCodeSVG value={join.url} size={156} level="M" marginSize={0} title="สแกนเพื่อเข้าร่วมเกม" />
+            <QRCodeSVG value={join.url} size={156} level="M" marginSize={0} title="สแกนเพื่อเข้าร่วมเกม" className="short:size-24" />
           </motion.div>
         )}
       </motion.div>
 
       {/* on a phone the title drops under the count instead of being cut to a few letters */}
       <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-x-4 gap-y-3 px-1 max-sm:flex-wrap">
-        <div className="glass flex shrink-0 items-center gap-3 px-5 py-2">
-          <span className="text-3xl" aria-hidden>
+        <div className="glass flex shrink-0 items-center gap-3 px-5 py-2 short:py-1">
+          <span className="text-3xl short:text-2xl" aria-hidden>
             👥
           </span>
-          <PopNumber value={state.playerCount} className="font-display text-4xl font-extrabold" />
+          <PopNumber value={state.playerCount} className="font-display text-4xl font-extrabold short:text-3xl" />
           <span className="text-lg whitespace-nowrap text-white/70">ผู้เล่น</span>
         </div>
         <div className="flex min-w-0 items-center gap-3">
@@ -104,14 +105,14 @@ export function StageLobby({
                 <motion.div
                   layoutId="lobby-cover"
                   style={{ borderRadius: 28 }}
-                  className="relative aspect-video w-[min(32rem,46dvh)] max-w-full overflow-hidden shadow-2xl ring-4 ring-white/15"
+                  className="relative aspect-video w-[min(32rem,46dvh)] max-w-full overflow-hidden shadow-2xl ring-4 ring-white/15 short:w-[min(32rem,20dvh)]"
                   aria-hidden
                 >
                   <GameCover game={cover} />
                   <span className="shine animate-shine motion-reduce:hidden" style={{ animationDuration: '5s' }} />
                 </motion.div>
               </motion.div>
-              <p className="mt-6 flex items-center gap-3 text-2xl text-white/80">
+              <p className="mt-6 flex items-center gap-3 text-2xl text-white/80 short:mt-2 short:text-lg">
                 <span aria-hidden>📱</span> รอผู้เล่นเข้าห้อง <WaitingDots />
               </p>
             </div>

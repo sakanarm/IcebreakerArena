@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* a laptop's browser window, a 720p projector or a tablet on its side: wide, but without a full HD screen's height,
+   so the big screen's scenes come a size down (declared before `short`, which wins where both apply) */
+@custom-variant low (@media (min-width: 40rem) and (max-height: 900px));
+/* a phone on its side: the big screen's scenes get compact to fit the little height */
+@custom-variant short (@media (max-height: 500px));
+
 @theme {
   --font-sans: 'IBM Plex Sans Thai', 'Kanit', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Kanit', 'IBM Plex Sans Thai', ui-sans-serif, system-ui, sans-serif;

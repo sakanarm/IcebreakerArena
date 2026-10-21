@@ -52,17 +52,18 @@ export function FloatingShapes({ opacity = 0.1 }: { opacity?: number }) {
   );
 }
 
-export function Logo({ small = false }: { small?: boolean }) {
+/** `compact`: just the mark on a phone, where the name would crowd out the header's controls */
+export function Logo({ small = false, compact = false }: { small?: boolean; compact?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className={`grid -rotate-6 grid-cols-2 gap-1 rounded-2xl bg-white/10 p-1.5 ${small ? 'size-10' : 'size-14'}`}>
+    <div className={`flex items-center gap-3 ${compact ? 'shrink-0' : ''}`}>
+      <div className={`grid -rotate-6 grid-cols-2 gap-1 rounded-2xl bg-white/10 p-1.5 ${small ? 'size-10' : 'size-14'} ${compact ? 'short:size-9' : ''}`}>
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className={`grid place-items-center rounded-md ${ANSWER_BG[i]}`}>
             <AnswerShape index={i} className="size-[70%] text-white" />
           </div>
         ))}
       </div>
-      <div className="leading-none">
+      <div className={`leading-none ${compact ? 'whitespace-nowrap max-sm:hidden' : ''}`}>
         <div className={`font-display font-extrabold tracking-tight ${small ? 'text-xl' : 'text-3xl'}`}>
           IceBreaker <span className="text-brand-2">Arena</span>
         </div>

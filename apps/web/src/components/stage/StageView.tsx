@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, usePresence, usePresenceData, useReducedMotion, type Variants } from 'motion/react';
-import { createContext, memo, useContext, useEffect, useLayoutEffect, useState } from 'react';
+import { createContext, memo, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { StageState } from '@icebreaker/shared';
 import { sfx } from '@/lib/sfx';
 import type { SoundControl } from '@/lib/use-sound';
@@ -62,33 +62,58 @@ export function StageView({ state, join, sound, online, onKick, docked = false }
 
   const counter = shown.key !== 'lobby' && shown.key !== 'podium' ? shown.q : null;
 
+  // a scene that had to scroll leaves the next one starting at its top
+  const mainRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [shown.key]);
+
   return (
-    <div className={`relative flex h-dvh flex-col overflow-hidden ${docked ? 'pb-24' : ''}`}>
+    // the dock measures itself (two rows on a phone, a slimmer one on a phone on its side); until it has, a guess
+    <div className={`relative flex h-dvh flex-col overflow-hidden ${docked ? 'pb-[var(--dock-h,6rem)]' : ''}`}>
       <FloatingShapes opacity={state.phase === 'lobby' ? 0.14 : 0.08} />
-      <header className="relative z-10 flex items-center gap-3 px-6 pt-4 pb-2 lg:px-10">
-        <Logo small />
-        <div className="flex-1" />
-        {counter && (
-          <span className="glass px-4 py-1.5 font-display text-lg font-semibold">
-            ข้อ {counter.number} / {counter.total}
-          </span>
-        )}
-        {!docked && state.phase !== 'lobby' && (
-          <span className="rounded-full bg-white px-4 py-1.5 font-display text-lg font-extrabold tracking-wider text-ink">PIN {state.pin}</span>
-        )}
-        {!online && <span className="animate-pulse rounded-full bg-bad px-4 py-1.5 font-semibold">กำลังเชื่อมต่อใหม่…</span>}
-        {/* a freshly opened projector tab stays silent until someone clicks on it */}
-        {sound.blocked && (
-          <button type="button" onClick={sound.unlock} className="animate-pulse rounded-full bg-gold px-4 py-1.5 font-semibold text-ink">
-            🔈 คลิกเพื่อเปิดเสียง
-          </button>
-        )}
-        <TopButton onClick={sound.toggle} label={sound.on ? 'ปิดเสียง' : 'เปิดเสียง'}>
-          {sound.on ? '🔊' : '🔇'}
-        </TopButton>
-        <FullscreenButton />
+      <header className="relative z-10 flex items-center gap-2 px-4 pt-3 pb-2 sm:gap-3 sm:px-6 sm:pt-4 short:pt-2 short:pb-1 lg:px-10">
+        <Logo small compact />
+        {/* one row on a phone too: what doesn't fit (a reconnect and a muted tab at once) goes onto a second */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {counter && (
+            <span className="glass px-3 py-1 font-display text-base font-semibold whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-lg short:py-1 short:text-base">
+              ข้อ {counter.number} / {counter.total}
+            </span>
+          )}
+          {!docked && state.phase !== 'lobby' && (
+            <span className="rounded-full bg-white px-3 py-1 font-display text-base font-extrabold tracking-wider whitespace-nowrap text-ink sm:px-4 sm:py-1.5 sm:text-lg">
+              PIN {state.pin}
+            </span>
+          )}
+          {!online && (
+            <span className="animate-pulse rounded-full bg-bad px-3 py-1 text-sm font-semibold whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-base">
+              <span className="max-sm:hidden">กำลัง</span>เชื่อมต่อใหม่…
+            </span>
+          )}
+          {/* a freshly opened projector tab stays silent until someone clicks on it */}
+          {sound.blocked && (
+            <button
+              type="button"
+              onClick={sound.unlock}
+              className="animate-pulse rounded-full bg-gold px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink sm:px-4 sm:py-1.5 sm:text-base"
+            >
+              🔈 <span className="max-sm:hidden">คลิกเพื่อ</span>เปิดเสียง
+            </button>
+          )}
+          <TopButton onClick={sound.toggle} label={sound.on ? 'ปิดเสียง' : 'เปิดเสียง'}>
+            {sound.on ? '🔊' : '🔇'}
+          </TopButton>
+          <FullscreenButton />
+        </div>
       </header>
-      <main className="relative min-h-0 flex-1 px-6 pb-5 lg:px-10">
+      {/* the longest questions and answers can need more height than a phone (or a laptop) has: then the scene
+          scrolls, as its parts never squeeze below what they hold (without a bar, which would flash up as tiles
+          slide in from below) */}
+      <main
+        ref={mainRef}
+        className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4 [scrollbar-width:none] sm:px-6 sm:pb-5 short:pb-2 lg:px-10"
+      >
         <Shut.Provider value={cover === 'shut'}>
           {/* the leaving scene was rendered before anyone knew what comes next, so it gets custom from here */}
           <AnimatePresence mode="wait" custom={wiped}>
@@ -179,14 +204,14 @@ const Scene = memo(function Scene({ state, join, onKick }: Pick<Props, 'state' |
   }
 });
 
-function TopButton({ onClick, label, children }: { onClick: () => void; label: string; children: React.ReactNode }) {
+function TopButton({ onClick, label, className = '', children }: { onClick: () => void; label: string; className?: string; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="grid size-11 place-items-center rounded-full bg-white/10 text-xl transition-colors hover:bg-white/20"
+      className={`grid size-10 shrink-0 place-items-center rounded-full bg-white/10 text-lg transition-colors hover:bg-white/20 sm:size-11 sm:text-xl short:size-9 short:text-lg ${className}`}
     >
       {children}
     </button>
@@ -208,7 +233,8 @@ function FullscreenButton() {
   };
 
   return (
-    <TopButton onClick={toggle} label={full ? 'ออกจากเต็มจอ' : 'เต็มจอ'}>
+    // a phone's browser has no full screen for a page (iPhone) or fills the screen already
+    <TopButton onClick={toggle} label={full ? 'ออกจากเต็มจอ' : 'เต็มจอ'} className="max-sm:hidden">
       {full ? '🗗' : '⛶'}
     </TopButton>
   );

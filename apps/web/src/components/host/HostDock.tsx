@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { StageState } from '@icebreaker/shared';
 import { fmt } from '@/lib/format';
 import { withBase } from '@/lib/paths';
@@ -11,6 +11,8 @@ import { getSocket } from '@/lib/socket';
 /** a double click or a bouncing clicker must not skip a question */
 const COOLDOWN_MS = 700;
 const NEXT_KEYS = ['Space', 'Enter', 'ArrowRight', 'PageDown', 'KeyN'];
+/** a button with words beside its icon, which a phone shows as the icon alone */
+const ICON_ON_PHONE = 'max-sm:px-2.5 max-sm:text-xl short:px-3 short:py-1.5 short:text-xl';
 
 function primaryLabel(state: StageState): string {
   switch (state.phase) {
@@ -67,6 +69,22 @@ export function HostDock({
     if (canEnd && !confirm('เกมยังเล่นอยู่ ออกจากหน้านี้ไหม?\nผู้เล่นจะค้างอยู่ที่ข้อนี้ จนกว่าคุณจะกดย้อนกลับมา')) e.preventDefault();
   };
 
+  // the stage keeps its scene clear of the dock, whose height depends on the screen's width and on what it shows
+  const dock = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = dock.current;
+    if (!el) return;
+    const root = document.documentElement.style;
+    const measure = () => root.setProperty('--dock-h', `${el.offsetHeight}px`);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      root.removeProperty('--dock-h');
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (blocked || e.repeat || e.altKey || e.ctrlKey || e.metaKey || !NEXT_KEYS.includes(e.code)) return;
@@ -81,46 +99,52 @@ export function HostDock({
 
   return (
     <motion.div
+      ref={dock}
       initial={{ y: 120 }}
       animate={{ y: 0 }}
       transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 26 }}
-      className="fixed inset-x-0 bottom-0 z-40 px-4 pb-3"
+      className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 short:pb-1.5"
     >
-      <div className="glass mx-auto flex max-w-6xl items-center gap-2 bg-night/70 px-3 py-3 sm:gap-3 sm:px-4">
-        <Link href="/" onClick={leave} className="btn btn-ghost shrink-0 px-3 text-xl" aria-label="กลับหน้าแรก" title="กลับหน้าแรก">
+      {/* on a phone, two rows: the room's numbers above, the buttons below with "Next" taking what is left; on a
+          phone on its side, one slim row, as every line of height there is the scene's */}
+      <div className="glass mx-auto flex max-w-6xl flex-wrap items-center gap-2 bg-night/70 px-3 py-3 sm:flex-nowrap sm:gap-3 sm:px-4 short:py-1.5">
+        <Link href="/" onClick={leave} className="btn btn-ghost shrink-0 px-3 text-xl max-sm:px-2.5 short:py-1.5" aria-label="กลับหน้าแรก" title="กลับหน้าแรก">
           🏠
         </Link>
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm lg:text-base">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm max-sm:order-first max-sm:basis-full lg:text-base short:flex-nowrap">
           <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 font-display font-extrabold tracking-wider text-ink">PIN {state.pin}</span>
-          <span className="rounded-full bg-white/10 px-3 py-1">👥 {fmt(state.playerCount)}</span>
+          <span className="whitespace-nowrap rounded-full bg-white/10 px-3 py-1">👥 {fmt(state.playerCount)}</span>
+          {/* the scene counts the answers in big type too, so a phone on its side leaves it to that */}
           {state.phase === 'question' && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
+            <span className="whitespace-nowrap rounded-full bg-white/10 px-3 py-1 short:hidden">
               ตอบแล้ว {fmt(state.answeredCount)}/{fmt(state.playerCount)}
             </span>
           )}
           <span className="hidden text-white/50 xl:inline">กด Space หรือ → เพื่อไปต่อ</span>
         </div>
 
-        <a href={withBase(`/stage/${state.pin}`)} target="_blank" rel="noopener" className="btn btn-ghost hidden px-4 text-base md:inline-flex" title="เปิดจอแสดงผลแยก สำหรับโปรเจกเตอร์">
+        {/* a new tab on the same phone is no projector */}
+        <a href={withBase(`/stage/${state.pin}`)} target="_blank" rel="noopener" className="btn btn-ghost hidden px-4 text-base md:inline-flex short:hidden" title="เปิดจอแสดงผลแยก สำหรับโปรเจกเตอร์">
           🖥️ จอแยก
         </a>
+        {/* on a phone the buttons are their icons; the words stay for screen readers */}
         {canEnd && (
-          <button type="button" onClick={end} className="btn btn-ghost px-4 text-base" title="จบเกมแล้วประกาศผลทันที">
-            ⏹ จบเกม
+          <button type="button" onClick={end} className={`${ICON_ON_PHONE} btn btn-ghost shrink-0 px-4 text-base`} title="จบเกมแล้วประกาศผลทันที">
+            ⏹<span className="max-sm:sr-only short:sr-only">จบเกม</span>
           </button>
         )}
         {state.phase === 'podium' ? (
           <>
-            <Link href="/host" className="btn btn-ghost px-4 text-base" title="กลับไปเลือกเกม แล้วเปิดห้องใหม่">
-              🎮 เล่นเกมอื่น
+            <Link href="/host" className={`${ICON_ON_PHONE} btn btn-ghost shrink-0 px-4 text-base`} title="กลับไปเลือกเกม แล้วเปิดห้องใหม่">
+              🎮<span className="max-sm:sr-only short:sr-only">เล่นเกมอื่น</span>
             </Link>
-            <button type="button" onClick={onClose} className="btn btn-ghost px-4 text-base" title="ปิดห้องนี้ ผู้เล่นทุกคนจะออกจากห้อง">
-              🚪 ปิดห้อง
+            <button type="button" onClick={onClose} className={`${ICON_ON_PHONE} btn btn-ghost shrink-0 px-4 text-base`} title="ปิดห้องนี้ ผู้เล่นทุกคนจะออกจากห้อง">
+              🚪<span className="max-sm:sr-only short:sr-only">ปิดห้อง</span>
             </button>
           </>
         ) : (
           // leaving the page keeps the room open (a refresh must not end the game), so closing is its own button
-          <button type="button" onClick={onClose} className="btn btn-ghost shrink-0 px-3 text-xl" aria-label="ปิดห้อง" title="ปิดห้องนี้ ผู้เล่นทุกคนจะออกจากห้อง">
+          <button type="button" onClick={onClose} className="btn btn-ghost shrink-0 px-3 text-xl max-sm:px-2.5 short:py-1.5" aria-label="ปิดห้อง" title="ปิดห้องนี้ ผู้เล่นทุกคนจะออกจากห้อง">
             🚪
           </button>
         )}
@@ -129,7 +153,7 @@ export function HostDock({
           onClick={next}
           disabled={waiting}
           title={waiting ? 'รอผู้เล่นอย่างน้อย 1 คน' : undefined}
-          className="btn btn-gold shrink-0 px-5 py-4 text-lg sm:min-w-48 sm:px-8 sm:text-xl"
+          className="btn btn-gold shrink-0 px-5 py-4 text-lg max-sm:flex-1 max-sm:px-3 max-sm:py-3 sm:min-w-48 sm:px-8 sm:text-xl short:py-1.5"
         >
           <motion.span key={label} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
             {waiting ? 'รอผู้เล่น…' : label}

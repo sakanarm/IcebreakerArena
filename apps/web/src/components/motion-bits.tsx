@@ -52,11 +52,14 @@ export function TimerRing({
   startsAt,
   endsAt,
   size = 128,
+  className,
   ticks = false,
 }: {
   startsAt: number;
   endsAt: number;
   size?: number;
+  /** sizes the ring instead of `size`, e.g. smaller on a phone; the number scales with it */
+  className?: string;
   ticks?: boolean;
 }) {
   const now = useServerNow(true, 200);
@@ -72,7 +75,12 @@ export function TimerRing({
   }, [secs, ticks]);
 
   return (
-    <div className="relative shrink-0" style={{ width: size, height: size }} role="timer" aria-label={`เหลือ ${secs} วินาที`}>
+    <div
+      className={`relative shrink-0 ${className ? `[container-type:size] ${className}` : ''}`}
+      style={className ? undefined : { width: size, height: size }}
+      role="timer"
+      aria-label={`เหลือ ${secs} วินาที`}
+    >
       <motion.div
         className="absolute inset-0 rounded-full bg-bad/30"
         animate={danger && secs > 0 ? { scale: [1, 1.18, 1], opacity: [0.7, 0, 0.7] } : { scale: 1, opacity: 0 }}
@@ -99,7 +107,7 @@ export function TimerRing({
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 500, damping: 22 }}
         className={`absolute inset-0 grid place-items-center font-display font-extrabold tabular-nums ${danger ? 'text-bad' : ''}`}
-        style={{ fontSize: size * 0.36 }}
+        style={{ fontSize: className ? '36cqw' : size * 0.36 }}
       >
         {secs}
       </motion.span>
