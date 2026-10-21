@@ -50,6 +50,49 @@
   to { transform: translateX(320%) skewX(-20deg); }
 }
 
+/* The big screen's scene wipe (SceneWipe): the columns shut over the old scene, stay shut while the new one
+   mounts, then open on the other side. SceneWipe sets the durations and delays. */
+@keyframes wipe-shut-down {
+  from { transform: translate3d(0, -101%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes wipe-shut-up {
+  from { transform: translate3d(0, 101%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes wipe-open-down {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, 101%, 0); }
+}
+
+@keyframes wipe-open-up {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -101%, 0); }
+}
+
+/* each shape rolls in with its column and snaps into place, then rolls on as the column leaves */
+@keyframes wipe-spin-in {
+  from { transform: rotate(-120deg) scale(0.4); }
+  to { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes wipe-spin-in-back {
+  from { transform: rotate(120deg) scale(0.4); }
+  to { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes wipe-spin-out {
+  from { transform: rotate(0deg) scale(1); }
+  to { transform: rotate(90deg) scale(0.7); }
+}
+
+@keyframes wipe-spin-out-back {
+  from { transform: rotate(0deg) scale(1); }
+  to { transform: rotate(-90deg) scale(0.7); }
+}
+
 @layer base {
   :root {
     color-scheme: dark;
@@ -185,6 +228,47 @@
   .shine {
     @apply pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/25;
   }
+
+  .wipe-shut-down,
+  .wipe-shut-up,
+  .wipe-open-down,
+  .wipe-open-up,
+  .wipe-spin-in,
+  .wipe-spin-in-back,
+  .wipe-spin-out,
+  .wipe-spin-out-back {
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.7, 0, 0.2, 1);
+  }
+  /* a little past the mark and back: the shape snaps into place */
+  .wipe-spin-in,
+  .wipe-spin-in-back {
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1.3);
+  }
+  .wipe-shut-down {
+    animation-name: wipe-shut-down;
+  }
+  .wipe-shut-up {
+    animation-name: wipe-shut-up;
+  }
+  .wipe-open-down {
+    animation-name: wipe-open-down;
+  }
+  .wipe-open-up {
+    animation-name: wipe-open-up;
+  }
+  .wipe-spin-in {
+    animation-name: wipe-spin-in;
+  }
+  .wipe-spin-in-back {
+    animation-name: wipe-spin-in-back;
+  }
+  .wipe-spin-out {
+    animation-name: wipe-spin-out;
+  }
+  .wipe-spin-out-back {
+    animation-name: wipe-spin-out-back;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -193,5 +277,10 @@
   .animate-bob,
   .animate-shine {
     animation: none !important;
+  }
+
+  /* SceneWipe is not mounted then either; without its keyframes a column would sit over the screen */
+  .wipe {
+    display: none !important;
   }
 }
