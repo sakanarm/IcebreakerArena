@@ -57,7 +57,8 @@ export function HostDock({
     const now = Date.now();
     if (now - lastPress.current < COOLDOWN_MS) return;
     lastPress.current = now;
-    getSocket().emit('host:next');
+    // the scene it was pressed on: if the game has just moved on by itself, the press is dropped, not spent on the new one
+    getSocket().emit('host:next', { step: state.step });
   };
 
   const end = () => {

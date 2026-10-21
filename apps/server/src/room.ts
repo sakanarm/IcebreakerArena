@@ -82,6 +82,8 @@ const newId = (bytes: number) => randomBytes(bytes).toString('base64url');
 export class Room {
   readonly hostToken = newId(18);
   phase: Phase = 'lobby';
+  /** goes up at every change of phase, see `host:next` */
+  private step = 0;
   lastActivity = Date.now();
   startedAt: number | null = null;
   endedAt: number | null = null;
@@ -193,9 +195,10 @@ export class Room {
 
   // ---------- host controls ----------
 
-  /** The single Kahoot-style "Next" button. */
-  next() {
+  /** The single Kahoot-style "Next" button. `at`: the step it was pressed on; a press on a screen already gone does nothing. */
+  next(at?: number) {
     this.touch();
+    if (at !== undefined && at !== this.step) return;
     switch (this.phase) {
       case 'lobby':
         if (this.players.size === 0) return;
@@ -214,8 +217,9 @@ export class Room {
     }
   }
 
-  skip() {
+  skip(at?: number) {
     this.touch();
+    if (at !== undefined && at !== this.step) return;
     if (this.phase === 'round') this.openQuestion();
     else if (this.phase === 'question') this.reveal();
   }
@@ -354,6 +358,7 @@ export class Room {
   private setPhase(phase: Phase) {
     this.clearTimer();
     this.phase = phase;
+    this.step++;
     this.queueStage(true);
     for (const p of this.players.values()) this.sendPlayerState(p);
   }
@@ -406,6 +411,7 @@ export class Room {
       podium: inPhase('podium') ? this.ranking.slice(0, 3).map(toRow) : [],
       awards: inPhase('podium') ? this.awards() : [],
       isLastQuestion: this.slotIndex >= this.slots.length - 1,
+      step: this.step,
     };
   }
 

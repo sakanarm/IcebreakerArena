@@ -25,10 +25,15 @@ export interface ClientToServerEvents {
 
   'host:create': (payload: { game: Game }, ack: Ack<Result<{ pin: string; hostToken: string }>>) => void;
   'host:attach': (payload: { pin: string; hostToken: string }, ack: Ack<Result>) => void;
-  /** Kahoot-style single "Next" button: moves the game to its next step */
-  'host:next': () => void;
-  /** closes answering now and goes to the reveal */
-  'host:skip': () => void;
+  /**
+   * Kahoot-style single "Next" button: moves the game to its next step. `at` is the `step` of the screen it was
+   * pressed on, so a press that crosses the game moving on by itself (a question's time running out, a round's
+   * intro ending) does nothing, instead of skipping the screen that just came up. Without it the game moves on
+   * from wherever it is.
+   */
+  'host:next': (at?: { step: number }) => void;
+  /** closes answering now and goes to the reveal; `at` as for `host:next` */
+  'host:skip': (at?: { step: number }) => void;
   'host:kick': (playerId: string) => void;
   'host:end': () => void;
   'host:report': (ack: Ack<Result<{ report: GameReport }>>) => void;

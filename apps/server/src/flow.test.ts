@@ -381,3 +381,44 @@ test('a finished room nobody has open does not hold up a deploy; anything else d
   host.close();
   await eventually({ rooms: before.rooms + 2, inUse: before.inUse + 1 }, 'a finished room nobody has open');
 });
+
+test('a Next pressed just as the game moved on by itself is dropped, not spent on the screen that came up', async () => {
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  const p = await connect();
+  assert.ok((await p.emitWithAck('player:join', { pin: created.pin, nickname: 'Solo', avatar: '🐼' })).ok);
+  const lobby = await stage.until((s) => s.playerCount === 1);
+  // a socket handles its events in order: once this comes back, the presses sent before it have been dealt with
+  const phase = async () => {
+    const r = await host.emitWithAck('room:check', created.pin);
+    assert.ok(r.ok);
+    return r.phase;
+  };
+
+  host.emit('host:next', { step: lobby.step });
+  const round = await stage.until((s) => s.phase === 'round');
+  assert.equal(round.step, lobby.step + 1, 'every change of phase is a new step');
+
+  // the round's intro ends by itself while the host's press on it is on the way: the question it opened stays
+  const question = await stage.until((s) => s.phase === 'question');
+  host.emit('host:next', { step: round.step });
+  host.emit('host:skip', { step: round.step });
+  assert.equal(await phase(), 'question');
+
+  // a double press on the reveal moves on once, to the leaderboard, not on past it to the next question
+  host.emit('host:next', { step: question.step });
+  const reveal = await stage.until((s) => s.phase === 'reveal');
+  host.emit('host:next', { step: reveal.step });
+  host.emit('host:next', { step: reveal.step });
+  await stage.until((s) => s.phase === 'leaderboard');
+  assert.equal(await phase(), 'leaderboard');
+
+  // a page from before the step came along sends none, and moves the game on as it always did
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'question' && s.question?.number === 2);
+  host.emit('host:skip');
+  await stage.until((s) => s.phase === 'reveal' && s.question?.number === 2);
+  assert.ok((await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken })).ok);
+});

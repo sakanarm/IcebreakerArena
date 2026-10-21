@@ -200,6 +200,8 @@ export interface StageState {
   podium: LeaderRow[];
   awards: Award[];
   isLastQuestion: boolean;
+  /** goes up by one at every change of phase: the host's Next carries the one it was pressed on (see `host:next`) */
+  step: number;
 }
 
 export interface PlayerResult {

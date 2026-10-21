@@ -98,8 +98,8 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
       done({ ok: true });
     });
 
-    on('host:next', () => hostRoom()?.next());
-    on('host:skip', () => hostRoom()?.skip());
+    on('host:next', (at) => hostRoom()?.next(stepOf(at)));
+    on('host:skip', (at) => hostRoom()?.skip(stepOf(at)));
     on('host:end', () => hostRoom()?.end());
 
     on('host:kick', (playerId) => {
@@ -211,6 +211,12 @@ function handle<E extends keyof ClientToServerEvents>(socket: GameSocket, event:
     }
   };
   socket.on(event, listener as never);
+}
+
+/** the step a host's press carries (see `host:next`); anything else counts as none, as from a page before it */
+function stepOf(at: unknown): number | undefined {
+  const step = typeof at === 'object' && at !== null ? (at as { step?: unknown }).step : undefined;
+  return Number.isSafeInteger(step) ? (step as number) : undefined;
 }
 
 function reply<T extends (...args: never[]) => void>(ack: T): T {
