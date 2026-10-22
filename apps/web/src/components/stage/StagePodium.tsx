@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { Award, LeaderRow, StageState } from '@icebreaker/shared';
 import { shower } from '@/lib/confetti';
@@ -68,7 +68,7 @@ export function StagePodium({ state }: { state: StageState }) {
         layout="position"
         className="relative flex w-full max-w-4xl flex-col items-center gap-3 sm:gap-6 low:max-w-3xl low:gap-3 short:max-w-md short:gap-2"
       >
-        <Spotlights block={block} slots={slots} target={target} on={reduce ? step >= 3 : step >= 1} sweep={!reduce && drum && step < 3} />
+        <Spotlights block={block} slots={slots} target={target} on={reduce ? step >= 3 : step >= 1} sweep={!reduce && drum && step < 3} reduce={reduce} />
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.h2
             key={step >= 3 ? 'won' : 'wait'}
@@ -124,6 +124,18 @@ interface Beam {
   aim: Record<Place, number>;
 }
 
+/** Where an element sits in `root` as laid out, so the players' pop-in and the block's own move do not skew it. */
+function laidOut(el: HTMLElement, root: HTMLElement) {
+  let x = el.offsetWidth / 2;
+  let y = el.offsetHeight / 2;
+  for (let n: HTMLElement | null = el; n !== root; n = n.offsetParent as HTMLElement | null) {
+    if (!n) return null;
+    x += n.offsetLeft;
+    y += n.offsetTop;
+  }
+  return { x, y };
+}
+
 /**
  * Two beams from above the stage, one from either side, aimed at a place's player. They hang from the top
  * of a box over the podium that clips them, so what they sweep never makes the scene scroll.
@@ -134,34 +146,41 @@ function Spotlights({
   target,
   on,
   sweep,
+  reduce,
 }: {
   block: RefObject<HTMLDivElement | null>;
   slots: RefObject<Partial<Record<Place, HTMLDivElement | null>>>;
   target: Place;
   on: boolean;
   sweep: boolean;
+  reduce: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [beams, setBeams] = useState<Beam[] | null>(null);
 
   // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side. After the
-  // commit, not in a layout effect: the block's ref and the stands' refs are only set once this has run
+  // commit, not in a layout effect: the block's ref and the stands' refs are only set once this has run; and
+  // again as each place is called, at the face of the player who has just come on
   useEffect(() => {
     const el = box.current;
     const outer = block.current;
     if (!el || !outer) return;
     const measure = () => {
-      const b = el.getBoundingClientRect();
-      if (!b.width || !b.height) return;
+      const w = el.offsetWidth;
+      if (!w || !el.offsetHeight) return;
+      const top = el.offsetTop;
       const points = ([1, 2, 3] as const).map((p) => {
-        const s = slots.current[p]?.getBoundingClientRect();
-        // at the player's face and name, in the slot over the stand
-        return s ? { p, x: s.left + s.width / 2 - b.left, y: s.top + s.height * 0.6 - b.top } : { p, x: b.width / 2, y: b.height * 0.7 };
+        const slot = slots.current[p];
+        const face = slot?.querySelector<HTMLElement>('[data-face]');
+        const at = (face && laidOut(face, outer)) ?? (slot && laidOut(slot, outer));
+        // before a player is on: about where their face will be, in the slot over the stand
+        const y = at && !face && slot ? at.y + slot.offsetHeight * 0.15 : at?.y;
+        return { p, x: at ? at.x - el.offsetLeft : w / 2, y: y != null ? y - top : el.offsetHeight * 0.7 };
       });
-      const width = Math.min(260, Math.max(90, b.width * 0.2));
+      const width = Math.min(260, Math.max(90, w * 0.2));
       setBeams(
         [0.14, 0.86].map((f) => {
-          const x = b.width * f;
+          const x = w * f;
           const aim = {} as Record<Place, number>;
           let length = 0;
           for (const { p, x: px, y: py } of points) {
@@ -176,34 +195,40 @@ function Spotlights({
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     return () => ro.disconnect();
-  }, [block, slots]);
+  }, [block, slots, target]);
 
   return (
     <div ref={box} aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 bottom-0 overflow-clip">
-      {beams?.map((b, i) => {
-        // the sweep swings off from where the beam is aimed to the far side of the stage and back, so it never jumps
-        const aims = Object.values(b.aim);
-        const from = b.aim[target];
-        const lo = Math.min(...aims) - 6;
-        const hi = Math.max(...aims) + 6;
-        const to = from - lo > hi - from ? lo : hi;
-        return (
-          <motion.div
-            key={i}
-            data-spot={i}
-            data-aim={sweep ? 'sweep' : on ? target : 'off'}
-            className="absolute top-0 bg-linear-to-b from-amber-50/55 via-amber-50/20 to-transparent [clip-path:polygon(46%_0,54%_0,100%_100%,0_100%)]"
-            style={{ left: b.x - b.width / 2, width: b.width, height: b.length, originX: 0.5, originY: 0 }}
-            initial={{ opacity: 0, rotate: b.aim[target] }}
-            animate={
-              sweep
-                ? { opacity: 1, rotate: [from, to], transition: { rotate: { duration: i ? 0.5 : 0.62, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }, opacity: { duration: 0.2 } } }
-                : { opacity: on ? 1 : 0, rotate: b.aim[target], transition: { rotate: { type: 'spring', stiffness: 120, damping: 14 }, opacity: { duration: 0.3 } } }
-            }
-          />
-        );
-      })}
+      {beams?.map((b, i) => <SpotBeam key={i} i={i} beam={b} target={target} on={on} sweep={sweep} reduce={reduce} />)}
     </div>
+  );
+}
+
+function SpotBeam({ i, beam, target, on, sweep, reduce }: { i: number; beam: Beam; target: Place; on: boolean; sweep: boolean; reduce: boolean }) {
+  const aim = beam.aim[target];
+  const aims = Object.values(beam.aim);
+  const lo = Math.min(...aims) - 6;
+  const hi = Math.max(...aims) + 6;
+  // the sweep swings off from where the beam is to the far side of the stage and back, and the spring onto the
+  // winner takes over from wherever it is, so the light never jumps
+  const far = aim - lo > hi - aim ? lo : hi;
+  const rotate = useMotionValue(aim);
+  useEffect(() => {
+    const a = sweep
+      ? animate(rotate, [rotate.get(), far], { duration: i ? 0.5 : 0.62, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' })
+      : animate(rotate, aim, on && !reduce ? { type: 'spring', stiffness: 120, damping: 14 } : { duration: 0 });
+    return () => a.stop();
+  }, [rotate, sweep, on, reduce, aim, far, i]);
+  return (
+    <motion.div
+      data-spot={i}
+      data-aim={sweep ? 'sweep' : on ? target : 'off'}
+      className="absolute top-0 bg-linear-to-b from-amber-50/55 via-amber-50/20 to-transparent [clip-path:polygon(46%_0,54%_0,100%_100%,0_100%)]"
+      style={{ left: beam.x - beam.width / 2, width: beam.width, height: beam.length, originX: 0.5, originY: 0, rotate }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: sweep || on ? 1 : 0 }}
+      transition={{ duration: sweep ? 0.2 : 0.3 }}
+    />
   );
 }
 
@@ -267,7 +292,7 @@ function Pedestal({
                   👑
                 </motion.span>
               )}
-              <span className={`animate-bob inline-block ${place === 1 ? 'text-5xl sm:text-7xl low:text-5xl short:text-4xl' : 'text-4xl sm:text-6xl low:text-5xl short:text-4xl'}`} aria-hidden>
+              <span data-face className={`animate-bob inline-block ${place === 1 ? 'text-5xl sm:text-7xl low:text-5xl short:text-4xl' : 'text-4xl sm:text-6xl low:text-5xl short:text-4xl'}`} aria-hidden>
                 {row.avatar}
               </span>
               {/* the medal lands on the left end of the name */}
