@@ -30,6 +30,7 @@
   --animate-wiggle: wiggle 2.6s ease-in-out infinite;
   --animate-bob: bob 2.2s ease-in-out infinite;
   --animate-shine: shine 2.8s linear infinite;
+  --animate-rays: rays 14s linear infinite;
 }
 
 @keyframes float {
@@ -49,6 +50,10 @@
 @keyframes bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
+}
+
+@keyframes rays {
+  to { transform: rotate(1turn); }
 }
 
 @keyframes shine {
@@ -281,7 +286,8 @@
   .animate-float,
   .animate-wiggle,
   .animate-bob,
-  .animate-shine {
+  .animate-shine,
+  .animate-rays {
     animation: none !important;
   }
 

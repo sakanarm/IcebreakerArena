@@ -15,7 +15,9 @@ export type SfxName =
   | 'correct'
   | 'wrong'
   | 'drumroll'
-  | 'fanfare';
+  | 'fanfare'
+  | 'rise'
+  | 'clink';
 export type MusicName = 'lobby' | 'question';
 
 interface ToneOptions {
@@ -135,6 +137,15 @@ class SoundEngine {
         return this.drumroll(t, 1.6);
       case 'fanfare':
         return this.fanfare(t);
+      // a podium stand comes up out of the floor and lands
+      case 'rise':
+        this.noise(t, 0.32, { filter: 'bandpass', freq: 160, freqTo: 1100, q: 0.9, gain: 0.2 });
+        return this.tone(110, t + 0.28, 0.3, { gain: 0.35, glideTo: 48 });
+      // a medal lands on a name
+      case 'clink':
+        this.tone(hz(100), t, 0.35, { type: 'triangle', gain: 0.1 });
+        this.tone(hz(107), t + 0.01, 0.25, { gain: 0.06 });
+        return this.tone(hz(103), t + 0.09, 0.3, { type: 'triangle', gain: 0.05 });
     }
   }
 
