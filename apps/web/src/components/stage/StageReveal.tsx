@@ -34,6 +34,7 @@ export function StageReveal({ state }: { state: StageState }) {
 
 /** Quiz, true/false and poll: a bar per tile rising together, then the right tiles light up. */
 function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
+  const reduce = useReducedMotion();
   const poll = q.type === 'poll';
   const max = Math.max(1, ...r.counts);
   const graded = r.correct.length > 0;
@@ -67,7 +68,7 @@ function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
                     style={{ height: `${pct}%` }}
                     initial={{ scaleY: 0 }}
                     // the wrong answers' bars get thinner as they fade, so the right one stands out against them
-                    animate={{ scaleY: 1, scaleX: faded ? 0.8 : 1, opacity: faded ? 0.35 : 1 }}
+                    animate={{ scaleY: 1, scaleX: faded && !reduce ? 0.8 : 1, opacity: faded ? 0.35 : 1 }}
                     transition={{
                       scaleY: { delay: 0.15 + i * 0.1, type: 'spring', stiffness: 150, damping: 19 },
                       scaleX: { delay: VERDICT_S, type: 'spring', stiffness: 260, damping: 24 },
@@ -88,9 +89,9 @@ function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
                   <AnswerShape index={i} className="size-5 text-white sm:size-7" />
                   {correct && (
                     <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: VERDICT_S + 0.05, type: 'spring', stiffness: 500, damping: 12 }}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: VERDICT_S + 0.05, type: 'spring', stiffness: 500, damping: 12, opacity: { delay: VERDICT_S + 0.05, duration: 0.1 } }}
                       className="text-base font-extrabold sm:text-2xl"
                     >
                       ✓

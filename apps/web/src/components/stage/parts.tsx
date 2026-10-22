@@ -75,7 +75,7 @@ export const VERDICT_S = 1;
 /**
  * The four answer tiles on the big screen. In `reveal` mode the right answers swell and get a ✓ that
  * pops with a ring going out from it, and the rest shrink and fade back (a poll has no right answer, so
- * nothing moves).
+ * nothing moves). Under reduced motion nothing changes size: the ✓ and the fading come in at the same moment.
  */
 export function AnswerGrid({ options, reveal = false, correct = [] }: { options: string[]; reveal?: boolean; correct?: number[] }) {
   const reduce = useReducedMotion();
@@ -91,7 +91,7 @@ export function AnswerGrid({ options, reveal = false, correct = [] }: { options:
             key={i}
             data-verdict={!reveal || !correct.length ? undefined : isCorrect ? 'right' : 'wrong'}
             initial={reveal ? { opacity: 1, y: 0, scale: 1 } : { y: 48, opacity: 0, scale: 0.9 }}
-            animate={{ y: 0, opacity: faded ? 0.35 : 1, scale: isCorrect ? 1.04 : faded ? 0.92 : 1 }}
+            animate={{ y: 0, opacity: faded ? 0.35 : 1, scale: reduce || !reveal ? 1 : isCorrect ? 1.04 : faded ? 0.92 : 1 }}
             transition={
               reveal
                 ? // the right one swells with a bounce, the wrong ones settle back without one
@@ -125,9 +125,10 @@ export function AnswerGrid({ options, reveal = false, correct = [] }: { options:
                   )}
                   <motion.span
                     data-tick
-                    initial={{ scale: 0, rotate: -60 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: VERDICT_S + 0.05, type: 'spring', stiffness: 520, damping: 12 }}
+                    // its opacity keeps the moment even when reduced motion skips the pop
+                    initial={{ scale: 0, rotate: -60, opacity: 0 }}
+                    animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                    transition={{ delay: VERDICT_S + 0.05, type: 'spring', stiffness: 520, damping: 12, opacity: { delay: VERDICT_S + 0.05, duration: 0.1 } }}
                     className="grid size-8 place-items-center rounded-full bg-white text-xl font-extrabold text-good shadow-lg sm:size-12 sm:text-3xl low:size-10 low:text-2xl short:size-7 short:text-lg"
                     aria-label="คำตอบที่ถูก"
                   >
