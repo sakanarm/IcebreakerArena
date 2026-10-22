@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { Award, LeaderRow, StageState } from '@icebreaker/shared';
 import { shower } from '@/lib/confetti';
 import { AWARDS_AT, CROWN_S, DRUMROLL_AT, FALL_S, MEDAL_S, PLACE_AT, RIDER_S, medalFall, type Place } from '@/lib/podium';
@@ -55,7 +55,6 @@ export function StagePodium({ state }: { state: StageState }) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const block = useRef<HTMLDivElement>(null);
   const slots = useRef<Partial<Record<Place, HTMLDivElement | null>>>({});
   const target: Place = step >= 3 ? 1 : step >= 2 ? 2 : 3;
 
@@ -64,11 +63,10 @@ export function StagePodium({ state }: { state: StageState }) {
     <div className="flex h-full flex-col items-center justify-end-safe gap-3 sm:gap-6 low:gap-4 short:flex-row short:items-end-safe short:justify-center short:gap-4">
       {/* moves up (or aside) smoothly when the awards come in, with the lights on it */}
       <motion.div
-        ref={block}
         layout="position"
         className="relative flex w-full max-w-4xl flex-col items-center gap-3 sm:gap-6 low:max-w-3xl low:gap-3 short:max-w-md short:gap-2"
       >
-        <Spotlights block={block} slots={slots} target={target} on={reduce ? step >= 3 : step >= 1} sweep={!reduce && drum && step < 3} reduce={reduce} />
+        <Spotlights slots={slots} target={target} on={reduce ? step >= 3 : step >= 1} sweep={!reduce && drum && step < 3} reduce={reduce} />
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.h2
             key={step >= 3 ? 'won' : 'wait'}
@@ -141,14 +139,12 @@ function laidOut(el: HTMLElement, root: HTMLElement) {
  * of a box over the podium that clips them, so what they sweep never makes the scene scroll.
  */
 function Spotlights({
-  block,
   slots,
   target,
   on,
   sweep,
   reduce,
 }: {
-  block: RefObject<HTMLDivElement | null>;
   slots: RefObject<Partial<Record<Place, HTMLDivElement | null>>>;
   target: Place;
   on: boolean;
@@ -158,12 +154,13 @@ function Spotlights({
   const box = useRef<HTMLDivElement>(null);
   const [beams, setBeams] = useState<Beam[] | null>(null);
 
-  // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side. After the
-  // commit, not in a layout effect: the block's ref and the stands' refs are only set once this has run; and
-  // again as each place is called, at the face of the player who has just come on
-  useEffect(() => {
+  // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side. Again as
+  // each place is called, at the face of the player who has just come on, before that is painted. The block is
+  // this box's parent (its ref is not set yet when this first runs, nor are the stands', so the observer's first
+  // call, after the commit, measures again)
+  useLayoutEffect(() => {
     const el = box.current;
-    const outer = block.current;
+    const outer = el?.parentElement;
     if (!el || !outer) return;
     const measure = () => {
       const w = el.offsetWidth;
@@ -195,7 +192,7 @@ function Spotlights({
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     return () => ro.disconnect();
-  }, [block, slots, target]);
+  }, [slots, target]);
 
   return (
     <div ref={box} aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 bottom-0 overflow-clip">
@@ -213,10 +210,12 @@ function SpotBeam({ i, beam, target, on, sweep, reduce }: { i: number; beam: Bea
   // winner takes over from wherever it is, so the light never jumps
   const far = aim - lo > hi - aim ? lo : hi;
   const rotate = useMotionValue(aim);
-  useEffect(() => {
+  // before paint, so a light that is off, or under reduced motion, is already where it points as it comes on
+  useLayoutEffect(() => {
+    if (!sweep && !(on && !reduce)) return rotate.set(aim);
     const a = sweep
       ? animate(rotate, [rotate.get(), far], { duration: i ? 0.5 : 0.62, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' })
-      : animate(rotate, aim, on && !reduce ? { type: 'spring', stiffness: 120, damping: 14 } : { duration: 0 });
+      : animate(rotate, aim, { type: 'spring', stiffness: 120, damping: 14 });
     return () => a.stop();
   }, [rotate, sweep, on, reduce, aim, far, i]);
   return (
