@@ -422,3 +422,108 @@ test('a Next pressed just as the game moved on by itself is dropped, not spent o
   await stage.until((s) => s.phase === 'reveal' && s.question?.number === 2);
   assert.ok((await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken })).ok);
 });
+
+test('a player kicked while answering is open comes off the count, and when they were the last to answer the reveal comes', async () => {
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  const players: { s: Client; id: string }[] = [];
+  for (const nickname of ['Early', 'Late', 'Idle']) {
+    const s = await connect();
+    const joined = await s.emitWithAck('player:join', { pin: created.pin, nickname, avatar: '🐼' });
+    if (!joined.ok) throw new Error(`${nickname} could not join: ${joined.error}`);
+    players.push({ s, id: joined.playerId });
+  }
+  const [early, late, idle] = players;
+  await stage.until((s) => s.playerCount === 3);
+  host.emit('host:next');
+  const open = await stage.until((s) => s.phase === 'question');
+  const q = open.question!;
+  await sleepUntil(q.startsAt);
+
+  assert.ok((await early.s.emitWithAck('player:answer', { questionId: q.id, choice: 1 })).ok);
+  await stage.until((s) => s.answeredCount === 1);
+  // the one who answered goes: their answer goes with them, so the big screen does not count 1 of 2 as everyone
+  host.emit('host:kick', early.id);
+  const after = await stage.until((s) => s.playerCount === 2);
+  assert.equal(after.answeredCount, 0);
+  assert.equal(after.phase, 'question');
+
+  assert.ok((await late.s.emitWithAck('player:answer', { questionId: q.id, choice: 0 })).ok);
+  await stage.until((s) => s.answeredCount === 1);
+  // the one still to answer goes: everyone left has answered, so the reveal comes as after the last answer
+  host.emit('host:kick', idle.id);
+  const reveal = await stage.until((s) => s.phase === 'reveal');
+  assert.ok(Date.now() < q.endsAt, 'the reveal came before time ran out');
+  assert.equal(reveal.reveal?.answered, 1);
+  assert.equal(reveal.reveal?.totalPlayers, 1);
+  assert.ok((await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken })).ok);
+});
+
+test('the reveal waits a second while the big screen stamps time up or everyone answering, and comes at once on a skip', async () => {
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  const players: Client[] = [];
+  for (const nickname of ['One', 'Two', 'Three']) {
+    const s = await connect();
+    const joined = await s.emitWithAck('player:join', { pin: created.pin, nickname, avatar: '🐼' });
+    if (!joined.ok) throw new Error(`${nickname} could not join: ${joined.error}`);
+    players.push(s);
+  }
+  const [one, two, three] = players;
+  await stage.until((s) => s.playerCount === 3);
+  const at = (epochMs: number) => new Promise((r) => setTimeout(r, Math.max(0, epochMs - Date.now())));
+  const answer = (s: Client, questionId: string) => s.emitWithAck('player:answer', { questionId, choice: 0 });
+
+  // time runs out: an answer still on its way is let in, a later one is not, and the reveal waits its second
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'round');
+  host.emit('host:skip');
+  const q1 = (await stage.until((s) => s.phase === 'question')).question!;
+  await sleepUntil(q1.startsAt);
+  assert.ok((await answer(one, q1.id)).ok);
+  await at(q1.endsAt + 150);
+  assert.ok((await answer(two, q1.id)).ok, 'an answer 150 ms after time ran out is let in');
+  await at(q1.endsAt + 450);
+  assert.deepEqual(await answer(three, q1.id), { ok: false, error: 'too_late' });
+  const r1 = await stage.until((s) => s.phase === 'reveal');
+  const timeUp = Date.now() - q1.endsAt;
+  assert.ok(timeUp >= 950 && timeUp <= 1400, `the reveal came ${timeUp} ms after time ran out, not about a second`);
+  assert.equal(r1.reveal?.answered, 2);
+
+  // everyone answers: the big screen hears of the last answer at once, and the reveal waits its second
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'leaderboard');
+  host.emit('host:next');
+  const q2 = (await stage.until((s) => s.phase === 'question' && s.question?.number === 2)).question!;
+  await sleepUntil(q2.startsAt);
+  assert.ok((await answer(one, q2.id)).ok);
+  assert.ok((await answer(two, q2.id)).ok);
+  const lastSent = Date.now();
+  assert.ok((await answer(three, q2.id)).ok);
+  await stage.until((s) => s.phase === 'question' && s.answeredCount === 3);
+  const heard = Date.now() - lastSent;
+  assert.ok(heard < 150, `the big screen heard of the last answer ${heard} ms after it was sent, held back like the others`);
+  await stage.until((s) => s.phase === 'reveal' && s.question?.number === 2);
+  const allIn = Date.now() - lastSent;
+  assert.ok(allIn >= 950 && allIn <= 1400, `the reveal came ${allIn} ms after everyone had answered, not about a second`);
+
+  // the host skips: nothing is stamped, so nothing waits
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'leaderboard');
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'round' && s.round?.index === 1);
+  host.emit('host:skip');
+  const q3 = (await stage.until((s) => s.phase === 'question' && s.question?.number === 3)).question!;
+  await sleepUntil(q3.startsAt);
+  assert.ok((await answer(one, q3.id)).ok);
+  const skipped = Date.now();
+  host.emit('host:skip');
+  await stage.until((s) => s.phase === 'reveal' && s.question?.number === 3);
+  const onSkip = Date.now() - skipped;
+  assert.ok(onSkip < 150, `the reveal came ${onSkip} ms after the skip, not at once`);
+  assert.ok((await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken })).ok);
+});

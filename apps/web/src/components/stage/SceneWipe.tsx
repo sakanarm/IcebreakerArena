@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Phase } from '@icebreaker/shared';
 import { ANSWER_BG, AnswerShape } from '../shapes';
 
@@ -10,6 +10,15 @@ export const wipesInto = (phase: Phase) => WIPED.has(phase);
 
 /** how much of the screen the blinds hide: none of it, part of it (they are on their way), or all of it */
 export type Cover = 'none' | 'shutting' | 'shut';
+
+/** the blinds are shut over the whole screen (the stage provides it) */
+export const BlindsShut = createContext(false);
+/**
+ * True while the blinds are shut over a scene that has just mounted under them: what it holds back until this goes
+ * false comes in as they open, so its entrance is the first thing the room sees of it. Never true without the
+ * blinds (reduced motion, a reload).
+ */
+export const useBlindsShut = () => useContext(BlindsShut);
 
 // column k moves k × STAGGER_MS after the first: it shuts in SHUT_MS, stays shut, then opens in OPEN_MS
 const STAGGER_MS = 20;

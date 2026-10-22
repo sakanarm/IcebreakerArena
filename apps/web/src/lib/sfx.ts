@@ -35,6 +35,7 @@ class SoundEngine {
   private musicBus: GainNode | null = null;
   private loop: { name: MusicName; timer: ReturnType<typeof setInterval> } | null = null;
   private wantMusic: MusicName | null = null;
+  private hurried = false;
   private enabled = false;
   private listeners = new Set<() => void>();
   private waitingForGesture = false;
@@ -76,6 +77,11 @@ class SoundEngine {
     if (!name) return this.stopLoop();
     if (this.loop?.name === name) return;
     if (this.enabled) this.startLoop(name);
+  }
+
+  /** The last seconds of a question: its music picks up speed until this is turned off (sound turned on meanwhile too). */
+  hurry(on: boolean) {
+    this.hurried = on;
   }
 
   play(name: SfxName) {
@@ -231,13 +237,15 @@ class SoundEngine {
     bus.gain.value = name === 'lobby' ? 0.32 : 0.26;
     bus.connect(this.master);
     this.musicBus = bus;
-    const step = 60 / (name === 'lobby' ? 112 : 136) / 2;
+    const beat = 60 / (name === 'lobby' ? 112 : 136) / 2;
     let i = 0;
     let at = ctx.currentTime + 0.08;
     const schedule = () => {
       while (at < ctx.currentTime + 0.3) {
+        // hurried: from 136 to 170 beats a minute, from the next step on
+        const step = name === 'question' && this.hurried ? beat * 0.8 : beat;
         if (name === 'lobby') this.lobbyStep(i, at, step, bus);
-        else this.questionStep(i, at, step, bus);
+        else this.questionStep(i, at, step, bus, this.hurried);
         at += step;
         i = (i + 1) % 64;
       }
@@ -272,7 +280,7 @@ class SoundEngine {
   }
 
   /** Driving minor pulse while a question is open */
-  private questionStep(i: number, t: number, step: number, bus: GainNode) {
+  private questionStep(i: number, t: number, step: number, bus: GainNode, hurried: boolean) {
     const bar = Math.floor(i / 8) % 4;
     const pos = i % 8;
     const root = [45, 41, 48, 43][bar]!;
@@ -280,6 +288,11 @@ class SoundEngine {
     if (pos % 2 === 0) this.tone(150, t, 0.12, { gain: 0.3, glideTo: 50, dest: bus });
     this.noise(t, 0.03, { filter: 'highpass', freq: 8000, gain: pos % 2 ? 0.05 : 0.025, dest: bus });
     if (pos === 4) this.noise(t, 0.12, { filter: 'bandpass', freq: 1800, q: 0.8, gain: 0.12, dest: bus });
+    // hurried: a kick on every step and a hi-hat between them
+    if (hurried) {
+      if (pos % 2 === 1) this.tone(150, t, 0.1, { gain: 0.22, glideTo: 50, dest: bus });
+      this.noise(t + step / 2, 0.02, { filter: 'highpass', freq: 9000, gain: 0.04, dest: bus });
+    }
     if (pos === 0 || pos === 3 || pos === 6) {
       const lead = [69, 72, 76, 72][(i >> 1) % 4]!;
       this.tone(hz(lead + (bar === 1 ? -4 : 0)), t, step * 0.7, { type: 'triangle', gain: 0.05, dest: bus });

@@ -1,12 +1,12 @@
 'use client';
 
 import { AnimatePresence, motion, usePresence, usePresenceData, useReducedMotion, type Variants } from 'motion/react';
-import { createContext, memo, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { StageState } from '@icebreaker/shared';
 import { sfx } from '@/lib/sfx';
 import type { SoundControl } from '@/lib/use-sound';
 import { FloatingShapes, Logo } from '../shapes';
-import { type Cover, SceneWipe, wipesInto } from './SceneWipe';
+import { BlindsShut, type Cover, SceneWipe, useBlindsShut, wipesInto } from './SceneWipe';
 import { StageLeaderboard } from './StageLeaderboard';
 import { StageLobby } from './StageLobby';
 import { StagePodium } from './StagePodium';
@@ -32,9 +32,6 @@ const SCENE: Variants = {
   shown: { opacity: 1 },
   gone: (wiped: boolean) => (wiped ? {} : { opacity: 0, transition: { duration: FADE_S } }),
 };
-
-/** the blinds are shut over the whole screen */
-const Shut = createContext(false);
 
 /** The big screen: one scene per phase, each with its own entrance. */
 export function StageView({ state, join, sound, online, onKick, docked = false }: Props) {
@@ -114,7 +111,7 @@ export function StageView({ state, join, sound, online, onKick, docked = false }
         ref={mainRef}
         className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-4 [scrollbar-width:none] sm:px-6 sm:pb-5 short:pb-2 lg:px-10"
       >
-        <Shut.Provider value={cover === 'shut'}>
+        <BlindsShut.Provider value={cover === 'shut'}>
           {/* the leaving scene was rendered before anyone knew what comes next, so it gets custom from here */}
           <AnimatePresence mode="wait" custom={wiped}>
             <motion.section
@@ -132,7 +129,7 @@ export function StageView({ state, join, sound, online, onKick, docked = false }
               <Hold />
             </motion.section>
           </AnimatePresence>
-        </Shut.Provider>
+        </BlindsShut.Provider>
       </main>
       <SceneWipe run={reduce ? 0 : scene.wipes} ready={shown.key === key} onCover={setCover} />
     </div>
@@ -155,7 +152,7 @@ function Mounted<T>({ value, onMount }: { value: T; onMount: (value: T) => void 
 function Hold() {
   const [present, safeToRemove] = usePresence();
   const wiped = usePresenceData() === true;
-  const shut = useContext(Shut);
+  const shut = useBlindsShut();
   const [faded, setFaded] = useState(false);
 
   useEffect(() => {

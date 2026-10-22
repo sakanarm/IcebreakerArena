@@ -37,8 +37,11 @@ const STAGE_MIN_GAP_MS = 250;
 const LOBBY_LIST_CAP = 200;
 /** answers still in flight when the timer hits 0 are accepted */
 const ANSWER_GRACE_MS = 300;
+/** time is up: the reveal waits this long (answers stop at the grace above), while the Stage stamps "หมดเวลา!" */
+const TIME_UP_HOLD_MS = 1000;
 const ROUND_INTRO_MS = 3500;
-const ALL_ANSWERED_DELAY_MS = 400;
+/** everyone has answered: the reveal waits this long, while the Stage stamps "ตอบครบแล้ว!" */
+const ALL_ANSWERED_DELAY_MS = 1000;
 
 interface Answer {
   sent: AnswerSent;
@@ -169,6 +172,14 @@ export class Room {
     this.byToken.delete(player.token);
     this.ranking = this.ranking.filter((p) => p !== player);
     this.ranking.forEach((p, i) => (p.rank = i + 1));
+    // while answering is open: their answer no longer counts toward everyone having answered (the Stage stamps
+    // "ตอบครบแล้ว!" from the counts), and when they were the one still to answer, everyone left has
+    const cur = this.current;
+    if (this.phase === 'question' && cur && Date.now() <= cur.endsAt + ANSWER_GRACE_MS) {
+      if (player.answers.has(cur.slot.q.id)) this.answeredCount--;
+      else if (player.socketId && this.answeredCount > 0 && this.answeredCount >= this.connectedCount())
+        this.schedule(ALL_ANSWERED_DELAY_MS, () => this.reveal());
+    }
     this.queueStage(true);
     return player.socketId;
   }
@@ -255,7 +266,7 @@ export class Room {
     this.answeredCount = 0;
     this.revealInfo = null;
     this.setPhase('question');
-    this.schedule(endsAt - now + ANSWER_GRACE_MS, () => this.reveal());
+    this.schedule(endsAt - now + TIME_UP_HOLD_MS, () => this.reveal());
   }
 
   answer(playerId: string, questionId: string, input: unknown): Result {
@@ -275,8 +286,10 @@ export class Room {
     player.answers.set(questionId, { sent, responseMs });
     this.answeredCount++;
     this.touch();
-    this.queueStage();
-    if (this.answeredCount >= this.connectedCount()) this.schedule(ALL_ANSWERED_DELAY_MS, () => this.reveal());
+    const all = this.answeredCount >= this.connectedCount();
+    // the answer that completes the count goes out at once, not throttled: the Stage stamps it while the reveal waits
+    this.queueStage(all);
+    if (all) this.schedule(ALL_ANSWERED_DELAY_MS, () => this.reveal());
     return { ok: true };
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { animate, motion, useReducedMotion } from 'motion/react';
+import { animate, motion, useAnimate, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 import { useServerNow } from '@/lib/clock';
 import { fmt } from '@/lib/format';
@@ -69,13 +69,23 @@ export function TimerRing({
   const danger = left <= 5000;
   // where the ring starts: full when mounted as answering opens, less after a reload mid-question
   const [initialLeft] = useState(left);
+  const reduce = useReducedMotion();
+  const [ring, beat] = useAnimate<HTMLDivElement>();
 
   useEffect(() => {
     if (ticks && secs > 0 && secs <= 5) sfx.play('tick');
   }, [secs, ticks]);
 
+  // the last seconds: the whole ring kicks with every one of them
+  useEffect(() => {
+    if (!danger || secs <= 0 || reduce || !ring.current) return;
+    const kick = beat(ring.current, { scale: [1.12, 1] }, { duration: 0.45, ease: [0.2, 0.9, 0.3, 1] });
+    return () => kick.stop();
+  }, [secs, danger, reduce, ring, beat]);
+
   return (
     <div
+      ref={ring}
       className={`relative shrink-0 ${className ? `[container-type:size] ${className}` : ''}`}
       style={className ? undefined : { width: size, height: size }}
       role="timer"
@@ -101,16 +111,20 @@ export function TimerRing({
           transition={{ duration: initialLeft / 1000, ease: 'linear' }}
         />
       </svg>
-      <motion.span
-        key={secs}
-        initial={{ scale: 1.4, opacity: 0.5 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-        className={`absolute inset-0 grid place-items-center font-display font-extrabold tabular-nums ${danger ? 'text-bad' : ''}`}
-        style={{ fontSize: className ? '36cqw' : size * 0.36 }}
-      >
-        {secs}
-      </motion.span>
+      {/* only the number grows as each second lands: grown with the whole ring's box it would reach past the screen
+          beside a ring at the edge */}
+      <span className="absolute inset-0 grid place-items-center">
+        <motion.span
+          key={secs}
+          initial={{ scale: danger ? 1.8 : 1.4, opacity: 0.5 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          className={`font-display font-extrabold tabular-nums ${danger ? 'text-bad' : ''}`}
+          style={{ fontSize: className ? '36cqw' : size * 0.36 }}
+        >
+          {secs}
+        </motion.span>
+      </span>
     </div>
   );
 }
