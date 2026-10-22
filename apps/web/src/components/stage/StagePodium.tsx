@@ -304,15 +304,16 @@ function Pedestal({
               <span data-face className={`animate-bob inline-block ${place === 1 ? 'text-5xl sm:text-7xl low:text-5xl short:text-4xl' : 'text-4xl sm:text-6xl low:text-5xl short:text-4xl'}`} aria-hidden>
                 {row.avatar}
               </span>
-              {/* the medal lands on the left end of the name */}
+              {/* the medal lands on the left end of the name; an emoji's box is wider than the medal drawn in it, so the
+                  name starts past the box and not just past the medal */}
               <span className="relative mt-1 flex max-w-full items-center">
-                <span className="max-w-full truncate rounded-full bg-white py-0.5 pr-2 pl-7 text-sm font-semibold text-ink shadow-lg sm:py-1 sm:pr-4 sm:pl-11 sm:text-xl low:pl-10 low:text-lg short:pl-6 short:text-xs">
+                <span className="max-w-full truncate rounded-full bg-white py-0.5 pr-2 pl-8 text-sm font-semibold text-ink shadow-lg sm:py-1 sm:pr-4 sm:pl-13 sm:text-xl low:pl-10 low:text-lg short:pl-6 short:text-xs">
                   {row.nickname}
                 </span>
                 {!reduce && (
                   <motion.span
                     aria-hidden
-                    className={`absolute top-1/2 -left-1.5 size-9 -translate-y-1/2 rounded-full border-4 sm:-left-2 sm:size-14 short:size-7 ${place === 1 ? 'border-gold' : 'border-white'}`}
+                    className={`absolute top-1/2 -left-2 size-9 -translate-y-1/2 rounded-full border-4 sm:-left-2 sm:size-14 short:size-7 ${place === 1 ? 'border-gold' : 'border-white'}`}
                     initial={{ scale: 1, opacity: 0 }}
                     animate={{ scale: 2.4, opacity: [0, 0.9, 0] }}
                     transition={{ delay: MEDAL_S + FALL_S, duration: 0.6, ease: 'easeOut' }}
@@ -320,7 +321,7 @@ function Pedestal({
                 )}
                 <motion.span
                   data-medal={place}
-                  className="absolute top-1/2 -left-1.5 -translate-y-1/2 text-3xl drop-shadow-lg sm:-left-2 sm:text-5xl low:text-4xl short:text-2xl"
+                  className="absolute top-1/2 -left-2 -translate-y-1/2 text-3xl drop-shadow-lg sm:-left-3 sm:text-5xl low:text-4xl short:-left-2 short:text-2xl"
                   {...medalFall(140, MEDAL_S)}
                   aria-label={`อันดับ ${place}`}
                 >
