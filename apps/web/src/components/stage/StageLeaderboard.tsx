@@ -23,10 +23,11 @@ export function StageLeaderboard({ state }: { state: StageState }) {
   }, []);
   const anyone = rows.length > 0;
   useEffect(() => {
-    if (!anyone) return;
-    const t = setTimeout(() => sfx.play('sparkle'), SWAP_AFTER_MS + CROWN_AFTER_S * 1000);
+    if (!anyone || !swapped) return;
+    // counted from the swap, as the crown is: a screen that was held up a moment still has the two land together
+    const t = setTimeout(() => sfx.play('sparkle'), CROWN_AFTER_S * 1000);
     return () => clearTimeout(t);
-  }, [anyone]);
+  }, [anyone, swapped]);
 
   // first the previous order with the previous scores, then everyone slides to their new place
   const ordered = swapped ? rows : [...rows].sort((a, b) => (a.prevRank ?? Infinity) - (b.prevRank ?? Infinity));
