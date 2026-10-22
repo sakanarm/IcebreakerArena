@@ -80,7 +80,8 @@ function InGame({ state, player, sound }: { state: PlayerState; player: Player; 
   }, [phase]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    // clip: a full-width tile springing in (or swelling when picked) on a phone held sideways pokes past the edge
+    <div className="flex min-h-dvh flex-col overflow-x-clip">
       <OfflineBanner online={player.online} />
 
       {/* z-10: the result / round screens paint a full-screen color layer behind the content */}
@@ -109,7 +110,7 @@ function InGame({ state, player, sound }: { state: PlayerState; player: Player; 
             {phase === 'lobby' && <PlayerLobby me={me} onLeave={() => void player.leave(true)} />}
             {phase === 'round' && state.round && <PlayerRound round={state.round} />}
             {phase === 'question' && q && (
-              <PlayerQuestion q={q} myAnswer={player.myAnswer} late={player.late} onAnswer={(sent) => void player.answer(q.id, sent)} />
+              <PlayerQuestion q={q} myAnswer={player.myAnswer} late={player.late} onAnswer={(sent) => player.answer(q.id, sent)} />
             )}
             {phase === 'reveal' && <PlayerResult state={state} />}
             {phase === 'leaderboard' && <PlayerRank me={me} />}

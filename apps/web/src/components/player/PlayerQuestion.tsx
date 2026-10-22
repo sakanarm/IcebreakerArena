@@ -1,18 +1,25 @@
 'use client';
 
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { LIMITS, sliderStart, type AnswerSent, type QuestionPublic } from '@icebreaker/shared';
-import { useServerNow } from '@/lib/clock';
+import { serverNow, useServerNow } from '@/lib/clock';
 import { fmtValue, TYPE_LABEL } from '@/lib/format';
 import { sfx, vibrate } from '@/lib/sfx';
+import { waitingLines, waitMood } from '@/lib/waiting-lines';
 import { TimerRing, WaitingDots } from '../motion-bits';
 import { ANSWER_BG, ANSWER_NAMES, AnswerShape } from '../shapes';
 
-const WAITING_LINES = ['ใจเย็นๆ รอเฉลยแป๊บ', 'มั่นใจแค่ไหนเนี่ย?', 'ตอบไวแบบนี้ มีลุ้น!', 'ดูเฉลยบนจอใหญ่ได้เลย', 'ลุ้นๆๆ'];
-
 /** a right answer gets full points however late it comes, so the timer is only the deadline */
 export const untimed = (q: QuestionPublic) => !q.timed && q.type !== 'poll' && q.multiplier > 0;
+
+/** the middle of what was tapped, and half its size, on the screen */
+type Origin = { x: number; y: number; r: number };
+const originOf = (el: Element | null | undefined): Origin | null => {
+  if (!el) return null;
+  const b = el.getBoundingClientRect();
+  return { x: b.left + b.width / 2, y: b.top + b.height / 2, r: Math.max(b.width, b.height) / 2 };
+};
 
 /** One question on the phone: read it, 3-2-1, answer, wait for the reveal. */
 export function PlayerQuestion({
@@ -24,18 +31,61 @@ export function PlayerQuestion({
   q: QuestionPublic;
   myAnswer: AnswerSent | null;
   late: boolean;
-  onAnswer: (sent: AnswerSent) => void;
+  /** false when the answer was dropped: this phone already sent one */
+  onAnswer: (sent: AnswerSent) => boolean;
 }) {
   const now = useServerNow(true, 100);
   const view = myAnswer !== null ? 'sent' : now < q.startsAt ? 'lead' : now > q.endsAt ? 'timeup' : 'pad';
+  // when and where this phone sent its answer: the color pours out from there, and the wait says how it went
+  const [mine, setMine] = useState<{ at: number; from: Origin | null } | null>(null);
+  const answer = (sent: AnswerSent, from: Origin | null) => {
+    const at = serverNow();
+    if (!onAnswer(sent)) return false;
+    setMine({ at, from });
+    return true;
+  };
+
+  // the last five seconds: the music hurries along, as on the big screen
+  const hurry = q.endsAt - now <= 5000;
+  useEffect(() => {
+    if (!hurry) return;
+    sfx.hurry(true);
+    return () => sfx.hurry(false);
+  }, [hurry]);
 
   return (
-    <AnimatePresence mode="wait">
-      {view === 'lead' && <LeadIn key="lead" q={q} now={now} />}
-      {view === 'pad' && <Pad key={`pad-${q.id}`} q={q} onAnswer={onAnswer} />}
-      {view === 'sent' && <Sent key="sent" q={q} sent={myAnswer!} late={late} />}
-      {view === 'timeup' && <TimeUp key="timeup" />}
-    </AnimatePresence>
+    <div className="relative isolate flex flex-1 flex-col">
+      <AnimatePresence mode="wait">
+        {view === 'lead' && <LeadIn key="lead" q={q} now={now} />}
+        {view === 'pad' && <Pad key={`pad-${q.id}`} q={q} onAnswer={answer} />}
+        {view === 'sent' && <Sent key="sent" q={q} sent={myAnswer!} late={late} at={mine?.at ?? null} />}
+        {view === 'timeup' && <TimeUp key="timeup" />}
+      </AnimatePresence>
+      {/* after the pad in the page, so it covers the pad as it goes; the "sent" screen sits above it */}
+      {view === 'sent' && <Flood from={mine?.from ?? null} bg={late ? 'bg-slate-500' : sentLook(q, myAnswer!).bg} />}
+    </div>
+  );
+}
+
+/** The color of what was sent pours out over the screen from where it was tapped (the middle after a reload). */
+function Flood({ from, bg }: { from: Origin | null; bg: string }) {
+  // a circle 3 screens across covers the screen from any point on it; it starts the size of what was tapped
+  const [start] = useState(() => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const at = from ?? { x: w / 2, y: h / 2, r: 0 };
+    return { x: at.x, y: at.y, scale: Math.min(1, (2 * at.r) / (3 * Math.max(w, h))) };
+  });
+  return (
+    <motion.div
+      aria-hidden
+      data-flood
+      className={`pointer-events-none fixed size-[300vmax] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-300 ${bg}`}
+      style={{ left: start.x, top: start.y }}
+      initial={{ scale: start.scale }}
+      animate={{ scale: 1 }}
+      transition={{ duration: 0.5, ease: [0.2, 0.8, 0.2, 1] }}
+    />
   );
 }
 
@@ -81,15 +131,21 @@ function LeadIn({ q, now }: { q: QuestionPublic; now: number }) {
   );
 }
 
-function Pad({ q, onAnswer }: { q: QuestionPublic; onAnswer: (sent: AnswerSent) => void }) {
-  const send = (sent: AnswerSent) => {
+function Pad({ q, onAnswer }: { q: QuestionPublic; onAnswer: (sent: AnswerSent, from: Origin | null) => boolean }) {
+  const send = (sent: AnswerSent, from: Origin | null) => {
+    if (!onAnswer(sent, from)) return false;
     vibrate(30);
     sfx.play('tap');
-    onAnswer(sent);
+    return true;
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.97 }} className="flex flex-1 flex-col gap-3">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
+      className="flex flex-1 flex-col gap-3"
+    >
       <div className="flex items-center gap-3">
         <TimerRing startsAt={q.startsAt} endsAt={q.endsAt} size={56} />
         <div className="flex-1">
@@ -98,30 +154,34 @@ function Pad({ q, onAnswer }: { q: QuestionPublic; onAnswer: (sent: AnswerSent) 
         </div>
       </div>
       {q.type === 'puzzle' ? (
-        <PuzzlePad q={q} onSend={(order) => send({ order })} />
+        <PuzzlePad q={q} onSend={(order, from) => send({ order }, from)} />
       ) : q.type === 'type' ? (
-        <TypePad onSend={(text) => send({ text })} />
+        <TypePad onSend={(text, from) => send({ text }, from)} />
       ) : q.type === 'slider' && q.slider ? (
-        <SliderPad slider={q.slider} onSend={(value) => send({ value })} />
+        <SliderPad slider={q.slider} onSend={(value, from) => send({ value }, from)} />
       ) : (
-        <TilePad q={q} onPick={(choice) => send({ choice })} />
+        <TilePad q={q} onPick={(choice, from) => send({ choice }, from)} />
       )}
     </motion.div>
   );
 }
 
-function TilePad({ q, onPick }: { q: QuestionPublic; onPick: (choice: number) => void }) {
+function TilePad({ q, onPick }: { q: QuestionPublic; onPick: (choice: number, from: Origin | null) => boolean }) {
   const two = q.options.length === 2;
+  // the tapped tile swells while the others drop away under its color; one tap only, even while they go
+  const [picked, setPicked] = useState<number | null>(null);
   return (
     <div className={`grid flex-1 gap-3 ${two ? 'grid-cols-1' : 'grid-cols-2'}`}>
       {q.options.map((text, i) => (
         <motion.button
           key={i}
           type="button"
-          onClick={() => onPick(i)}
+          onClick={(e) => {
+            if (picked === null && onPick(i, originOf(e.currentTarget))) setPicked(i);
+          }}
           initial={{ scale: 0.6, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: i * 0.05, type: 'spring', stiffness: 500, damping: 25 }}
+          animate={picked === null ? { scale: 1, opacity: 1 } : picked === i ? { scale: 1.06, opacity: 1 } : { scale: 0.7, opacity: 0 }}
+          transition={picked === null ? { delay: i * 0.05, type: 'spring', stiffness: 500, damping: 25 } : { type: 'spring', stiffness: 520, damping: 30 }}
           whileTap={{ scale: 0.92 }}
           aria-label={`${ANSWER_NAMES[i]}: ${text}`}
           className={`flex min-h-28 flex-col items-center justify-center gap-2 rounded-3xl p-3 shadow-[inset_0_-8px_0_rgb(0_0_0/0.25)] ${ANSWER_BG[i]} ${q.options.length === 3 && i === 2 ? 'col-span-2' : ''}`}
@@ -135,7 +195,7 @@ function TilePad({ q, onPick }: { q: QuestionPublic; onPick: (choice: number) =>
 }
 
 /** Tap the items in order: each one flies up into the next numbered slot; tap a placed one to take it back. */
-function PuzzlePad({ q, onSend }: { q: QuestionPublic; onSend: (order: number[]) => void }) {
+function PuzzlePad({ q, onSend }: { q: QuestionPublic; onSend: (order: number[], from: Origin | null) => void }) {
   const [order, setOrder] = useState<number[]>([]);
   const n = q.options.length;
   const left = q.options.map((_, i) => i).filter((i) => !order.includes(i));
@@ -168,7 +228,7 @@ function PuzzlePad({ q, onSend }: { q: QuestionPublic; onSend: (order: number[])
             type="button"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            onClick={() => onSend(order)}
+            onClick={(e) => onSend(order, originOf(e.currentTarget))}
             className="btn btn-gold min-h-16 text-xl"
           >
             ✅ ส่งลำดับนี้
@@ -196,12 +256,13 @@ function PuzzleItem({ q, d, onTap, placed = false }: { q: QuestionPublic; d: num
   );
 }
 
-function TypePad({ onSend }: { onSend: (text: string) => void }) {
+function TypePad({ onSend }: { onSend: (text: string, from: Origin | null) => void }) {
   const [text, setText] = useState('');
   const ready = text.trim().length > 0;
-  const submit = (e: FormEvent) => {
+  const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (ready) onSend(text.trim());
+    // sent with Enter on the keyboard, the color still pours from the send button
+    if (ready) onSend(text.trim(), originOf(e.currentTarget.querySelector('button[type=submit]')));
   };
   return (
     <form onSubmit={submit} className="flex flex-1 flex-col justify-center gap-4">
@@ -230,7 +291,7 @@ function TypePad({ onSend }: { onSend: (text: string) => void }) {
   );
 }
 
-function SliderPad({ slider, onSend }: { slider: NonNullable<QuestionPublic['slider']>; onSend: (value: number) => void }) {
+function SliderPad({ slider, onSend }: { slider: NonNullable<QuestionPublic['slider']>; onSend: (value: number, from: Origin | null) => void }) {
   const { min, max, step, unit } = slider;
   const steps = Math.round((max - min) / step);
   const [value, setValue] = useState(() => sliderStart(slider));
@@ -280,7 +341,7 @@ function SliderPad({ slider, onSend }: { slider: NonNullable<QuestionPublic['sli
         <Nudge label={`+${fmtValue(step)}`} onTap={() => nudge(1)} />
         {long && <Nudge label={`+${fmtValue(10 * step)}`} onTap={() => nudge(10)} />}
       </div>
-      <button type="button" onClick={() => onSend(value)} disabled={!moved} className="btn btn-gold min-h-16 text-xl">
+      <button type="button" onClick={(e) => onSend(value, originOf(e.currentTarget))} disabled={!moved} className="btn btn-gold min-h-16 text-xl">
         {moved ? `✅ ส่ง ${fmtValue(value, unit)}` : '👆 เลื่อนเลือกก่อนส่ง'}
       </button>
     </div>
@@ -305,35 +366,67 @@ function sentLook(q: QuestionPublic, sent: AnswerSent): { bg: string; icon: Reac
   return { bg: ANSWER_BG[choice] ?? 'bg-brand', icon: <AnswerShape index={choice} className="size-20 text-white" />, text: q.options[choice] ?? null };
 }
 
-function Sent({ q, sent, late }: { q: QuestionPublic; sent: AnswerSent; late: boolean }) {
-  const [line] = useState(() => WAITING_LINES[Math.floor(Math.random() * WAITING_LINES.length)]);
+/** `at`: when it was sent, on the server's clock; null when this phone did not see it go (it reloaded after answering) */
+function Sent({ q, sent, late, at }: { q: QuestionPublic; sent: AnswerSent; late: boolean; at: number | null }) {
+  const reduce = useReducedMotion();
+  const [lines] = useState(() => waitingLines(waitMood(q, at)));
+  // the line changes every few seconds until the reveal
+  const [turn, setTurn] = useState(0);
+  useEffect(() => {
+    if (late) return;
+    const id = setInterval(() => setTurn((n) => n + 1), 3200);
+    return () => clearInterval(id);
+  }, [late]);
   const look = sentLook(q, sent);
+  // how long it took, where the speed counts for points (the server's own count can differ by the trip there)
+  const took = at !== null && q.timed && q.multiplier > 0 && q.type !== 'poll' ? Math.max(0, at - q.startsAt) / 1000 : null;
+  const waiting = !late && !reduce;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="flex flex-1 flex-col items-center justify-center gap-5 text-center"
+      className="relative z-10 flex flex-1 flex-col items-center justify-center gap-5 text-center"
     >
       <motion.div
         initial={{ scale: 0.3, rotate: -90 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 14 }}
-        className={`grid size-36 place-items-center rounded-[2rem] shadow-[inset_0_-8px_0_rgb(0_0_0/0.25)] ${late ? 'bg-slate-500' : look.bg}`}
+        className="relative grid size-36 place-items-center"
       >
-        {look.icon}
+        {/* rings go out from it while it waits, like a call going out */}
+        {waiting &&
+          [0, 1].map((i) => (
+            <motion.span
+              key={i}
+              aria-hidden
+              data-ring
+              className="absolute inset-0 rounded-full border-4 border-white/70"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: [0.9, 1.9], opacity: [0.7, 0] }}
+              transition={{ duration: 2.2, delay: 0.5 + i * 1.1, repeat: Infinity, ease: 'easeOut' }}
+            />
+          ))}
+        <motion.div
+          animate={waiting ? { y: [0, -8, 0] } : { y: 0 }}
+          transition={waiting ? { duration: 2.4, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.2 }}
+          className="grid size-36 place-items-center rounded-full bg-black/15"
+        >
+          {look.icon}
+        </motion.div>
       </motion.div>
       {late ? (
         <>
-          <h2 className="text-3xl font-extrabold">ส่งไม่ทันเวลา 😅</h2>
-          <p className="text-white/75">ข้อหน้ากดให้ไวขึ้นอีกนิดนะ</p>
+          <h2 className="text-3xl font-extrabold drop-shadow">ส่งไม่ทันเวลา 😅</h2>
+          <p className="text-white/80">ข้อหน้ากดให้ไวขึ้นอีกนิดนะ</p>
         </>
       ) : (
         <>
-          <h2 className="text-3xl font-extrabold">ส่งคำตอบแล้ว!</h2>
-          {look.text !== null && <p className="max-w-xs truncate text-white/80">“{look.text}”</p>}
+          <h2 className="text-3xl font-extrabold drop-shadow">ส่งคำตอบแล้ว!</h2>
+          {look.text !== null && <p className="max-w-xs truncate rounded-full bg-black/20 px-4 py-1.5 font-semibold">“{look.text}”</p>}
           {sent.order && (
-            <ol className="flex max-w-xs flex-col gap-1 text-left text-sm text-white/80">
+            <ol className="flex max-w-xs flex-col gap-1 rounded-2xl bg-black/20 px-4 py-2 text-left text-sm">
               {sent.order.map((d, pos) => (
                 <li key={d} className="truncate">
                   {pos + 1}. {q.options[d]}
@@ -341,9 +434,32 @@ function Sent({ q, sent, late }: { q: QuestionPublic; sent: AnswerSent; late: bo
               ))}
             </ol>
           )}
-          <p className="flex items-center gap-2 text-white/70">
-            {line} <WaitingDots />
-          </p>
+          {took !== null && (
+            <motion.span
+              data-took
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.35, type: 'spring', stiffness: 420, damping: 18 }}
+              className="rounded-full bg-white px-3 py-1 text-sm font-bold text-ink tabular-nums"
+            >
+              ⚡ ตอบใน {took.toFixed(1)} วินาที
+            </motion.span>
+          )}
+          <div className="grid h-7 place-items-center overflow-hidden">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.p
+                key={turn}
+                data-line
+                initial={{ y: 14, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -14, opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="flex items-center gap-2 whitespace-nowrap text-white/90"
+              >
+                {lines[turn % lines.length]} <WaitingDots />
+              </motion.p>
+            </AnimatePresence>
+          </div>
         </>
       )}
     </motion.div>

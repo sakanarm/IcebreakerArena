@@ -42,6 +42,8 @@ export function usePlayer(initialPin: string | null) {
   const [picked, setPicked] = useState<Picked | null>(null);
   /** true once this tab is in the room, so a reconnect knows to resume */
   const joined = useRef(false);
+  /** the question this tab has sent an answer to, until answering moves on */
+  const answering = useRef<string | null>(null);
 
   const resume = useCallback(async (p: string) => {
     const session = load<PlayerSession | null>(keys.playerSession(p), null);
@@ -63,6 +65,7 @@ export function usePlayer(initialPin: string | null) {
     const socket = getSocket();
     const onState = (s: PlayerState) => {
       if (s.pin !== pin) return;
+      if (s.phase !== 'question') answering.current = null;
       setState(s);
       setStatus('playing');
     };
@@ -149,13 +152,24 @@ export function usePlayer(initialPin: string | null) {
     [pin],
   );
 
-  const answer = useCallback(async (questionId: string, sent: AnswerSent) => {
+  /**
+   * False when this tab has already answered the question: two taps closer together than a screen update
+   * would otherwise send both, and the phone would show the second while the server keeps the first.
+   */
+  const answer = useCallback((questionId: string, sent: AnswerSent) => {
+    if (answering.current === questionId) return false;
+    answering.current = questionId;
     setPicked({ questionId, sent, late: false });
-    const res = await ack(getSocket().timeout(5000).emitWithAck('player:answer', { questionId, ...sent }));
-    if (res.ok) return;
-    if (res.error === 'too_late' || res.error === 'not_open') setPicked({ questionId, sent, late: true });
-    // refused (a value the question can't take): back to the answer pad rather than a stuck "sent"
-    else if (res.error === 'bad_request') setPicked((p) => (p?.questionId === questionId ? null : p));
+    void ack(getSocket().timeout(5000).emitWithAck('player:answer', { questionId, ...sent })).then((res) => {
+      if (res.ok) return;
+      if (res.error === 'too_late' || res.error === 'not_open') setPicked({ questionId, sent, late: true });
+      // refused (a value the question can't take): back to the answer pad rather than a stuck "sent"
+      else if (res.error === 'bad_request') {
+        if (answering.current === questionId) answering.current = null;
+        setPicked((p) => (p?.questionId === questionId ? null : p));
+      }
+    });
+    return true;
   }, []);
 
   /** back to the PIN screen, or with `rejoin` straight to this room's name screen ("change name" in the lobby) */
