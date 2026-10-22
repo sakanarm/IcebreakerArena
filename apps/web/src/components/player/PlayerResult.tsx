@@ -97,7 +97,15 @@ export function PlayerResult({ state }: { state: PlayerState }) {
           transition={{ delay: 0.75 }}
           className="flex items-center gap-2 rounded-full bg-white/20 px-4 py-1.5 font-semibold"
         >
-          <motion.span animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 0.8, repeat: Infinity }} aria-hidden>
+          {/* the longer the run, the bigger the flame and the faster it beats */}
+          <motion.span
+            data-flame={flameSize(r.streak)}
+            animate={{ scale: [1, 1.3, 1] }}
+            transition={{ duration: Math.max(0.4, 0.8 - (r.streak - 2) * 0.08), repeat: Infinity }}
+            style={{ fontSize: `${flameSize(r.streak)}em` }}
+            className="inline-block leading-none"
+            aria-hidden
+          >
             🔥
           </motion.span>
           ตอบถูกติดกัน {r.streak} ข้อ
@@ -126,6 +134,11 @@ export function PlayerResult({ state }: { state: PlayerState }) {
       <RankLine me={state.me} />
     </div>
   );
+}
+
+/** a run of two gets the flame at its own size, each one more a quarter bigger, up to two and a quarter */
+export function flameSize(streak: number) {
+  return Math.min(1 + Math.max(0, streak - 2) * 0.25, 2.25);
 }
 
 /** what the right answer was, for the question types that have no right tile */
@@ -181,13 +194,25 @@ function KeyView({ state }: { state: PlayerState }) {
 /** "2nd place, 120 points behind Panda": the reason to try harder on the next question. */
 export function RankLine({ me, delay = 0.9 }: { me: PlayerMe; delay?: number }) {
   if (me.rank === null) return null;
+  const climbed = me.prevRank !== null ? me.prevRank - me.rank : 0;
   return (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay }}
-      className="rounded-2xl bg-black/25 px-5 py-3 text-center"
+      className="flex flex-col items-center rounded-2xl bg-black/25 px-5 py-3 text-center"
     >
+      {climbed > 0 && (
+        <motion.div
+          data-climb={climbed}
+          initial={{ scale: 0.3, y: 10, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          transition={{ delay: delay + 0.3, type: 'spring', stiffness: 460, damping: 13, opacity: { delay: delay + 0.3, duration: 0.12 } }}
+          className={`mb-1.5 rounded-full px-3 py-0.5 font-display text-base font-extrabold shadow-lg ${me.rank === 1 ? 'bg-gold text-ink' : 'bg-white text-good'}`}
+        >
+          {me.rank === 1 ? '👑 ขึ้นนำแล้ว!' : `⬆️ ขึ้นมา ${fmt(climbed)} อันดับ!`}
+        </motion.div>
+      )}
       <div className="font-display text-xl font-semibold">
         อันดับที่ {fmt(me.rank)} <span className="text-base font-normal text-white/75">จาก {fmt(me.totalPlayers)} คน</span>
       </div>

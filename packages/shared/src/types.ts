@@ -200,6 +200,8 @@ export interface StageState {
   podium: LeaderRow[];
   awards: Award[];
   isLastQuestion: boolean;
+  /** leaderboard only: the question after this board is the game's last */
+  nextIsLast: boolean;
   /** goes up by one at every change of phase: the host's Next carries the one it was pressed on (see `host:next`) */
   step: number;
 }
@@ -220,6 +222,8 @@ export interface PlayerMe {
   avatar: string;
   score: number;
   rank: number | null;
+  /** the place before the latest reveal; null until there was one */
+  prevRank: number | null;
   streak: number;
   gapToAbove: number | null;
   aboveNickname: string | null;

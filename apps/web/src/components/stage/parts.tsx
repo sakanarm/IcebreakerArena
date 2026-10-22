@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, type Variants } from 'motion/react';
+import { motion, useReducedMotion, type Variants } from 'motion/react';
 import type { ReactNode } from 'react';
 import type { QuestionPublic } from '@icebreaker/shared';
 import { TYPE_LABEL } from '@/lib/format';
@@ -69,11 +69,16 @@ export function QuestionMeta({ q, pop = false, children }: { q: QuestionPublic; 
   );
 }
 
+/** seconds into a reveal when the counts are up and the verdict lands: the wrong answers shrink back, the right get their ✓ */
+export const VERDICT_S = 1;
+
 /**
- * The four answer tiles on the big screen. In `reveal` mode the right answers
- * glow and the rest fade back (a poll has no right answer, so nothing fades).
+ * The four answer tiles on the big screen. In `reveal` mode the right answers swell and get a ✓ that
+ * pops with a ring going out from it, and the rest shrink and fade back (a poll has no right answer, so
+ * nothing moves).
  */
 export function AnswerGrid({ options, reveal = false, correct = [] }: { options: string[]; reveal?: boolean; correct?: number[] }) {
+  const reduce = useReducedMotion();
   return (
     // two by two everywhere: on a phone on its side four in a row would leave a word or two a line, so there the
     // tiles get slim instead
@@ -84,10 +89,16 @@ export function AnswerGrid({ options, reveal = false, correct = [] }: { options:
         return (
           <motion.div
             key={i}
+            data-verdict={!reveal || !correct.length ? undefined : isCorrect ? 'right' : 'wrong'}
             initial={reveal ? { opacity: 1, y: 0, scale: 1 } : { y: 48, opacity: 0, scale: 0.9 }}
-            animate={{ y: 0, opacity: faded ? 0.35 : 1, scale: isCorrect ? 1.02 : 1 }}
-            transition={{ delay: reveal ? 1 : 0.1 + i * 0.08, type: 'spring', stiffness: 380, damping: 26 }}
-            className={`relative flex min-h-16 items-center gap-2 overflow-hidden rounded-2xl px-3 py-2 shadow-[inset_0_-6px_0_rgb(0_0_0/0.22)] sm:min-h-24 sm:gap-4 sm:px-6 sm:py-4 low:min-h-20 low:py-3 short:min-h-10 short:gap-2 short:px-3 short:py-1 ${ANSWER_BG[i]} ${isCorrect ? 'ring-4 ring-white' : ''}`}
+            animate={{ y: 0, opacity: faded ? 0.35 : 1, scale: isCorrect ? 1.04 : faded ? 0.92 : 1 }}
+            transition={
+              reveal
+                ? // the right one swells with a bounce, the wrong ones settle back without one
+                  { delay: VERDICT_S, type: 'spring', stiffness: isCorrect ? 420 : 260, damping: isCorrect ? 13 : 24 }
+                : { delay: 0.1 + i * 0.08, type: 'spring', stiffness: 380, damping: 26 }
+            }
+            className={`relative flex min-h-16 items-center gap-2 rounded-2xl px-3 py-2 shadow-[inset_0_-6px_0_rgb(0_0_0/0.22)] sm:min-h-24 sm:gap-4 sm:px-6 sm:py-4 low:min-h-20 low:py-3 short:min-h-10 short:gap-2 short:px-3 short:py-1 ${ANSWER_BG[i]} ${isCorrect ? 'ring-4 ring-white' : ''}`}
           >
             {/* each shape spins into its tile as the tile slides in */}
             <motion.span
@@ -101,16 +112,32 @@ export function AnswerGrid({ options, reveal = false, correct = [] }: { options:
             <span className="min-w-0 flex-1 text-base leading-snug font-semibold break-words sm:text-2xl lg:text-3xl low:text-2xl short:text-base">{text}</span>
             {isCorrect && (
               <>
-                <motion.span
-                  initial={{ scale: 0, rotate: -45 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 1.15, type: 'spring', stiffness: 400, damping: 14 }}
-                  className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-xl font-extrabold text-good sm:size-12 sm:text-3xl low:size-10 low:text-2xl short:size-7 short:text-lg"
-                  aria-label="คำตอบที่ถูก"
-                >
-                  ✓
-                </motion.span>
-                <span className="shine animate-shine" />
+                <span className="relative grid shrink-0">
+                  {!reduce && (
+                    <motion.span
+                      data-ring
+                      aria-hidden
+                      className="absolute inset-0 rounded-full border-4 border-white"
+                      initial={{ scale: 1, opacity: 0 }}
+                      animate={{ scale: 2.6, opacity: [0, 0.9, 0] }}
+                      transition={{ delay: VERDICT_S + 0.12, duration: 0.7, ease: 'easeOut' }}
+                    />
+                  )}
+                  <motion.span
+                    data-tick
+                    initial={{ scale: 0, rotate: -60 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: VERDICT_S + 0.05, type: 'spring', stiffness: 520, damping: 12 }}
+                    className="grid size-8 place-items-center rounded-full bg-white text-xl font-extrabold text-good shadow-lg sm:size-12 sm:text-3xl low:size-10 low:text-2xl short:size-7 short:text-lg"
+                    aria-label="คำตอบที่ถูก"
+                  >
+                    ✓
+                  </motion.span>
+                </span>
+                {/* its own clip, so the swelling tile and the ring going out are not cut at its edge */}
+                <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                  <span className="shine animate-shine" />
+                </span>
               </>
             )}
           </motion.div>

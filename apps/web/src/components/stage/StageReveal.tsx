@@ -6,7 +6,7 @@ import { sliderBin, type QuestionPublic, type RevealInfo, type StageState } from
 import { fmt, fmtValue, percent, secondsLabel } from '@/lib/format';
 import { sfx } from '@/lib/sfx';
 import { ANSWER_BG, AnswerShape } from '../shapes';
-import { AnswerGrid, PromptBar } from './parts';
+import { AnswerGrid, PromptBar, VERDICT_S } from './parts';
 
 export function StageReveal({ state }: { state: StageState }) {
   const q = state.question!;
@@ -36,6 +36,13 @@ export function StageReveal({ state }: { state: StageState }) {
 function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
   const poll = q.type === 'poll';
   const max = Math.max(1, ...r.counts);
+  const graded = r.correct.length > 0;
+  // a bell as the right answer gets its ✓ (a poll has none to ring for)
+  useEffect(() => {
+    if (!graded) return;
+    const t = setTimeout(() => sfx.play('ding'), VERDICT_S * 1000);
+    return () => clearTimeout(t);
+  }, [graded]);
   return (
     <>
       {/* never lower than the stats card beside the bars, or the card would climb over the question */}
@@ -59,10 +66,12 @@ function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
                     className={`absolute inset-x-0 bottom-0 origin-bottom rounded-t-xl ${ANSWER_BG[i]}`}
                     style={{ height: `${pct}%` }}
                     initial={{ scaleY: 0 }}
-                    animate={{ scaleY: 1, opacity: faded ? 0.35 : 1 }}
+                    // the wrong answers' bars get thinner as they fade, so the right one stands out against them
+                    animate={{ scaleY: 1, scaleX: faded ? 0.8 : 1, opacity: faded ? 0.35 : 1 }}
                     transition={{
                       scaleY: { delay: 0.15 + i * 0.1, type: 'spring', stiffness: 150, damping: 19 },
-                      opacity: { delay: 1 },
+                      scaleX: { delay: VERDICT_S, type: 'spring', stiffness: 260, damping: 24 },
+                      opacity: { delay: VERDICT_S },
                     }}
                   />
                   <motion.span
@@ -81,7 +90,7 @@ function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      transition={{ delay: 1.05, type: 'spring', stiffness: 500, damping: 14 }}
+                      transition={{ delay: VERDICT_S + 0.05, type: 'spring', stiffness: 500, damping: 12 }}
                       className="text-base font-extrabold sm:text-2xl"
                     >
                       ✓

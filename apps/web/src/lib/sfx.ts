@@ -2,7 +2,20 @@
  * Every sound is synthesized with WebAudio at runtime: there are no audio
  * files, so nothing to license and nothing to download at the event.
  */
-export type SfxName = 'pop' | 'tap' | 'whoosh' | 'tick' | 'count' | 'go' | 'reveal' | 'correct' | 'wrong' | 'drumroll' | 'fanfare';
+export type SfxName =
+  | 'pop'
+  | 'tap'
+  | 'whoosh'
+  | 'tick'
+  | 'count'
+  | 'go'
+  | 'reveal'
+  | 'ding'
+  | 'sparkle'
+  | 'correct'
+  | 'wrong'
+  | 'drumroll'
+  | 'fanfare';
 export type MusicName = 'lobby' | 'question';
 
 interface ToneOptions {
@@ -106,6 +119,14 @@ class SoundEngine {
         return this.tone(hz(83), t + 0.1, 0.3, { type: 'triangle', gain: 0.22 });
       case 'reveal':
         return [72, 76, 79, 84].forEach((n, i) => this.tone(hz(n), t + i * 0.07, 0.8, { type: 'triangle', gain: 0.13 }));
+      // a bell as the right answer gets its tick on the big screen
+      case 'ding':
+        this.tone(hz(88), t, 0.7, { gain: 0.16 });
+        this.tone(hz(95), t, 0.5, { gain: 0.07 });
+        return this.tone(hz(100), t + 0.05, 0.4, { gain: 0.04 });
+      // a quick run up, as the crown lands on the leader
+      case 'sparkle':
+        return [84, 88, 91, 96].forEach((n, i) => this.tone(hz(n), t + i * 0.045, 0.22, { type: 'triangle', gain: 0.09 }));
       case 'correct':
         return [72, 76, 79, 84].forEach((n, i) => this.tone(hz(n), t + i * 0.08, 0.35, { type: 'square', gain: 0.06, cutoff: 3000 }));
       case 'wrong':

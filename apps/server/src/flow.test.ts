@@ -124,6 +124,7 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
   assert.equal(a1.result?.correct, true);
   assert.ok(a1.result!.points >= 900 && a1.result!.points <= 1000, `fast answer scores near 1,000, got ${a1.result!.points}`);
   assert.equal(a1.me.rank, 1);
+  assert.equal(a1.me.prevRank, null, 'no place before the first reveal');
   const b1 = await bob.state.until((s) => s.phase === 'reveal');
   assert.equal(b1.result?.correct, false);
   assert.equal(b1.result?.points, 0);
@@ -135,6 +136,7 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
   host.emit('host:next');
   const lb = await stage.until((s) => s.phase === 'leaderboard');
   assert.equal(lb.leaderboard[0]?.nickname, 'Alice');
+  assert.equal(lb.nextIsLast, false);
 
   // Q2 is a poll in the same round: no round card, and it reveals by itself once everyone has voted
   host.emit('host:next');
@@ -157,9 +159,11 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
 
   // Round 2 (×2): its card moves on by itself
   host.emit('host:next');
-  await stage.until((s) => s.phase === 'leaderboard');
+  const lb2 = await stage.until((s) => s.phase === 'leaderboard');
+  assert.equal(lb2.nextIsLast, true, 'the board before the last question says so');
   host.emit('host:next');
-  await stage.until((s) => s.phase === 'round' && s.round?.index === 1);
+  const r2 = await stage.until((s) => s.phase === 'round' && s.round?.index === 1);
+  assert.equal(r2.nextIsLast, false, 'only the board says it');
   const q3 = (await stage.until((s) => s.phase === 'question' && s.question?.number === 3)).question!;
   assert.equal(q3.multiplier, 2);
   assert.equal(stage.latest?.isLastQuestion, true);
@@ -171,6 +175,7 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
   const b3 = await bob.state.until((s) => s.phase === 'reveal' && s.question?.number === 3);
   assert.ok(b3.result!.points >= 1800, `the final round doubles points, got ${b3.result!.points}`);
   assert.equal(b3.me.rank, 1, 'Bob overtakes Alice with the ×2 final');
+  assert.equal(b3.me.prevRank, 2, 'and his phone knows he came up from second');
 
   // after the last question, Next goes straight to the podium
   host.emit('host:next');

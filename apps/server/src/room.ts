@@ -424,6 +424,7 @@ export class Room {
       podium: inPhase('podium') ? this.ranking.slice(0, 3).map(toRow) : [],
       awards: inPhase('podium') ? this.awards() : [],
       isLastQuestion: this.slotIndex >= this.slots.length - 1,
+      nextIsLast: inPhase('leaderboard') && this.slotIndex === this.slots.length - 2,
       step: this.step,
     };
   }
@@ -442,6 +443,7 @@ export class Room {
         avatar: p.avatar,
         score: p.score,
         rank: p.rank,
+        prevRank: p.prevRank,
         streak: p.streak,
         gapToAbove: above ? above.score - p.score : null,
         aboveNickname: above?.nickname ?? null,
