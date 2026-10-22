@@ -66,7 +66,7 @@ export function StagePodium({ state }: { state: StageState }) {
         layout="position"
         className="relative flex w-full max-w-4xl flex-col items-center gap-3 sm:gap-6 low:max-w-3xl low:gap-3 short:max-w-md short:gap-2"
       >
-        <Spotlights slots={slots} target={target} on={reduce ? step >= 3 : step >= 1} sweep={!reduce && drum && step < 3} reduce={reduce} />
+        <Spotlights slots={slots} step={step} target={target} on={reduce ? step >= 3 : step >= 1} sweep={!reduce && drum && step < 3} reduce={reduce} />
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.h2
             key={step >= 3 ? 'won' : 'wait'}
@@ -140,12 +140,15 @@ function laidOut(el: HTMLElement, root: HTMLElement) {
  */
 function Spotlights({
   slots,
+  step,
   target,
   on,
   sweep,
   reduce,
 }: {
   slots: RefObject<Partial<Record<Place, HTMLDivElement | null>>>;
+  /** how far the podium has got: each step brings a player on, whose face the lights then find */
+  step: number;
   target: Place;
   on: boolean;
   sweep: boolean;
@@ -154,8 +157,9 @@ function Spotlights({
   const box = useRef<HTMLDivElement>(null);
   const [beams, setBeams] = useState<Beam[] | null>(null);
 
-  // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side. Again as
-  // each place is called, at the face of the player who has just come on, before that is painted. The block is
+  // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side. Again at
+  // each step, at the face of the player who has just come on, before that is painted (the 3rd comes on while
+  // the lights already point at their place, so the place alone would miss them). The block is
   // this box's parent (its ref is not set yet when this first runs, nor are the stands', so the observer's first
   // call, after the commit, measures again)
   useLayoutEffect(() => {
@@ -192,7 +196,7 @@ function Spotlights({
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     return () => ro.disconnect();
-  }, [slots, target]);
+  }, [slots, step]);
 
   return (
     <div ref={box} aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 bottom-0 overflow-clip">
