@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { Award, LeaderRow, StageState } from '@icebreaker/shared';
 import { shower } from '@/lib/confetti';
 import { AWARDS_AT, CROWN_S, DRUMROLL_AT, FALL_S, MEDAL_S, PLACE_AT, RIDER_S, medalFall, type Place } from '@/lib/podium';
@@ -144,8 +144,9 @@ function Spotlights({
   const box = useRef<HTMLDivElement>(null);
   const [beams, setBeams] = useState<Beam[] | null>(null);
 
-  // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side
-  useLayoutEffect(() => {
+  // aimed by measure: the columns sit differently on a projector, a laptop and a phone on its side. After the
+  // commit, not in a layout effect: the block's ref and the stands' refs are only set once this has run
+  useEffect(() => {
     const el = box.current;
     const outer = block.current;
     if (!el || !outer) return;
@@ -315,9 +316,10 @@ function Pedestal({
 function AwardCard({ award, delay }: { award: Award; delay: number }) {
   return (
     <motion.div
-      initial={{ y: 40, opacity: 0, rotate: -3 }}
-      animate={{ y: 0, opacity: 1, rotate: 0 }}
-      transition={{ delay, type: 'spring', stiffness: 260, damping: 18 }}
+      // pops in where it stays: one coming up from below would hang under the scene and make it scroll
+      initial={{ scale: 0.6, opacity: 0, rotate: -6 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      transition={{ delay, type: 'spring', stiffness: 320, damping: 18, opacity: { delay, duration: 0.15 } }}
       className="glass flex max-w-full items-center gap-3 px-3 py-2 sm:gap-4 sm:px-5 sm:py-3 low:py-2 short:max-w-48 short:gap-2 short:py-1.5"
     >
       <span className="text-3xl sm:text-4xl short:text-2xl" aria-hidden>
