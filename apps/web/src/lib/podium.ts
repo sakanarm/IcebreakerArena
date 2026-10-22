@@ -7,10 +7,14 @@ import type { Easing } from 'motion/react';
 
 export type Place = 1 | 2 | 3;
 
-/** ms after the podium comes on when each place is announced: 3rd, then 2nd, then a drum roll and the winner */
-export const PLACE_AT: Record<Place, number> = { 3: 600, 2: 2000, 1: 4250 };
-export const DRUMROLL_AT = 2600;
-export const AWARDS_AT = 5600;
+/**
+ * ms after the podium comes on when each place is announced: 3rd, then 2nd, then a drum roll and the winner.
+ * Each place has its moment to itself: its medal is down and the lights have settled on its player before the
+ * next one starts.
+ */
+export const PLACE_AT: Record<Place, number> = { 3: 600, 2: 2000, 1: 4650 };
+export const DRUMROLL_AT = 3000;
+export const AWARDS_AT = 6000;
 
 /** seconds after its place is announced: the stand rises from the floor, its player pops onto it */
 export const RIDER_S = 0.3;
