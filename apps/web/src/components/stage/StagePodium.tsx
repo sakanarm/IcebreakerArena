@@ -181,9 +181,12 @@ function Spotlights({
   return (
     <div ref={box} aria-hidden className="pointer-events-none absolute inset-x-0 -top-16 bottom-0 overflow-clip">
       {beams?.map((b, i) => {
+        // the sweep swings off from where the beam is aimed to the far side of the stage and back, so it never jumps
         const aims = Object.values(b.aim);
+        const from = b.aim[target];
         const lo = Math.min(...aims) - 6;
         const hi = Math.max(...aims) + 6;
+        const to = from - lo > hi - from ? lo : hi;
         return (
           <motion.div
             key={i}
@@ -194,7 +197,7 @@ function Spotlights({
             initial={{ opacity: 0, rotate: b.aim[target] }}
             animate={
               sweep
-                ? { opacity: 1, rotate: i ? [hi, lo] : [lo, hi], transition: { rotate: { duration: i ? 0.5 : 0.62, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }, opacity: { duration: 0.2 } } }
+                ? { opacity: 1, rotate: [from, to], transition: { rotate: { duration: i ? 0.5 : 0.62, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }, opacity: { duration: 0.2 } } }
                 : { opacity: on ? 1 : 0, rotate: b.aim[target], transition: { rotate: { type: 'spring', stiffness: 120, damping: 14 }, opacity: { duration: 0.3 } } }
             }
           />
