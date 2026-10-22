@@ -56,6 +56,12 @@ export function StagePodium({ state }: { state: StageState }) {
   }, []);
 
   const slots = useRef<Partial<Record<Place, HTMLDivElement | null>>>({});
+  // made once: a new ref function each render would be let go and set again after the lights have measured
+  const [slotRefs] = useState(() => {
+    const refs = {} as Record<Place, (el: HTMLDivElement | null) => void>;
+    for (const { place } of PLACES) refs[place] = (el) => void (slots.current[place] = el);
+    return refs;
+  });
   const target: Place = step >= 3 ? 1 : step >= 2 ? 2 : 3;
 
   return (
@@ -88,7 +94,7 @@ export function StagePodium({ state }: { state: StageState }) {
                 row={state.podium[p.place - 1]}
                 risen={step >= STEP_OF[p.place]}
                 reduce={reduce}
-                slotRef={(el) => void (slots.current[p.place] = el)}
+                slotRef={slotRefs[p.place]}
               />
             ))}
           </div>
