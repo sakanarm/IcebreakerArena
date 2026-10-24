@@ -48,6 +48,9 @@ export function HostDock({
 }) {
   const lastPress = useRef(0);
   const waiting = state.phase === 'lobby' && state.playerCount === 0;
+  const expected = state.phase === 'lobby' ? (state.expected ?? null) : null;
+  // everyone the Host waits for is in: the Start button calls for the press
+  const ready = expected !== null && state.playerCount >= expected;
   const canEnd = state.phase !== 'lobby' && state.phase !== 'podium';
   const label = primaryLabel(state);
 
@@ -114,7 +117,10 @@ export function HostDock({
         </Link>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm max-sm:order-first max-sm:basis-full lg:text-base short:flex-nowrap">
           <span className="whitespace-nowrap rounded-full bg-white px-3 py-1 font-display font-extrabold tracking-wider text-ink">PIN {state.pin}</span>
-          <span className="whitespace-nowrap rounded-full bg-white/10 px-3 py-1">👥 {fmt(state.playerCount)}</span>
+          <span className="whitespace-nowrap rounded-full bg-white/10 px-3 py-1">
+            👥 {fmt(state.playerCount)}
+            {expected !== null && state.playerCount <= expected && <span className="text-white/60">/{fmt(expected)}</span>}
+          </span>
           {/* the scene counts the answers in big type too, so a phone on its side leaves it to that */}
           {state.phase === 'question' && (
             <span className="whitespace-nowrap rounded-full bg-white/10 px-3 py-1 short:hidden">
@@ -154,7 +160,7 @@ export function HostDock({
           onClick={next}
           disabled={waiting}
           title={waiting ? 'รอผู้เล่นอย่างน้อย 1 คน' : undefined}
-          className="btn btn-gold shrink-0 px-5 py-4 text-lg max-sm:flex-1 max-sm:px-3 max-sm:py-3 sm:min-w-48 sm:px-8 sm:text-xl short:py-1.5"
+          className={`btn btn-gold shrink-0 px-5 py-4 text-lg max-sm:flex-1 max-sm:px-3 max-sm:py-3 sm:min-w-48 sm:px-8 sm:text-xl short:py-1.5 ${ready ? 'animate-call motion-reduce:animate-none' : ''}`}
         >
           <motion.span key={label} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
             {waiting ? 'รอผู้เล่น…' : label}

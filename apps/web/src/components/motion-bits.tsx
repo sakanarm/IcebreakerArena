@@ -147,10 +147,12 @@ export function WaitingDots() {
 
 /** A number that pops whenever it changes (answer counter, player counter). */
 export function PopNumber({ value, className }: { value: number; className?: string }) {
+  // under reduced motion the new number is just there, without a frame at the bigger size first
+  const reduce = useReducedMotion();
   return (
     <motion.span
       key={value}
-      initial={{ scale: 1.35 }}
+      initial={reduce ? false : { scale: 1.35 }}
       animate={{ scale: 1 }}
       transition={{ type: 'spring', stiffness: 600, damping: 18 }}
       className={`inline-block tabular-nums ${className ?? ''}`}

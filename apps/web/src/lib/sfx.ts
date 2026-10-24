@@ -17,7 +17,8 @@ export type SfxName =
   | 'drumroll'
   | 'fanfare'
   | 'rise'
-  | 'clink';
+  | 'clink'
+  | 'ready';
 export type MusicName = 'lobby' | 'question';
 
 interface ToneOptions {
@@ -86,6 +87,18 @@ class SoundEngine {
     if (fresh && this.ctx && this.wantMusic) this.startLoop(this.wantMusic);
   }
 
+  /**
+   * Starts the browser's audio ahead of the first sound, from a click that leads to a screen with sound. That takes
+   * the browser a moment, up to a second when it has played nothing yet, and the page stands still meanwhile: here it
+   * falls in the wait for what was clicked, not in the animation of the screen it leads to. After the next frame, so
+   * the click has shown it was heard first. The engine outlives a move to another page of the app (a link,
+   * router.push), so that page finds the audio running.
+   */
+  warmUp() {
+    if (typeof window === 'undefined' || this.ctx) return;
+    requestAnimationFrame(() => setTimeout(() => this.init()));
+  }
+
   /** Background music that keeps playing until changed; null stops it. */
   music(name: MusicName | null) {
     this.wantMusic = name;
@@ -146,6 +159,10 @@ class SoundEngine {
         this.tone(hz(100), t, 0.35, { type: 'triangle', gain: 0.1 });
         this.tone(hz(107), t + 0.01, 0.25, { gain: 0.06 });
         return this.tone(hz(103), t + 0.09, 0.3, { type: 'triangle', gain: 0.05 });
+      // the last of the players the Host waits for is in: a bright run up that rings on
+      case 'ready':
+        [79, 83, 86, 91].forEach((n, i) => this.tone(hz(n), t + i * 0.06, 0.3, { type: 'triangle', gain: 0.12 }));
+        return this.tone(hz(95), t + 0.24, 0.9, { gain: 0.08 });
     }
   }
 

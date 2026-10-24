@@ -20,6 +20,7 @@ interface Props {
   sound: SoundControl;
   online: boolean;
   onKick?: (id: string, nickname: string) => void;
+  onExpect?: (count: number) => void;
   /** the Host's control dock sits under the stage */
   docked?: boolean;
 }
@@ -34,7 +35,7 @@ const SCENE: Variants = {
 };
 
 /** The big screen: one scene per phase, each with its own entrance. */
-export function StageView({ state, join, sound, online, onKick, docked = false }: Props) {
+export function StageView({ state, join, sound, online, onKick, onExpect, docked = false }: Props) {
   // the leaderboard has no current question, but its header still says which one just ended
   const [lastQ, setLastQ] = useState<{ id: string; number: number; total: number } | null>(null);
   if (state.question && state.question.id !== lastQ?.id) setLastQ(state.question);
@@ -124,7 +125,7 @@ export function StageView({ state, join, sound, online, onKick, docked = false }
               animate="shown"
               exit="gone"
             >
-              <Scene state={state} join={join} onKick={onKick} />
+              <Scene state={state} join={join} onKick={onKick} onExpect={onExpect} />
               <Mounted value={{ key, q: lastQ }} onMount={setShown} />
               <Hold />
             </motion.section>
@@ -184,10 +185,10 @@ function sceneKey(state: StageState, lastQuestionId: string | undefined) {
 
 // the stage renders again each time the blinds move, and the scene under them has no need to: on a slow screen
 // that work would hold up the blinds' next frame
-const Scene = memo(function Scene({ state, join, onKick }: Pick<Props, 'state' | 'join' | 'onKick'>) {
+const Scene = memo(function Scene({ state, join, onKick, onExpect }: Pick<Props, 'state' | 'join' | 'onKick' | 'onExpect'>) {
   switch (state.phase) {
     case 'lobby':
-      return <StageLobby state={state} join={join} onKick={onKick} />;
+      return <StageLobby state={state} join={join} onKick={onKick} onExpect={onExpect} />;
     case 'round':
       return state.round && <StageRoundIntro round={state.round} />;
     case 'question':

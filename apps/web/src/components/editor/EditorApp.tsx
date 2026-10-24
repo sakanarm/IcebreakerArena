@@ -12,6 +12,7 @@ import { downloadText } from '@/lib/csv';
 import { blankGame, copyGame, deleteMyGame, dropBlankOptions, findGame, isSample, listMyGames, newId, saveMyGame } from '@/lib/games';
 import { createRoom } from '@/lib/host';
 import { withBase } from '@/lib/paths';
+import { warmHostSound } from '@/lib/use-sound';
 import { WaitingDots } from '../motion-bits';
 import { switchedText } from '../AccountChip';
 import { Notice } from '../Notice';
@@ -383,6 +384,7 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
     const s = store.current;
     if (s.kind === 'local' || s.id === null || edits.current !== savedAt.current) writeNow(game);
     setStarting(true);
+    warmHostSound();
     const res = await createRoom(game);
     if (res.ok) return router.push(`/host/${res.pin}`);
     setToast(res.message);

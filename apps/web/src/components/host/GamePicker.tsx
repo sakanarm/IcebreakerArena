@@ -10,6 +10,7 @@ import { ApiError, apiMessage } from '@/lib/api';
 import { cloud, settled, type CatalogEntry, type GameRecord, type ReportReason } from '@/lib/cloud';
 import { copyGame, countQuestions, deleteMyGame, dropBlankOptions, listMyGames, saveMyGame } from '@/lib/games';
 import { createRoom } from '@/lib/host';
+import { warmHostSound } from '@/lib/use-sound';
 import { AccountChip, switchedText } from '../AccountChip';
 import { GameCover } from '../cover/GameCover';
 import { WaitingDots } from '../motion-bits';
@@ -34,6 +35,7 @@ export function GamePicker() {
   const start = async (game: Game) => {
     setToast(null);
     setStarting(game.id);
+    warmHostSound();
     const res = await createRoom(game);
     if (res.ok) return router.push(`/host/${res.pin}`);
     setToast({ text: res.message, tone: 'bad' });

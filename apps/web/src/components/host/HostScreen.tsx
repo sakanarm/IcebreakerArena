@@ -105,10 +105,12 @@ export function HostScreen({ pin }: { pin: string }) {
   const kick = (id: string, nickname: string) => {
     if (confirm(`นำ "${nickname}" ออกจากห้อง?`)) getSocket().emit('host:kick', id);
   };
+  const expect = (count: number) => getSocket().emit('host:expect', count);
+  const lobby = state.phase === 'lobby';
 
   return (
     <>
-      <StageView state={state} join={join} sound={sound} online={online} onKick={state.phase === 'lobby' ? kick : undefined} docked />
+      <StageView state={state} join={join} sound={sound} online={online} onKick={lobby ? kick : undefined} onExpect={lobby ? expect : undefined} docked />
       <HostDock state={state} onReport={openReport} onClose={closeRoom} blocked={reportOpen || closing} />
       <ReportView open={reportOpen} onClose={closeReport} />
       {/* over the podium, not instead of it: if closing fails, the podium must not play all over again */}

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import type { Phase } from '@icebreaker/shared';
 import { getSocket } from '@/lib/socket';
 import { hostedPins, keys, load, remove } from '@/lib/storage';
+import { warmHostSound } from '@/lib/use-sound';
 
 interface OpenRoom {
   pin: string;
@@ -104,7 +105,7 @@ export function OpenRooms({ say }: { say: (text: string) => void }) {
                     <span className="text-sm text-white/60">{PHASE_TEXT[r.phase]}</span>
                   </span>
                   <span className="flex gap-2">
-                    <Link href={`/host/${r.pin}`} className="btn btn-light px-4 text-base">
+                    <Link href={`/host/${r.pin}`} onClick={warmHostSound} className="btn btn-light px-4 text-base">
                       กลับไปที่ห้อง
                     </Link>
                     <button type="button" disabled={closing === r.pin} onClick={() => void close(r)} className="btn btn-ghost px-4 text-base">

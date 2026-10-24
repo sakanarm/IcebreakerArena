@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { sfx } from './sfx';
-import { load, save } from './storage';
+import { keys, load, save } from './storage';
 
 /**
  * Sound on/off for this screen, remembered per device. The big screen starts
@@ -37,3 +37,11 @@ export function useSound(key: string, defaultOn: boolean) {
 }
 
 export type SoundControl = ReturnType<typeof useSound>;
+
+/**
+ * For the click that opens the Host's screen, a room just made or one gone back to: the browser's audio starts on the
+ * way there, not as the lobby comes in. Only when the Host keeps sound on, which it is unless turned off.
+ */
+export function warmHostSound() {
+  if (load(keys.hostSound, true)) sfx.warmUp();
+}
