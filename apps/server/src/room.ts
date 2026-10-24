@@ -101,6 +101,8 @@ export class Room {
   /** `shown` is a puzzle's shuffle: shown[k] = the authored position of the k-th item players see */
   private current: { slot: Slot; startsAt: number; endsAt: number; shown: number[] | null } | null = null;
   private answeredCount = 0;
+  /** the head count the Host waits for in the lobby, 0 for none */
+  private expected = 0;
   private revealInfo: RevealInfo | null = null;
   private stats = new Map<string, RevealInfo>();
   private timer: NodeJS.Timeout | null = null;
@@ -182,6 +184,16 @@ export class Room {
     }
     this.queueStage(true);
     return player.socketId;
+  }
+
+  /** lobby only: an integer up to the room's cap, 0 to take it off; anything else is ignored */
+  expect(count: unknown) {
+    if (this.phase !== 'lobby' || !Number.isSafeInteger(count)) return;
+    const n = count as number;
+    if (n < 0 || n > MAX_PLAYERS_PER_ROOM || n === this.expected) return;
+    this.expected = n;
+    this.touch();
+    this.queueStage();
   }
 
   sendPlayerState(player: { id: string }) {
@@ -415,6 +427,7 @@ export class Room {
       cover: this.game.cover ?? null,
       phase: this.phase,
       playerCount: this.players.size,
+      expected: this.expected || null,
       players: inPhase('lobby') ? [...this.players.values()].slice(-LOBBY_LIST_CAP).map(toLite) : [],
       round: this.roundInfo(),
       question: this.questionPublic(),

@@ -256,6 +256,51 @@ test('leaving from the lobby takes the name off the big screen for good', async 
   assert.deepEqual(back, { ok: false, error: 'not_allowed' });
 });
 
+test('the lobby waits for the head count the host sets; odd values, other sockets and a started game leave it be', async () => {
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  assert.equal((await stage.until(() => true)).expected, null);
+  const seen = new Set<number | null>();
+  (host as unknown as Socket).on('stage:state', (s: StageState) => seen.add(s.expected));
+
+  host.emit('host:expect', 3);
+  await stage.until((s) => s.expected === 3);
+  for (const odd of [-1, 1.5, '4', 1001, Number.NaN, null, { count: 6 }]) host.emit('host:expect', odd as unknown as number);
+  host.emit('host:expect', 5);
+  await stage.until((s) => s.expected === 5);
+  assert.deepEqual([...seen].filter((n) => n !== 3 && n !== 5), [], 'only the two good counts ever showed');
+
+  // a player, or a second screen, is no host
+  const p = await connect();
+  const joined = await p.emitWithAck('player:join', { pin: created.pin, nickname: 'Early', avatar: '🐸' });
+  assert.ok(joined.ok);
+  p.emit('host:expect', 9);
+  const screen = await connect();
+  const second = track<StageState>(screen, 'stage:state');
+  assert.ok((await screen.emitWithAck('stage:attach', created.pin)).ok);
+  screen.emit('host:expect', 9);
+  await stage.until((s) => s.playerCount === 1);
+  assert.equal((await second.until(() => true)).expected, 5);
+
+  host.emit('host:expect', 0);
+  await stage.until((s) => s.expected === null);
+  host.emit('host:expect', 1);
+  await stage.until((s) => s.expected === 1);
+
+  host.emit('host:next');
+  await stage.until((s) => s.phase !== 'lobby');
+  host.emit('host:expect', 7);
+  // events from one socket are handled in order, so the answer to this one comes after the count was dealt with
+  assert.ok((await host.emitWithAck('room:check', created.pin)).ok);
+  const late = await connect();
+  const third = track<StageState>(late, 'stage:state');
+  assert.ok((await late.emitWithAck('stage:attach', created.pin)).ok);
+  assert.equal((await third.until(() => true)).expected, 1);
+  assert.ok(![...seen].includes(9) && ![...seen].includes(7));
+});
+
 test('the big screens get the cover, cleaned; phones do not need it', async () => {
   const host = await connect();
   const stage = track<StageState>(host, 'stage:state');

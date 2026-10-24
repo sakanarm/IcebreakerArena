@@ -101,6 +101,7 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
     on('host:next', (at) => hostRoom()?.next(stepOf(at)));
     on('host:skip', (at) => hostRoom()?.skip(stepOf(at)));
     on('host:end', () => hostRoom()?.end());
+    on('host:expect', (count) => hostRoom()?.expect(count));
 
     on('host:kick', (playerId) => {
       const socketId = hostRoom()?.kick(String(playerId));

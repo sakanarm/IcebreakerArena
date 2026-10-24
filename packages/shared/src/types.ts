@@ -188,6 +188,8 @@ export interface StageState {
   cover: GameCover | null;
   phase: Phase;
   playerCount: number;
+  /** the head count the Host waits for in the lobby, for its "พร้อมแล้ว!"; null when none is set */
+  expected: number | null;
   /** lobby only, capped to the newest players */
   players: PlayerLite[];
   round: RoundInfo | null;

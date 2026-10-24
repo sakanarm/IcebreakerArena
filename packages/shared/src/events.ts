@@ -35,6 +35,8 @@ export interface ClientToServerEvents {
   /** closes answering now and goes to the reveal; `at` as for `host:next` */
   'host:skip': (at?: { step: number }) => void;
   'host:kick': (playerId: string) => void;
+  /** lobby only: how many players the Host waits for (see `StageState.expected`); 0 takes it off */
+  'host:expect': (count: number) => void;
   'host:end': () => void;
   'host:report': (ack: Ack<Result<{ report: GameReport }>>) => void;
   /**
