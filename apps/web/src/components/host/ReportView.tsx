@@ -217,7 +217,7 @@ function QuestionsList({ questions }: { questions: ReportQuestion[] }) {
                 · <span aria-hidden>{TYPE_ICON[q.type]}</span> {TYPE_LABEL[q.type]}
               </span>
               <span>· ตอบ {fmt(q.answered)} คน</span>
-              {!poll && <span>· เวลาเฉลี่ย {secondsLabel(q.avgMs)}</span>}
+              <span>· เวลาเฉลี่ย {secondsLabel(q.avgMs)}</span>
               {!poll && q.answered > 0 && (
                 <span className={`ml-auto rounded-full px-3 py-0.5 font-semibold text-white ${tone}`}>
                   {RATE_LABEL[q.type]} {rate}%
@@ -411,7 +411,7 @@ function questionRows(questions: ReportQuestion[]) {
         q.answered,
         poll ? null : q.correctCount,
         poll ? null : percent(q.correctCount, q.answered),
-        poll ? null : seconds(q.avgMs),
+        seconds(q.avgMs),
         q.type === 'slider' ? (q.average ?? null) : null,
       ];
     }),

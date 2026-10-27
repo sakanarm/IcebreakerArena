@@ -2,12 +2,9 @@
 
 import { motion } from 'motion/react';
 import { useEffect } from 'react';
-import type { RoundInfo } from '@icebreaker/shared';
+import { ROUND_INTRO_MS, type RoundInfo } from '@icebreaker/shared';
 import { sfx } from '@/lib/sfx';
 import { ANSWER_BG, AnswerShape } from '../shapes';
-
-/** must match the server's ROUND_INTRO_MS: the card moves on by itself */
-const INTRO_S = 3.5;
 
 export function StageRoundIntro({ round }: { round: RoundInfo }) {
   useEffect(() => {
@@ -114,7 +111,7 @@ export function StageRoundIntro({ round }: { round: RoundInfo }) {
             className="h-full origin-left rounded-full bg-white/85"
             initial={{ scaleX: 1 }}
             animate={{ scaleX: 0 }}
-            transition={{ duration: INTRO_S, ease: 'linear' }}
+            transition={{ duration: ROUND_INTRO_MS / 1000, ease: 'linear' }}
           />
         </div>
       </div>

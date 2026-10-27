@@ -132,6 +132,8 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
   assert.equal(b1.me.gapToAbove, a1.me.score);
   const c1 = await carol.state.until((s) => s.phase === 'reveal');
   assert.equal(c1.result?.answered, false);
+  const sentMs = [a1.result!.responseMs!, b1.result!.responseMs!];
+  assert.equal(r1.reveal?.avgMs, Math.round((sentMs[0]! + sentMs[1]!) / 2), 'the average takes the wrong answer too, not only the right one');
 
   host.emit('host:next');
   const lb = await stage.until((s) => s.phase === 'leaderboard');
@@ -200,6 +202,15 @@ test('a full game runs from lobby to podium with server-side scoring', async () 
     ['Bob', 'Alice', 'alice 2'].map((n) => [row(n)?.correctCount, row(n)?.gradedCount, row(n)?.answeredCount]),
     [[1, 2, 3], [1, 2, 3], [0, 2, 2]],
   );
+  // a question's average time and a player's count the same answers: every one sent, right, wrong or a vote
+  const [rq1, rq2] = report.report.questions;
+  assert.equal(rq1?.avgMs, r1.reveal?.avgMs, 'the report says what the reveal said');
+  assert.notEqual(rq2?.avgMs, null, 'a poll has an average time too');
+  const total = (rows: { avgMs: number | null; n: number }[]) => rows.reduce((sum, r) => sum + (r.avgMs ?? 0) * r.n, 0);
+  const byQuestion = total(report.report.questions.map((q) => ({ avgMs: q.avgMs, n: q.answered })));
+  const byPlayer = total(report.report.players.map((p) => ({ avgMs: p.avgMs, n: p.answeredCount })));
+  // each average is rounded to the ms: half a ms per answer on each side, 8 answers
+  assert.ok(Math.abs(byQuestion - byPlayer) <= 8, `all answers' time, by question ${byQuestion} and by player ${byPlayer}`);
 });
 
 test('bad games, unknown rooms, stolen host controls and junk payloads are refused', async () => {

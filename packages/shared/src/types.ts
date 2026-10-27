@@ -159,7 +159,11 @@ export interface RevealInfo {
   answered: number;
   totalPlayers: number;
   correctCount: number;
-  avgCorrectMs: number | null;
+  /**
+   * how long the answers took on average: every answer sent, right or wrong, polls included. The report's
+   * question and player averages mean the same, so one "average time" never shows two numbers
+   */
+  avgMs: number | null;
 }
 
 export interface LeaderRow {
@@ -263,6 +267,7 @@ export interface ReportQuestion {
   average?: number | null;
   answered: number;
   correctCount: number;
+  /** every answer sent, right or wrong, as on the reveal */
   avgMs: number | null;
 }
 
@@ -276,6 +281,7 @@ export interface ReportPlayer {
   gradedCount: number;
   /** every answer sent, polls included */
   answeredCount: number;
+  /** over the same answers as `answeredCount` */
   avgMs: number | null;
   bestStreak: number;
 }

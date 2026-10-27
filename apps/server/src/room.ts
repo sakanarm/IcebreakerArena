@@ -1,5 +1,7 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import {
+  ALL_ANSWERED_DELAY_MS,
+  ANSWER_GRACE_MS,
   isOrder,
   isRightOrder,
   leadInMs,
@@ -7,10 +9,12 @@ import {
   matchTyped,
   MAX_PLAYERS_PER_ROOM,
   onScale,
+  ROUND_INTRO_MS,
   scoreAnswer,
   sliderBin,
   sliderBins,
   sliderCloseness,
+  TIME_UP_HOLD_MS,
   type AnswerKey,
   type AnswerSent,
   type Award,
@@ -35,13 +39,6 @@ import type { IO } from './io';
 const STAGE_MIN_GAP_MS = 250;
 /** the lobby shows the newest players only; the counter shows everyone */
 const LOBBY_LIST_CAP = 200;
-/** answers still in flight when the timer hits 0 are accepted */
-const ANSWER_GRACE_MS = 300;
-/** time is up: the reveal waits this long (answers stop at the grace above), while the Stage stamps "หมดเวลา!" */
-const TIME_UP_HOLD_MS = 1000;
-const ROUND_INTRO_MS = 3500;
-/** everyone has answered: the reveal waits this long, while the Stage stamps "ตอบครบแล้ว!" */
-const ALL_ANSWERED_DELAY_MS = 1000;
 
 interface Answer {
   sent: AnswerSent;
@@ -315,7 +312,7 @@ export class Room {
     const counts = Array.from({ length: barCount(q) }, () => 0);
     let answered = 0;
     let correctCount = 0;
-    let correctMsSum = 0;
+    let msSum = 0;
     let valueSum = 0;
 
     for (const p of this.players.values()) {
@@ -325,9 +322,9 @@ export class Room {
         if (bar !== null) counts[bar] = (counts[bar] ?? 0) + 1;
         valueSum += a.sent.value ?? 0;
         answered++;
+        msSum += a.responseMs;
         if (correct) {
           correctCount++;
-          correctMsSum += a.responseMs;
           p.correctMs += a.responseMs;
         }
       }
@@ -360,7 +357,7 @@ export class Room {
       answered,
       totalPlayers: this.players.size,
       correctCount,
-      avgCorrectMs: correctCount ? Math.round(correctMsSum / correctCount) : null,
+      avgMs: answered ? Math.round(msSum / answered) : null,
     };
     this.stats.set(q.id, this.revealInfo);
     this.setPhase('reveal');
@@ -560,7 +557,7 @@ export class Room {
           ...(q.slider ? { slider: q.slider, average: s.average ?? null } : {}),
           answered: s.answered,
           correctCount: s.correctCount,
-          avgMs: s.avgCorrectMs,
+          avgMs: s.avgMs,
         }];
       }),
       players: players.map((p, i) => {

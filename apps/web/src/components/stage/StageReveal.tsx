@@ -479,7 +479,7 @@ function RevealStats({
             />
           </div>
           <div className="text-white/80 sm:text-lg">
-            {percent(r.correctCount, r.answered)}% · <span className="whitespace-nowrap">เวลาเฉลี่ย</span> {secondsLabel(r.avgCorrectMs)}
+            {percent(r.correctCount, r.answered)}% · <span className="whitespace-nowrap">เวลาเฉลี่ย</span> {secondsLabel(r.avgMs)}
           </div>
         </>
       )}
