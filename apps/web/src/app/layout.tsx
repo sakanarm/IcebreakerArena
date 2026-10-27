@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { connection } from 'next/server';
 // Fonts ship with the app (no Google Fonts request), so it also works offline at an event.
 import '@fontsource/kanit/400.css';
 import '@fontsource/kanit/600.css';
@@ -20,7 +21,9 @@ export const viewport: Viewport = {
   themeColor: '#0b0b2b',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // every page renders per request: proxy.ts gives each one a fresh nonce, and a page built ahead of time has none
+  await connection();
   return (
     <html lang="th">
       <body className="arena-bg min-h-dvh">

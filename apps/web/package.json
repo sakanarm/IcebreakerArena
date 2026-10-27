@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "typecheck": "tsc -p . --noEmit",
-    "test": "tsx --test src/server/store.test.ts src/lib/waiting-lines.test.ts",
+    "test": "tsx --test src/server/store.test.ts src/lib/waiting-lines.test.ts src/lib/csp.test.ts",
     "users": "tsx scripts/users.ts"
   },
   "dependencies": {
