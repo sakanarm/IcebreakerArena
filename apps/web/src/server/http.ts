@@ -1,3 +1,4 @@
+import { MESSAGE_MAX_BYTES } from '@icebreaker/shared';
 import { DbUnavailable } from './db';
 import { TooLong } from './games';
 
@@ -43,7 +44,7 @@ export function guardMutation(req: Request) {
 }
 
 /** The JSON body, at most maxBytes, as unknown: callers check every field. */
-export async function readJson(req: Request, maxBytes = 512 * 1024): Promise<Record<string, unknown>> {
+export async function readJson(req: Request, maxBytes = MESSAGE_MAX_BYTES): Promise<Record<string, unknown>> {
   if (!(req.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) throw new HttpError(415, 'json_required');
   if (Number(req.headers.get('content-length') ?? 0) > maxBytes) throw new HttpError(413, 'too_large');
   const chunks: Uint8Array[] = [];

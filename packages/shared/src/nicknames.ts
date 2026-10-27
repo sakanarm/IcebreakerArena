@@ -1,3 +1,5 @@
+import { clip } from './text';
+
 /** Emoji avatars: no artwork to license, and they render on every phone. */
 export const AVATARS = [
   '🦊', '🐼', '🐯', '🐸', '🐙', '🦄', '🐧', '🐨', '🦁', '🐵',
@@ -36,12 +38,28 @@ export function randomAvatar(rand: () => number = Math.random): string {
   return pick(AVATARS, rand);
 }
 
-/** Strips control characters and markup-ish brackets, collapses spaces, and caps the length. */
+/**
+ * What takes no room on screen: zero-width spaces and joiners, the bidi controls that turn the names after them
+ * around, the BOM and soft hyphen, and the blank letters (Hangul fillers, the braille blank) that look like no name.
+ * Without them "Bob" and "Bob" with a zero-width space are the same name, so the second one becomes "Bob 2".
+ */
+const INVISIBLE = /[\p{Cf}\u034f\u115f\u1160\u2800\u3164\uffa0]/gu;
+
+/** a zero-width joiner between two emoji makes one emoji of them (👩‍💻): that one stays */
+const joinsEmoji = (s: string, at: number) =>
+  /\p{Extended_Pictographic}[\u{1f3fb}-\u{1f3ff}\ufe0f]?$/u.test(s.slice(0, at)) && /^\p{Extended_Pictographic}/u.test(s.slice(at + 1));
+
+/**
+ * Strips control characters, invisible ones and markup-ish brackets, keeps marks from piling up (Zalgo text; Thai
+ * puts at most two over one letter), collapses spaces, and caps the length without splitting a letter or an emoji.
+ */
 export function cleanNickname(raw: string): string {
-  return raw
+  const name = raw
     .normalize('NFC')
-    .replace(/[\u0000-\u001f\u007f<>]/g, '')
+    .replace(/[\u0000-\u001f\u007f-\u009f<>]/g, '')
+    .replace(INVISIBLE, (c: string, at: number, s: string) => (c === '\u200d' && joinsEmoji(s, at) ? c : ''))
+    .replace(/(\p{M}{3})\p{M}+/gu, '$1')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, NICKNAME_MAX);
+    .trim();
+  return clip(name, NICKNAME_MAX).trim();
 }

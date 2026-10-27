@@ -21,7 +21,18 @@ export const LIMITS = {
   /** steps on a slider scale; more than this and a phone can't land on one */
   sliderSteps: 10_000,
   unitMax: 20,
+  /** the game as it goes to the game server to open a room, in UTF-8: one message must carry it (MESSAGE_MAX_BYTES) */
+  gameBytesMax: 448 * 1024,
 } as const;
+
+/**
+ * The most one message may carry: a socket message to the game server, and a JSON body to the web app.
+ * A bigger socket message drops the connection, so a game that opens a room stays well under it.
+ */
+export const MESSAGE_MAX_BYTES = 512 * 1024;
+
+/** how many bytes a game takes on its way to the game server */
+export const gameBytes = (game: unknown) => new TextEncoder().encode(JSON.stringify(game)).length;
 
 export const TIME_CHOICES_S = [5, 10, 20, 30, 45, 60, 90, 120] as const;
 
@@ -89,17 +100,24 @@ export function validateGame(input: unknown): ValidateResult {
   if (errors.length > 0) return { ok: false, errors };
   const description = str(input.description);
   const cover = cleanCover(input.cover);
-  return {
-    ok: true,
-    game: {
-      id: str(input.id) || 'game',
-      title,
-      ...(description ? { description } : {}),
-      rounds,
-      settings: { streakBonus: isObj(input.settings) && input.settings.streakBonus === true },
-      ...(cover ? { cover } : {}),
-    },
+  const game: Game = {
+    id: str(input.id) || 'game',
+    title,
+    ...(description ? { description } : {}),
+    rounds,
+    settings: { streakBonus: isObj(input.settings) && input.settings.streakBonus === true },
+    ...(cover ? { cover } : {}),
   };
+  // only image links can take a game this far; anything that passes opens a room
+  const kb = (n: number) => Math.ceil(n / 1024).toLocaleString('en-US');
+  const bytes = gameBytes(game);
+  if (bytes > LIMITS.gameBytesMax) {
+    return {
+      ok: false,
+      errors: [`เกมนี้ใหญ่ ${kb(bytes)} KB เกินที่เปิดห้องได้ (${kb(LIMITS.gameBytesMax)} KB): ลิงก์รูปที่ยาวมากกินที่มากที่สุด ลองใช้ลิงก์ที่สั้นลง หรือแบ่งเป็นสองเกม`],
+    };
+  }
+  return { ok: true, game };
 }
 
 function checkQuestion(q: unknown, where: string, id: string, errors: string[]): Question {

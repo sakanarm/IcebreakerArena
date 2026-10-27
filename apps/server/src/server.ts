@@ -5,6 +5,7 @@ import { networkInterfaces } from 'node:os';
 import { Server } from 'socket.io';
 import {
   AVATARS,
+  MESSAGE_MAX_BYTES,
   cleanNickname,
   randomAvatar,
   randomNickname,
@@ -43,7 +44,7 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
     cors: { origin: true },
     pingInterval: 10_000,
     pingTimeout: 10_000,
-    maxHttpBufferSize: 512 * 1024,
+    maxHttpBufferSize: MESSAGE_MAX_BYTES,
   });
   const rooms = new Rooms(io);
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { sliderStart } from './answers';
 import { SAMPLE_GAMES } from './sample-games';
-import { QUESTION_TYPES, TIME_CHOICES_S, validateGame } from './validate';
+import { LIMITS, MESSAGE_MAX_BYTES, QUESTION_TYPES, TIME_CHOICES_S, gameBytes, validateGame } from './validate';
 
 /** a game of one question, so a test only spells out what it checks */
 const one = (q: Record<string, unknown>) =>
@@ -138,4 +138,17 @@ test('a poll never keeps a correct answer', () => {
   });
   assert.ok(res.ok);
   assert.deepEqual(res.game.rounds[0]!.questions[0]!.correct, []);
+});
+
+test('a game that passes fits in one message to the game server, and one too big says so', () => {
+  const question = (url: string) => ({ type: 'quiz', prompt: 'ก'.repeat(LIMITS.promptMax), options: ['ข'.repeat(LIMITS.optionMax), 'ค'.repeat(LIMITS.optionMax), 'ง'.repeat(LIMITS.optionMax), 'จ'.repeat(LIMITS.optionMax)], correct: [0], timeLimitS: 20, imageUrl: url });
+  const game = (url: string) => ({ title: 'ใหญ่', rounds: Array.from({ length: 5 }, () => ({ title: 'r', questions: Array.from({ length: LIMITS.questionsMax / 5 }, () => question(url)) })) });
+  const full = validateGame(game('https://x.example/' + 'a'.repeat(LIMITS.imageUrlMax - 18)));
+  assert.equal(full.ok, false);
+  if (!full.ok) assert.match(full.errors[0]!, /^เกมนี้ใหญ่ \d+ KB เกินที่เปิดห้องได้ \(448 KB\)/);
+  // the most the editor allows without long links still opens, with room to spare in the message
+  const most = validateGame(game('https://x.example/a.png'));
+  assert.equal(most.ok, true);
+  if (most.ok) assert.ok(gameBytes({ game: most.game }) < MESSAGE_MAX_BYTES && gameBytes(most.game) <= LIMITS.gameBytesMax);
+  assert.ok(LIMITS.gameBytesMax < MESSAGE_MAX_BYTES);
 });
