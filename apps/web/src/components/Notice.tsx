@@ -35,7 +35,7 @@ export function Notice({
         >
           {emoji}
         </motion.div>
-        <h1 className="mt-4 text-3xl font-extrabold">{title}</h1>
+        <h1 className="mt-4 text-3xl font-extrabold text-balance">{title}</h1>
         {children && <div className="mt-3 text-white/75">{children}</div>}
         {actions && <div className="mt-6 flex flex-wrap justify-center gap-3">{actions}</div>}
       </motion.div>

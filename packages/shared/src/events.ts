@@ -17,14 +17,19 @@ export type Result<T extends object = object> =
 
 type Ack<T> = (res: T) => void;
 
-/** Events a browser (Host, Stage or Player) sends to the game server. */
+/**
+ * Events a browser (Host, Stage or Player) sends to the game server. A PIN with no room behind it, or a token
+ * that does not match, counts against the address it came from: past a burst of those, room:check and
+ * player:join answer `rate_limited` for any PIN, and so does every other lookup but one with the right token.
+ */
 export interface ClientToServerEvents {
   /** answers with the server clock, for countdown sync */
   'time:sync': (ack: Ack<number>) => void;
   'room:check': (pin: string, ack: Ack<Result<{ title: string; phase: Phase }>>) => void;
 
-  'host:create': (payload: { game: Game }, ack: Ack<Result<{ pin: string; hostToken: string }>>) => void;
-  'host:attach': (payload: { pin: string; hostToken: string }, ack: Ack<Result>) => void;
+  /** `stageToken` opens the read-only big screen (stage:attach) on another tab or machine */
+  'host:create': (payload: { game: Game }, ack: Ack<Result<{ pin: string; hostToken: string; stageToken: string }>>) => void;
+  'host:attach': (payload: { pin: string; hostToken: string }, ack: Ack<Result<{ stageToken: string }>>) => void;
   /**
    * Kahoot-style single "Next" button: moves the game to its next step. `at` is the `step` of the screen it was
    * pressed on, so a press that crosses the game moving on by itself (a question's time running out, a round's
@@ -45,8 +50,8 @@ export interface ClientToServerEvents {
    */
   'host:close': (payload: { pin: string; hostToken: string }, ack: Ack<Result>) => void;
 
-  /** read-only big screen (a second display next to the Host Console) */
-  'stage:attach': (pin: string, ack: Ack<Result>) => void;
+  /** read-only big screen (a second display next to the Host Console), with the token the Host was given */
+  'stage:attach': (payload: { pin: string; stageToken: string }, ack: Ack<Result>) => void;
   /** the Host or Stage page went away but the tab, and its connection, stays: stop watching the room */
   'stage:leave': () => void;
 

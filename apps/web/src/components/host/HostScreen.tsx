@@ -15,7 +15,7 @@ import { ReportView } from './ReportView';
 
 /** Host Console: the big screen plus the controls, on the device that created the room. */
 export function HostScreen({ pin }: { pin: string }) {
-  const { state, status, online } = useStage(pin, 'host');
+  const { state, status, online, stageToken } = useStage(pin, 'host');
   const join = useJoinUrl(pin);
   const sound = useSound(keys.hostSound, true);
   const [reportOpen, setReportOpen] = useState(false);
@@ -85,17 +85,12 @@ export function HostScreen({ pin }: { pin: string }) {
         emoji="🔒"
         title="หน้านี้สำหรับผู้สร้างห้อง"
         actions={
-          <>
-            <Link href={`/stage/${pin}`} className="btn btn-gold">
-              🖥️ เปิดเป็นจอแสดงผล
-            </Link>
-            <Link href="/" className="btn btn-ghost">
-              หน้าแรก
-            </Link>
-          </>
+          <Link href="/" className="btn btn-gold">
+            หน้าแรก
+          </Link>
         }
       >
-        ปุ่มควบคุมเกมใช้ได้เฉพาะเบราว์เซอร์ที่สร้างห้อง {pin} ถ้าต้องการแค่แสดงผลบนโปรเจกเตอร์ ใช้โหมดจอแสดงผลได้เลย
+        ปุ่มควบคุมเกมใช้ได้เฉพาะเบราว์เซอร์ที่สร้างห้อง {pin} ถ้าต้องการแค่แสดงผลบนโปรเจกเตอร์ ให้กด 🖥️ จอแยก ในหน้าของผู้สร้างห้อง แล้วเปิดลิงก์นั้นที่เครื่องนี้
       </Notice>
     );
   }
@@ -111,7 +106,7 @@ export function HostScreen({ pin }: { pin: string }) {
   return (
     <>
       <StageView state={state} join={join} sound={sound} online={online} onKick={lobby ? kick : undefined} onExpect={lobby ? expect : undefined} docked />
-      <HostDock state={state} onReport={openReport} onClose={closeRoom} blocked={reportOpen || closing} />
+      <HostDock state={state} stageToken={stageToken} onReport={openReport} onClose={closeRoom} blocked={reportOpen || closing} />
       <ReportView open={reportOpen} onClose={closeReport} />
       {/* over the podium, not instead of it: if closing fails, the podium must not play all over again */}
       {closing && (

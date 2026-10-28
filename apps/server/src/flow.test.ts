@@ -4,6 +4,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { after, before, mock, test } from 'node:test';
 import { io, type Socket } from 'socket.io-client';
 import type { ClientToServerEvents, Game, PlayerState, ServerToClientEvents, StageState } from '@icebreaker/shared';
+import { MissLimiter } from './limits';
 import { startGameServer, type GameServer } from './server';
 
 type Client = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -237,6 +238,37 @@ test('bad games, unknown rooms, stolen host controls and junk payloads are refus
   assert.ok(alive.ok, 'the server survives malformed events');
 });
 
+test('the big screen opens only with the token its host was given, which the host page gets back after a refresh', async () => {
+  const host = await connect();
+  const created = await host.emitWithAck('host:create', { game: GAME });
+  assert.ok(created.ok);
+  assert.equal(Buffer.from(created.stageToken, 'base64url').length, 18);
+  assert.notEqual(created.stageToken, created.hostToken);
+
+  const screen = await connect();
+  const states = track<StageState>(screen, 'stage:state');
+  const refused = { ok: false, error: 'not_allowed' };
+  assert.deepEqual(await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: '' }), refused);
+  assert.deepEqual(await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.hostToken }), refused, 'the host token is no stage token');
+  // as long as the token in characters but not in bytes: refused like any other, not left unanswered
+  const wide = (token: string) => 'ก'.repeat(token.length);
+  assert.deepEqual(await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: wide(created.stageToken) }), refused);
+  assert.deepEqual(await screen.emitWithAck('host:attach', { pin: created.pin, hostToken: wide(created.hostToken) }), refused);
+  // a page from before the token sends the PIN alone
+  const raw = screen as unknown as { emitWithAck: (...args: unknown[]) => Promise<unknown> };
+  assert.deepEqual(await raw.emitWithAck('stage:attach', created.pin), { ok: false, error: 'room_not_found' });
+  assert.equal(states.latest, null, 'nothing of the room reached the screen');
+
+  assert.deepEqual(await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.stageToken }), { ok: true });
+  await states.until((s) => s.phase === 'lobby');
+
+  // the host page, refreshed, gets it back to make the link again
+  const refreshed = await connect();
+  const again = await refreshed.emitWithAck('host:attach', { pin: created.pin, hostToken: created.hostToken });
+  assert.deepEqual(again, { ok: true, stageToken: created.stageToken });
+  assert.ok((await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken })).ok);
+});
+
 test('a kicked player is told, and cannot come back with the old token', async () => {
   const host = await connect();
   const created = await host.emitWithAck('host:create', { game: GAME });
@@ -290,7 +322,7 @@ test('the lobby waits for the head count the host sets; odd values, other socket
   p.emit('host:expect', 9);
   const screen = await connect();
   const second = track<StageState>(screen, 'stage:state');
-  assert.ok((await screen.emitWithAck('stage:attach', created.pin)).ok);
+  assert.ok((await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.stageToken })).ok);
   screen.emit('host:expect', 9);
   await stage.until((s) => s.playerCount === 1);
   assert.equal((await second.until(() => true)).expected, 5);
@@ -307,7 +339,7 @@ test('the lobby waits for the head count the host sets; odd values, other socket
   assert.ok((await host.emitWithAck('room:check', created.pin)).ok);
   const late = await connect();
   const third = track<StageState>(late, 'stage:state');
-  assert.ok((await late.emitWithAck('stage:attach', created.pin)).ok);
+  assert.ok((await late.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.stageToken })).ok);
   assert.equal((await third.until(() => true)).expected, 1);
   assert.ok(![...seen].includes(9) && ![...seen].includes(7));
 });
@@ -321,7 +353,7 @@ test('the big screens get the cover, cleaned; phones do not need it', async () =
 
   const screen = await connect();
   const second = track<StageState>(screen, 'stage:state');
-  assert.ok((await screen.emitWithAck('stage:attach', created.pin)).ok);
+  assert.ok((await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.stageToken })).ok);
   assert.deepEqual((await second.until(() => true)).cover, { color: 'teal', emoji: '🎯' });
 
   const p = await connect();
@@ -340,7 +372,7 @@ test('the host can close the room: everyone in it is told, and the PIN stops wor
   const created = await host.emitWithAck('host:create', { game: GAME });
   assert.ok(created.ok);
   const screen = await connect();
-  assert.ok((await screen.emitWithAck('stage:attach', created.pin)).ok);
+  assert.ok((await screen.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.stageToken })).ok);
   const p = await connect();
   const joined = await p.emitWithAck('player:join', { pin: created.pin, nickname: 'Stayer', avatar: '🐸' });
   assert.ok(joined.ok);
@@ -372,7 +404,7 @@ test('a PIN handed out again after its room closed belongs to the new room alone
     const first = await oldHost.emitWithAck('host:create', { game: GAME });
     assert.ok(first.ok);
     const oldScreen = await connect();
-    assert.ok((await oldScreen.emitWithAck('stage:attach', first.pin)).ok);
+    assert.ok((await oldScreen.emitWithAck('stage:attach', { pin: first.pin, stageToken: first.stageToken })).ok);
     const oldPlayer = await connect();
     assert.ok((await oldPlayer.emitWithAck('player:join', { pin: first.pin, nickname: 'Old', avatar: '🐸' })).ok);
     assert.deepEqual(await oldHost.emitWithAck('host:close', { pin: first.pin, hostToken: first.hostToken }), { ok: true });
@@ -587,4 +619,63 @@ test('the reveal waits a second while the big screen stamps time up or everyone 
   const onSkip = Date.now() - skipped;
   assert.ok(onSkip < 150, `the reveal came ${onSkip} ms after the skip, not at once`);
   assert.ok((await host.emitWithAck('host:close', { pin: created.pin, hostToken: created.hostToken })).ok);
+});
+
+test('an address that keeps missing is refused every lookup but one with the right token, and no other address is', async () => {
+  // a limiter that never drains, so nothing here races the clock
+  const own = await startGameServer(0, '127.0.0.1', { misses: new MissLimiter(60, 0) });
+  const mine: Client[] = [];
+  // every connection comes from loopback, as through the proxy, which names the client
+  const from = (realIp?: string): Promise<Client> => {
+    const s: Client = io(`http://127.0.0.1:${own.port}`, { transports: ['websocket'], forceNew: true, extraHeaders: realIp ? { 'x-real-ip': realIp } : {} });
+    mine.push(s);
+    return new Promise((resolve) => s.once('connect', () => resolve(s)));
+  };
+  try {
+    const host = await from();
+    const created = await host.emitWithAck('host:create', { game: GAME });
+    assert.ok(created.ok);
+    const player = await from('203.0.113.7');
+    const joined = await player.emitWithAck('player:join', { pin: created.pin, nickname: 'Office', avatar: '🐼' });
+    assert.ok(joined.ok);
+
+    // someone at the same address guesses: every wrong token costs, as every wrong PIN does
+    const guesser = await from('203.0.113.7');
+    const wrong = { pin: created.pin, stageToken: 'x'.repeat(created.stageToken.length) };
+    for (let i = 0; i < 60; i++) assert.deepEqual(await guesser.emitWithAck('stage:attach', wrong), { ok: false, error: 'not_allowed' });
+    const limited = { ok: false, error: 'rate_limited' };
+    assert.deepEqual(await guesser.emitWithAck('stage:attach', wrong), limited);
+    assert.deepEqual(await guesser.emitWithAck('stage:attach', { ...wrong, pin: '000000' }), limited);
+
+    // from then on that address learns nothing from a PIN, on any connection: a room there or not answers alike
+    const next = await from('203.0.113.7');
+    assert.deepEqual(await next.emitWithAck('room:check', created.pin), limited);
+    assert.deepEqual(await next.emitWithAck('room:check', '000000'), limited);
+    assert.deepEqual(await next.emitWithAck('player:join', { pin: created.pin, nickname: 'Late', avatar: '🐼' }), limited);
+    assert.deepEqual(await next.emitWithAck('host:attach', { pin: created.pin, hostToken: 'x'.repeat(created.hostToken.length) }), limited);
+    assert.deepEqual(await next.emitWithAck('host:attach', { pin: '000000', hostToken: created.hostToken }), limited);
+    assert.deepEqual(await next.emitWithAck('host:close', { pin: created.pin, hostToken: '' }), limited);
+    assert.deepEqual(await next.emitWithAck('player:resume', { pin: created.pin, token: 'x'.repeat(joined.token.length) }), limited);
+
+    // but whoever holds a right token still gets in: the big screen, the Host, a phone already in the game
+    assert.deepEqual(await next.emitWithAck('stage:attach', { pin: created.pin, stageToken: created.stageToken }), { ok: true });
+    const hostAgain = await from('203.0.113.7');
+    const attached = await hostAgain.emitWithAck('host:attach', { pin: created.pin, hostToken: created.hostToken });
+    assert.deepEqual(attached, { ok: true, stageToken: created.stageToken });
+    player.close();
+    const back = await from('203.0.113.7');
+    const phone = track<PlayerState>(back, 'player:state');
+    assert.deepEqual(await back.emitWithAck('player:resume', { pin: created.pin, token: joined.token }), { ok: true });
+    assert.equal((await phone.until(() => true)).me.nickname, 'Office');
+
+    // the address next door, and connections the proxy names no one for, are not held back
+    const neighbour = await from('203.0.113.8');
+    assert.ok((await neighbour.emitWithAck('room:check', created.pin)).ok);
+    assert.ok((await neighbour.emitWithAck('player:join', { pin: created.pin, nickname: 'Next door', avatar: '🦊' })).ok);
+    assert.ok((await host.emitWithAck('room:check', created.pin)).ok);
+    assert.ok((await (await from('2001:db8:aa:bb::7')).emitWithAck('room:check', created.pin)).ok);
+  } finally {
+    for (const s of mine) s.close();
+    await own.close();
+  }
 });

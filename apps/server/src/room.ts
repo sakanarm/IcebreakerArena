@@ -81,6 +81,8 @@ const newId = (bytes: number) => randomBytes(bytes).toString('base64url');
 
 export class Room {
   readonly hostToken = newId(18);
+  /** what a screen other than the Host's needs besides the PIN; it reaches one only through the Host's page */
+  readonly stageToken = newId(18);
   phase: Phase = 'lobby';
   /** goes up at every change of phase, see `host:next` */
   private step = 0;

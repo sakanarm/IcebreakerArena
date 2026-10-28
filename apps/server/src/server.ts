@@ -13,8 +13,16 @@ import {
   type ClientToServerEvents,
 } from '@icebreaker/shared';
 import type { GameSocket, IO } from './io';
+import { MissLimiter, clientAddress } from './limits';
 import type { Room } from './room';
 import { Rooms } from './rooms';
+
+/**
+ * Lookups that may find nothing (a PIN, a token) per client address: a whole office gets this many wrong in a row
+ * before it has to slow down to one a second, while someone guessing PINs gets through a few thousand an hour at most.
+ */
+const MISS_BURST = 60;
+const MISSES_PER_SECOND = 1;
 
 export interface GameServer {
   port: number;
@@ -22,7 +30,11 @@ export interface GameServer {
 }
 
 /** Starts the HTTP + Socket.IO game server. Port 0 picks a free port (used by tests). */
-export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameServer> {
+export function startGameServer(
+  port: number,
+  host = '0.0.0.0',
+  { misses = new MissLimiter(MISS_BURST, MISSES_PER_SECOND) }: { misses?: MissLimiter } = {},
+): Promise<GameServer> {
   const httpServer = createServer((req, res) => {
     const path = (req.url ?? '/').split('?')[0];
     // deploy/deploy.sh refuses to restart while rooms are in use: they live only in this process
@@ -47,6 +59,7 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
     maxHttpBufferSize: MESSAGE_MAX_BYTES,
   });
   const rooms = new Rooms(io);
+  setInterval(() => misses.sweep(), 60_000).unref();
 
   const attachHost = (socket: GameSocket, room: Room) => {
     detach(socket);
@@ -65,16 +78,24 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
 
   io.on('connection', (socket) => {
     const allow = rateLimit(30, 10_000);
+    const address = clientAddress(socket.handshake.address, socket.handshake.headers);
     const on = <E extends keyof ClientToServerEvents>(event: E, fn: ClientToServerEvents[E]) => handle(socket, event, fn);
     const hostRoom = () => (socket.data.role === 'host' ? rooms.get(socket.data.pin) : undefined);
+    // a lookup that found nothing counts against the address it came from; past the burst it learns nothing more
+    const missed = (error: 'room_not_found' | 'not_allowed') => {
+      if (!misses.allows(address)) return { ok: false, error: 'rate_limited' } as const;
+      misses.miss(address);
+      return { ok: false, error } as const;
+    };
 
     on('time:sync', (ack) => reply(ack)(Date.now()));
 
+    // a PIN alone opens these, so an address past its misses is refused before the lookup, whatever the PIN
     on('room:check', (pin, ack) => {
       const done = reply(ack);
-      if (!allow()) return done({ ok: false, error: 'rate_limited' });
+      if (!allow() || !misses.allows(address)) return done({ ok: false, error: 'rate_limited' });
       const room = rooms.get(pin);
-      done(room ? { ok: true, title: room.game.title, phase: room.phase } : { ok: false, error: 'room_not_found' });
+      done(room ? { ok: true, title: room.game.title, phase: room.phase } : missed('room_not_found'));
     });
 
     // ---------- Host ----------
@@ -87,16 +108,17 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
       const room = rooms.create(checked.game);
       attachHost(socket, room);
       console.log(`[room ${room.pin}] created: ${room.game.title}`);
-      done({ ok: true, pin: room.pin, hostToken: room.hostToken });
+      done({ ok: true, pin: room.pin, hostToken: room.hostToken, stageToken: room.stageToken });
     });
 
+    // with the right token these always work, so nobody sharing the Host's address can lock the Host out
     on('host:attach', (payload, ack) => {
       const done = reply(ack);
       const room = rooms.get(payload?.pin);
-      if (!room) return done({ ok: false, error: 'room_not_found' });
-      if (!sameSecret(payload.hostToken, room.hostToken)) return done({ ok: false, error: 'not_allowed' });
+      if (!room) return done(missed('room_not_found'));
+      if (!sameSecret(payload.hostToken, room.hostToken)) return done(missed('not_allowed'));
       attachHost(socket, room);
-      done({ ok: true });
+      done({ ok: true, stageToken: room.stageToken });
     });
 
     on('host:next', (at) => hostRoom()?.next(stepOf(at)));
@@ -120,8 +142,8 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
     on('host:close', (payload, ack) => {
       const done = reply(ack);
       const room = rooms.get(payload?.pin);
-      if (!room) return done({ ok: false, error: 'room_not_found' });
-      if (!sameSecret(payload.hostToken, room.hostToken)) return done({ ok: false, error: 'not_allowed' });
+      if (!room) return done(missed('room_not_found'));
+      if (!sameSecret(payload.hostToken, room.hostToken)) return done(missed('not_allowed'));
       rooms.close(room);
       console.log(`[room ${room.pin}] closed by the host`);
       done({ ok: true });
@@ -129,10 +151,11 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
 
     // ---------- Stage (read-only second screen) ----------
 
-    on('stage:attach', (pin, ack) => {
+    on('stage:attach', (payload, ack) => {
       const done = reply(ack);
-      const room = rooms.get(pin);
-      if (!room) return done({ ok: false, error: 'room_not_found' });
+      const room = rooms.get(payload?.pin);
+      if (!room) return done(missed('room_not_found'));
+      if (!sameSecret(payload.stageToken, room.stageToken)) return done(missed('not_allowed'));
       detach(socket);
       socket.data = { pin: room.pin, role: 'stage' };
       socket.join(room.stageChannel);
@@ -149,9 +172,9 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
 
     on('player:join', (payload, ack) => {
       const done = reply(ack);
-      if (!allow()) return done({ ok: false, error: 'rate_limited' });
+      if (!allow() || !misses.allows(address)) return done({ ok: false, error: 'rate_limited' });
       const room = rooms.get(payload?.pin);
-      if (!room) return done({ ok: false, error: 'room_not_found' });
+      if (!room) return done(missed('room_not_found'));
       const nickname = cleanNickname(String(payload.nickname ?? '')) || randomNickname();
       const avatar = (AVATARS as readonly string[]).includes(payload.avatar) ? payload.avatar : randomAvatar();
       detach(socket);
@@ -166,10 +189,10 @@ export function startGameServer(port: number, host = '0.0.0.0'): Promise<GameSer
     on('player:resume', (payload, ack) => {
       const done = reply(ack);
       const room = rooms.get(payload?.pin);
-      if (!room) return done({ ok: false, error: 'room_not_found' });
+      if (!room) return done(missed('room_not_found'));
       detach(socket);
       const player = room.resume(String(payload.token ?? ''), socket.id);
-      if (!player) return done({ ok: false, error: 'not_allowed' });
+      if (!player) return done(missed('not_allowed'));
       socket.data = { pin: room.pin, role: 'player', playerId: player.id };
       done({ ok: true });
       room.sendPlayerState(player);
@@ -239,8 +262,11 @@ function rateLimit(max: number, windowMs: number) {
 }
 
 function sameSecret(given: unknown, expected: string) {
-  if (typeof given !== 'string' || given.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+  if (typeof given !== 'string') return false;
+  // as bytes: a string as long as the token in characters can be longer in bytes, and timingSafeEqual throws on that
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function json(res: ServerResponse, status: number, body: unknown) {

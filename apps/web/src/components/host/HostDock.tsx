@@ -13,6 +13,8 @@ const COOLDOWN_MS = 700;
 const NEXT_KEYS = ['Space', 'Enter', 'ArrowRight', 'PageDown', 'KeyN'];
 /** a button with words beside its icon, which a phone shows as the icon alone */
 const ICON_ON_PHONE = 'max-sm:px-2.5 max-sm:text-xl short:px-3 short:py-1.5 short:text-xl';
+/** the same up to a tablet's width, where the room's numbers need the row more than the words do */
+const ICON_ON_TABLET = 'max-md:px-2.5 max-md:text-xl short:px-3 short:py-1.5 short:text-xl';
 
 function primaryLabel(state: StageState): string {
   switch (state.phase) {
@@ -37,11 +39,14 @@ function primaryLabel(state: StageState): string {
  */
 export function HostDock({
   state,
+  stageToken,
   onReport,
   onClose,
   blocked,
 }: {
   state: StageState;
+  /** what the big screen's link carries after the #; null until the server has said it */
+  stageToken: string | null;
   onReport: () => void;
   onClose: () => void;
   blocked: boolean;
@@ -66,6 +71,13 @@ export function HostDock({
 
   const end = () => {
     if (confirm('จบเกมตอนนี้แล้วไปประกาศผลเลยไหม?')) getSocket().emit('host:end');
+  };
+
+  // a phone or a tablet is no projector: its share sheet takes the link to the machine that drives one
+  const shareStage = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!matchMedia('(pointer: coarse)').matches || typeof navigator.share !== 'function') return;
+    e.preventDefault();
+    navigator.share({ title: `จอแสดงผล ห้อง ${state.pin}`, url: e.currentTarget.href }).catch(() => {});
   };
 
   // leaving does not close the room, but nobody can move the game on until the Host comes back
@@ -130,11 +142,20 @@ export function HostDock({
           <span className="hidden text-white/50 xl:inline">กด Space หรือ → เพื่อไปต่อ</span>
         </div>
 
-        {/* a new tab on the same phone is no projector */}
-        <a href={withBase(`/stage/${state.pin}`)} target="_blank" rel="noopener" className="btn btn-ghost hidden px-4 text-base md:inline-flex short:hidden" title="เปิดจอแสดงผลแยก สำหรับโปรเจกเตอร์">
-          🖥️ จอแยก
-        </a>
-        {/* on a phone the buttons are their icons; the words stay for screen readers */}
+        {/* on a phone the buttons are their icons; the words stay for screen readers. Held upright, a phone has
+            room for this one only before the game, which is when a projector gets set up */}
+        {stageToken && (
+          <a
+            href={withBase(`/stage/${state.pin}#${stageToken}`)}
+            target="_blank"
+            rel="noopener"
+            onClick={shareStage}
+            className={`${ICON_ON_TABLET} btn btn-ghost shrink-0 px-4 text-base ${state.phase === 'lobby' ? '' : 'max-md:hidden short:inline-flex'}`}
+            title="เปิดจอแสดงผลแยก สำหรับโปรเจกเตอร์ หรือส่งลิงก์ไปเปิดที่เครื่องอื่น"
+          >
+            🖥️<span className="max-md:sr-only short:sr-only">จอแยก</span>
+          </a>
+        )}
         {canEnd && (
           <button type="button" onClick={end} className={`${ICON_ON_PHONE} btn btn-ghost shrink-0 px-4 text-base`} title="จบเกมแล้วประกาศผลทันที">
             ⏹<span className="max-sm:sr-only short:sr-only">จบเกม</span>

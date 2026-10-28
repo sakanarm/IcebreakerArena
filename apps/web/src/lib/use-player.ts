@@ -16,13 +16,15 @@ const MESSAGES: Record<string, string> = {
   timeout: 'เชื่อมต่อเกมเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง',
 };
 const messageFor = (code: string) => MESSAGES[code] ?? 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง';
+/** how long to wait before asking to come back in again, after no answer or being told to slow down */
+const RETRY_MS = 5000;
 
 /** An ack that never arrived (server down, bad network) becomes an ordinary error. */
-async function ack<T extends object>(p: Promise<Result<T>>): Promise<Result<T>> {
+async function ack<T extends object>(p: Promise<Result<T>>): Promise<Result<T> | { ok: false; error: 'timeout' }> {
   try {
     return await p;
   } catch {
-    return { ok: false, error: 'timeout' as never };
+    return { ok: false, error: 'timeout' };
   }
 }
 
@@ -45,18 +47,23 @@ export function usePlayer(initialPin: string | null) {
   /** the question this tab has sent an answer to, until answering moves on */
   const answering = useRef<string | null>(null);
 
-  const resume = useCallback(async (p: string) => {
+  /**
+   * Back in as the same player. 'later' when there was no answer or the server said to slow down: the session
+   * stays, to try again, as only a room that is gone or a token it no longer takes ends it.
+   */
+  const resume = useCallback(async (p: string): Promise<'ok' | 'none' | 'later'> => {
     const session = load<PlayerSession | null>(keys.playerSession(p), null);
-    if (!session) return false;
+    if (!session) return 'none';
     const res = await ack(getSocket().timeout(8000).emitWithAck('player:resume', { pin: p, token: session.token }));
     if (res.ok) {
       joined.current = true;
       setStatus('playing');
-      return true;
+      return 'ok';
     }
+    if (res.error === 'timeout' || res.error === 'rate_limited') return 'later';
     remove(keys.playerSession(p));
     if (joined.current) setStatus(res.error === 'room_not_found' ? 'closed' : 'kicked');
-    return false;
+    return 'none';
   }, []);
 
   // live updates for this room
@@ -76,12 +83,25 @@ export function usePlayer(initialPin: string | null) {
     };
     const onKicked = end('kicked');
     const onClosed = end('closed');
-    const onConnect = () => {
-      setOnline(true);
-      void syncClock(socket);
-      if (joined.current) void resume(pin);
+    let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    // with no answer, again in a while, for as long as the connection holds; a reconnect asks anyway
+    const rejoin = async () => {
+      clearTimeout(retry);
+      const back = await resume(pin);
+      if (back !== 'later') setOnline(true);
+      else if (alive && socket.connected && joined.current) retry = setTimeout(() => void rejoin(), RETRY_MS);
     };
-    const onDown = () => setOnline(false);
+    const onConnect = () => {
+      void syncClock(socket);
+      // in a room, the banner stays up until the server has this phone back as the same player
+      if (joined.current) void rejoin();
+      else setOnline(true);
+    };
+    const onDown = () => {
+      clearTimeout(retry);
+      setOnline(false);
+    };
     socket.on('player:state', onState);
     socket.on('player:kicked', onKicked);
     socket.on('room:closed', onClosed);
@@ -89,6 +109,8 @@ export function usePlayer(initialPin: string | null) {
     socket.on('disconnect', onDown);
     const stopSync = keepClockSynced(socket);
     return () => {
+      alive = false;
+      clearTimeout(retry);
       stopSync();
       socket.off('player:state', onState);
       socket.off('player:kicked', onKicked);
@@ -103,7 +125,13 @@ export function usePlayer(initialPin: string | null) {
     if (!initialPin) return;
     let alive = true;
     void (async () => {
-      if (await resume(initialPin)) return;
+      // with no answer yet the page keeps asking, rather than let go of the player this phone was
+      let resumed = await resume(initialPin);
+      while (resumed === 'later' && alive) {
+        await new Promise((r) => setTimeout(r, RETRY_MS));
+        if (alive) resumed = await resume(initialPin);
+      }
+      if (!alive || resumed === 'ok') return;
       const res = await ack(getSocket().timeout(8000).emitWithAck('room:check', initialPin));
       if (!alive) return;
       if (res.ok) {
