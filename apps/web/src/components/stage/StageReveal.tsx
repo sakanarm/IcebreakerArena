@@ -47,11 +47,12 @@ function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
   return (
     <>
       {/* never lower than the stats card beside the bars, or the card would climb over the question */}
-      <div className="mx-auto flex w-full max-w-6xl flex-1 items-end justify-center gap-3 sm:gap-10">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 items-end justify-center gap-3 sm:gap-6 md:gap-10">
         {/* bars are a share of whatever height the screen leaves, so a 1080p projector isn't half empty, with a
-            least height of their own: what doesn't fit under them scrolls */}
+            least height of their own: what doesn't fit under them scrolls. Where the card beside them leaves less
+            width than they want (a tablet held upright), they get thinner, down to what their shapes need */}
         <div
-          className="flex h-full max-h-[34rem] min-h-36 items-end gap-2 sm:gap-5 low:min-h-28 short:min-h-24"
+          className="flex h-full max-h-[34rem] min-h-36 min-w-0 items-end gap-2 sm:gap-3 md:gap-5 low:min-h-28 short:min-h-24"
           role="img"
           aria-label={`ผลการตอบ: ${r.counts.map((c, i) => `${q.options[i]} ${c} คน`).join(', ')}`}
         >
@@ -75,11 +76,12 @@ function TileReveal({ q, r }: { q: QuestionPublic; r: RevealInfo }) {
                       opacity: { delay: VERDICT_S },
                     }}
                   />
+                  {/* a count wider than a thin bar hangs over both its sides alike */}
                   <motion.span
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.55 + i * 0.1 }}
-                    className="absolute inset-x-0 mb-1 text-center font-display text-2xl font-extrabold tabular-nums sm:mb-2 sm:text-4xl short:text-2xl"
+                    className="absolute inset-x-0 mb-1 flex justify-center font-display text-2xl font-extrabold tabular-nums sm:mb-2 sm:text-3xl md:text-4xl short:text-2xl"
                     style={{ bottom: `${pct}%` }}
                   >
                     {fmt(r.counts[i] ?? 0)}
@@ -466,7 +468,8 @@ function RevealStats({
             <div className="text-white/70">{label}</div>
             <div className="shrink-0 font-display text-3xl font-extrabold sm:text-5xl short:text-3xl">
               {fmt(r.correctCount)}
-              <span className="text-lg text-white/60 sm:text-2xl short:text-lg"> / {fmt(r.answered)}</span>
+              {/* where the narrow card wraps the line, the slash goes down with what it is out of */}
+              <span className="text-lg text-white/60 sm:text-2xl short:text-lg"> <span className="whitespace-nowrap">/ {fmt(r.answered)}</span></span>
             </div>
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-white/15">
@@ -479,7 +482,7 @@ function RevealStats({
             />
           </div>
           <div className="text-white/80 sm:text-lg">
-            {percent(r.correctCount, r.answered)}% · <span className="whitespace-nowrap">เวลาเฉลี่ย</span> {secondsLabel(r.avgMs)}
+            {percent(r.correctCount, r.answered)}% · <span className="whitespace-nowrap">เวลาเฉลี่ย</span> <span className="whitespace-nowrap">{secondsLabel(r.avgMs)}</span>
           </div>
         </>
       )}
