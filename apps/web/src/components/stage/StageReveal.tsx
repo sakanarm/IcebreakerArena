@@ -1,8 +1,9 @@
 'use client';
 
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { sliderBin, type QuestionPublic, type RevealInfo, type StageState } from '@icebreaker/shared';
+import { AVERAGE_EMS, countsFit, ems, sizeFor } from '@/lib/fit';
 import { fmt, fmtValue, percent, secondsLabel } from '@/lib/format';
 import { sfx } from '@/lib/sfx';
 import { ANSWER_BG, AnswerShape } from '../shapes';
@@ -305,6 +306,14 @@ function SliderReveal({
   }, []);
 
   const average = r.average != null ? Math.round(r.average * 10) / 10 : null;
+  // each number as big as its room lets it be, worked out from its figures, so a long one comes out smaller
+  // instead of past the column's edge or over the next count (the room is in the column's width, cqw)
+  const fit = {
+    '--answer': sizeFor('100cqw - 2.5rem', ems(fmtValue(answer), 'display')),
+    '--ends': sizeFor('50cqw - 0.5rem', Math.max(ems(fmtValue(min), 'sans'), ems(fmtValue(max), 'sans'))),
+    '--average': sizeFor('100cqw - 1.5rem', AVERAGE_EMS + ems(fmtValue(average ?? 0), 'sans')),
+    '--counts': countsFit(bars.map((b) => ({ left: b.left / 100, width: b.width / 100, text: b.count ? fmt(b.count) : '' })), hit) ?? '100cqw',
+  } as CSSProperties;
 
   // the needle and the answer's label ride on the one value, so the label is over the needle all the way across
   const reduce = useReducedMotion();
@@ -321,14 +330,14 @@ function SliderReveal({
   const back = useTransform(swing, (p) => `${-p}%`);
 
   return (
-    // on a phone the scale takes the whole width, and the numbers come in under it
-    <div className="mx-auto flex w-full max-w-6xl flex-1 gap-3 max-sm:flex-col sm:gap-8">
-      <div className="flex min-w-0 flex-1 flex-col justify-end pb-2">
+    // on a phone, or anything taller than it is wide, the scale takes the whole width, and the numbers come in under it
+    <div className="mx-auto flex w-full max-w-6xl flex-1 gap-3 max-sm:flex-col sm:gap-8 portrait:flex-col short:min-h-0">
+      <div className="flex min-w-0 flex-1 flex-col justify-end pb-2 [container-type:inline-size]" style={fit}>
         {/* the answer rides over on the needle, above the chart, where no count can be under it */}
         <div className="relative z-10 mb-2 flex">
           <motion.div className="relative w-fit max-w-full" style={{ left, x: back }} {...APPEAR}>
             <motion.div
-              className="rounded-2xl bg-gold px-3 py-1 text-center font-display text-2xl leading-tight font-extrabold text-ink shadow-2xl sm:px-5 sm:py-2 sm:text-4xl short:py-0.5 short:text-xl"
+              className="rounded-2xl bg-gold px-3 py-1 text-center font-display text-[length:min(1.5rem,var(--answer))] leading-tight font-extrabold text-ink shadow-2xl sm:px-5 sm:py-2 sm:text-[length:min(2.25rem,var(--answer))] short:py-0.5 short:text-[length:min(1.25rem,var(--answer))]"
               animate={landed ? { scale: [1, 1.15, 1] } : {}}
               transition={{ duration: 0.45 }}
             >
@@ -367,10 +376,11 @@ function SliderReveal({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.6 + i * 0.06 }}
-                      className="absolute inset-x-0 z-20 mb-1 flex justify-center font-display text-base font-bold tabular-nums [text-shadow:0_2px_6px_rgb(0_0_0/0.6)] sm:text-2xl short:text-base"
+                      // centred over its bar; over an end bar, one wider than the bar runs inwards from the edge
+                      className={`absolute ${i === 0 ? 'left-0.5 min-w-[calc(100%-0.25rem)]' : i === bars.length - 1 ? 'right-0.5 min-w-[calc(100%-0.25rem)]' : 'inset-x-0'} z-20 mb-1 flex justify-center font-display text-[length:min(1rem,var(--counts))] leading-snug font-bold [text-shadow:0_2px_6px_rgb(0_0_0/0.6)] sm:text-[length:min(1.5rem,var(--counts))] short:text-[length:min(1rem,var(--counts))]`}
                       style={{ bottom: `${pct}%` }}
                     >
-                      <span className={`rounded-full px-1.5 ring-2 transition duration-500 sm:px-2.5 ${landed && i === hit ? 'bg-ink ring-gold' : 'ring-transparent'}`}>
+                      <span className={`rounded-full px-[0.35em] ring-2 transition duration-500 ${landed && i === hit ? 'bg-ink ring-gold' : 'ring-transparent'}`}>
                         {fmt(b.count)}
                       </span>
                     </motion.span>
@@ -386,9 +396,9 @@ function SliderReveal({
         </div>
         {/* the scale, with its two ends sharing the line under it however long their words are */}
         <div className="mt-1 h-3 rounded-full bg-white/25" />
-        <div className="mt-2 flex items-start justify-between gap-4 text-sm leading-snug text-white/70 tabular-nums sm:text-xl short:text-base">
-          <Value n={min} unit={unit} />
-          <Value n={max} unit={unit} className="text-right" />
+        <div className="mt-2 flex items-start justify-between gap-4 text-[length:min(0.875rem,var(--ends))] leading-snug text-white/70 tabular-nums sm:text-[length:min(1.25rem,var(--ends))] short:text-[length:min(1rem,var(--ends))]">
+          <Value n={min} unit={unit} className="min-w-0 flex-1" />
+          <Value n={max} unit={unit} className="min-w-0 flex-1 text-right" />
         </div>
         {/* a line of its own, there before the average fades in so nothing moves; on a phone on its side, where
             every line counts, the stats card says it instead */}
@@ -397,7 +407,7 @@ function SliderReveal({
             <motion.span
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: landed ? 1 : 0, y: landed ? 0 : -8 }}
-              className="relative h-fit w-fit max-w-full rounded-full bg-white/15 px-2 py-0.5 text-xs whitespace-nowrap text-white sm:px-3 sm:text-lg"
+              className="relative h-fit w-fit max-w-full rounded-full bg-white/15 px-2 py-0.5 text-[length:min(0.75rem,var(--average))] leading-normal whitespace-nowrap text-white sm:px-3 sm:text-[length:min(1.125rem,var(--average))]"
               // hung on its point the way the answer's label is
               style={{ left: `${at(average)}%`, translate: `${-at(average)}% 0` }}
             >
@@ -440,20 +450,20 @@ function RevealStats({
   margin?: number;
   /** a slider's average guess, which a phone on its side shows here instead of on the scale */
   average?: number | null;
-  /** on a phone it comes in under the scene, the width of it, instead of narrow beside it */
+  /** on a phone, or anything taller than it is wide, it comes in under the scene, the width of it, instead of beside it */
   under?: boolean;
 }) {
   const silent = r.totalPlayers - r.answered;
   const label = q.type === 'slider' ? (margin > 0 ? `ได้คะแนน (ห่างไม่เกิน ±${fmtValue(margin)})` : 'ตอบตรงเป๊ะ') : q.type === 'puzzle' ? 'เรียงถูก' : 'ตอบถูก';
   // where it is wide but not tall (a phone on its side, or under the scene), the label and the count share a line
-  const headline = `flex flex-col gap-1.5 sm:gap-3 short:flex-row short:items-baseline short:justify-between short:gap-3 ${under ? 'max-sm:flex-row max-sm:items-baseline max-sm:justify-between max-sm:gap-3' : ''}`;
+  const headline = `flex flex-col gap-1.5 sm:gap-3 short:flex-row short:items-baseline short:justify-between short:gap-3 ${under ? 'max-sm:flex-row max-sm:items-baseline max-sm:justify-between max-sm:gap-3 portrait:flex-row portrait:items-baseline portrait:justify-between portrait:gap-3' : ''}`;
   return (
     <motion.div
       initial={{ x: 40, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay, type: 'spring', stiffness: 260, damping: 24 }}
       // narrow on a phone, beside the bars: its lines wrap instead
-      className={`glass mb-2 flex shrink-0 flex-col gap-1.5 self-end px-3 py-3 text-sm sm:w-auto sm:min-w-64 sm:gap-3 sm:px-6 sm:py-5 sm:text-base low:gap-2 low:py-4 short:w-auto short:gap-1 short:py-1.5 short:mb-0 ${under ? 'max-sm:mb-0 max-sm:self-stretch' : 'w-32'}`}
+      className={`glass mb-2 flex shrink-0 flex-col gap-1.5 self-end px-3 py-3 text-sm sm:w-auto sm:min-w-64 sm:gap-3 sm:px-6 sm:py-5 sm:text-base low:gap-2 low:py-4 short:w-auto short:gap-1 short:py-1.5 short:mb-0 ${under ? 'max-sm:mb-0 max-sm:self-stretch portrait:mb-0 portrait:self-stretch' : 'w-32'}`}
     >
       {q.type === 'poll' ? (
         <div className={headline}>
