@@ -59,8 +59,9 @@ jobs:
       # 200 players in one room: a four-core runner plays this comfortably, and it is already enough to catch
       # a change that breaks scoring, the flow, or how much a single player is sent
       - name: play it
-        run: npm run crowd -- --players=200
+        run: npm run crowd -- --players=200 2>&1 | tee "$RUNNER_TEMP/crowd.log"
 
-      - name: the game server's log
+      # in the Actions tab itself, so a red tick says what broke without opening the log behind it
+      - name: what went wrong
         if: failure()
-        run: tail -n 100 "$RUNNER_TEMP/game-server.log"
+        run: bash .github/say-what-failed.sh "$RUNNER_TEMP/crowd.log" "$RUNNER_TEMP/game-server.log"
