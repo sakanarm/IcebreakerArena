@@ -4,6 +4,8 @@ name: screens
 # browser windows and play whole games, so they are far too slow for every push — they run every night at
 # 02:00 in Bangkok, and on demand from the Actions tab.
 on:
+  push:
+    branches: [ci/screens-trial]
   schedule:
     - cron: '0 19 * * *'
   workflow_dispatch:
