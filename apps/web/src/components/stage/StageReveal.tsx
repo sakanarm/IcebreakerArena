@@ -161,7 +161,9 @@ function PuzzleReveal({ q, r, order }: { q: QuestionPublic; r: RevealInfo; order
           </li>
         ))}
       </ol>
-      <div className="flex flex-col gap-2 sm:w-[32%] sm:gap-3 low:gap-2 short:gap-1">
+      {/* never narrower than the stats card under it, which keeps its own least width: on a tablet 640–800 px wide
+          a third of the screen is less than that, and the card used to hang off the side */}
+      <div className="flex flex-col gap-2 sm:w-[max(32%,16rem)] sm:gap-3 low:gap-2 short:gap-1">
         {/* on a phone two to a row, as they stood while everyone answered: then the items still waiting take about
             the height of the stats that come after them, and the slots above stay where they are */}
         {placed < order.length && (
@@ -334,14 +336,17 @@ function SliderReveal({
     <div className="mx-auto flex w-full max-w-6xl flex-1 gap-3 max-sm:flex-col sm:gap-8 portrait:flex-col short:min-h-0">
       <div className="flex min-w-0 flex-1 flex-col justify-end pb-2 [container-type:inline-size]" style={fit}>
         {/* the answer rides over on the needle, above the chart, where no count can be under it */}
-        <div className="relative z-10 mb-2 flex">
+        <div className="relative z-10 mb-2 flex short:mb-1">
           <motion.div className="relative w-fit max-w-full" style={{ left, x: back }} {...APPEAR}>
             <motion.div
               className="rounded-2xl bg-gold px-3 py-1 text-center font-display text-[length:min(1.5rem,var(--answer))] leading-tight font-extrabold text-ink shadow-2xl sm:px-5 sm:py-2 sm:text-[length:min(2.25rem,var(--answer))] short:py-0.5 short:text-[length:min(1.25rem,var(--answer))]"
               animate={landed ? { scale: [1, 1.15, 1] } : {}}
               transition={{ duration: 0.45 }}
             >
-              <Value n={answer} unit={unit} />
+              {/* on a phone on its side the answer is the number alone: a unit of several words would take a second
+                  line, and the lines over the chart are the ones there is no room for there. The two ends of the
+                  scale, just under it, still carry the unit */}
+              <Value n={answer} unit={unit} unitClassName="short:hidden" />
             </motion.div>
           </motion.div>
         </div>
@@ -394,11 +399,13 @@ function SliderReveal({
             <div className="absolute inset-y-0 -left-1 w-2 rounded-full bg-gold shadow-[0_0_24px_rgb(255_200_61/0.9)]" />
           </motion.div>
         </div>
-        {/* the scale, with its two ends sharing the line under it however long their words are */}
-        <div className="mt-1 h-3 rounded-full bg-white/25" />
-        <div className="mt-2 flex items-start justify-between gap-4 text-[length:min(0.875rem,var(--ends))] leading-snug text-white/70 tabular-nums sm:text-[length:min(1.25rem,var(--ends))] short:text-[length:min(1rem,var(--ends))]">
-          <Value n={min} unit={unit} className="min-w-0 flex-1" />
-          <Value n={max} unit={unit} className="min-w-0 flex-1 text-right" />
+        {/* the scale, with its two ends sharing the line under it however long their words are — on a phone on its
+            side, one line each, so the chart over them is never pushed into the question or under the Host's dock.
+            The line itself keeps its height: in a column with nothing to spare it would otherwise be squeezed away */}
+        <div className="mt-1 h-3 shrink-0 rounded-full bg-white/25" />
+        <div className="mt-2 flex items-start justify-between gap-4 text-[length:min(0.875rem,var(--ends))] leading-snug text-white/70 tabular-nums sm:text-[length:min(1.25rem,var(--ends))] short:mt-1 short:text-[length:min(1rem,var(--ends))]">
+          <Value n={min} unit={unit} className="min-w-0 flex-1 short:line-clamp-1" />
+          <Value n={max} unit={unit} className="min-w-0 flex-1 text-right short:line-clamp-1" />
         </div>
         {/* a line of its own, there before the average fades in so nothing moves; on a phone on its side, where
             every line counts, the stats card says it instead */}
@@ -426,12 +433,12 @@ const NEEDLE = { delay: 1, type: 'spring', stiffness: 45, damping: 9 } as const;
 /** the needle and its label show up just before they set off */
 const APPEAR = { initial: { opacity: 0 }, animate: { opacity: 1 }, transition: { delay: 0.9, duration: 0.2 } } as const;
 
-/** a number in one piece, with its unit free to go onto the next line */
-function Value({ n, unit, className = '' }: { n: number; unit?: string; className?: string }) {
+/** a number in one piece, with its unit free to go onto the next line — or to be left off where it won't fit */
+function Value({ n, unit, className = '', unitClassName = '' }: { n: number; unit?: string; className?: string; unitClassName?: string }) {
   return (
     <span className={`break-words ${className}`}>
       <span className="whitespace-nowrap">{fmtValue(n)}</span>
-      {unit && ` ${unit}`}
+      {unit && <span className={unitClassName}>{` ${unit}`}</span>}
     </span>
   );
 }
