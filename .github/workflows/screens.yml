@@ -38,10 +38,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/app
-      - run: npm run e2e:slider
+      # every check keeps its output: the step that follows reads it and says, in the Actions tab itself,
+      # what went wrong — the log behind it takes a login to open
+      - name: the slider's reveal
+        run: npm run e2e:slider 2>&1 | tee "$RUNNER_TEMP/e2e-slider.log"
       # the second check runs even when the first found something: both reports in one night are worth more
-      - run: npm run e2e:reveal
+      - name: the reveals with bars
         if: ${{ !cancelled() }}
+        run: npm run e2e:reveal 2>&1 | tee "$RUNNER_TEMP/e2e-reveal.log"
+      - name: what went wrong
+        if: failure()
+        run: bash .github/say-what-failed.sh "$RUNNER_TEMP"/e2e-*.log
       - name: keep the app's logs with the pictures
         if: failure()
         run: mkdir -p logs && cp "$RUNNER_TEMP"/*.log logs/ || true
@@ -79,7 +86,11 @@ jobs:
       - uses: ./.github/actions/app
       # two pages at a time: a hosted runner has four cores, and a page that does not get one measures the
       # wrong moment and reports a bug that is not there (e2e/README.md)
-      - run: npm run e2e -- --batch=2
+      - name: play both games on every screen
+        run: npm run e2e -- --batch=2 2>&1 | tee "$RUNNER_TEMP/e2e-sweep.log"
+      - name: what went wrong
+        if: failure()
+        run: bash .github/say-what-failed.sh "$RUNNER_TEMP"/e2e-*.log
       - name: keep the app's logs with the pictures
         if: failure()
         run: mkdir -p logs && cp "$RUNNER_TEMP"/*.log logs/ || true
