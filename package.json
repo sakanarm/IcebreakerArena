@@ -17,6 +17,7 @@
     "e2e:slider": "node e2e/slider-fit.mjs",
     "e2e:reveal": "node e2e/reveal-fit.mjs",
     "bots": "npm run bots -w @icebreaker/server --",
+    "crowd": "npm run crowd -w @icebreaker/server --",
     "users": "npm run users -w @icebreaker/web --"
   },
   "engines": {

@@ -8,7 +8,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc -p .",
     "test": "tsx --test src/limits.test.ts src/room.test.ts src/rooms.test.ts src/flow.test.ts",
-    "bots": "tsx scripts/bots.ts"
+    "bots": "tsx scripts/bots.ts",
+    "crowd": "tsx scripts/crowd.ts"
   },
   "dependencies": {
     "@icebreaker/shared": "*",
