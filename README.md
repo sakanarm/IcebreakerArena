@@ -1,5 +1,8 @@
 # MFEC IceBreaker Arena
 
+[![checks](https://github.com/sakanarm/IcebreakerArena/actions/workflows/checks.yml/badge.svg)](https://github.com/sakanarm/IcebreakerArena/actions/workflows/checks.yml)
+[![screens](https://github.com/sakanarm/IcebreakerArena/actions/workflows/screens.yml/badge.svg)](https://github.com/sakanarm/IcebreakerArena/actions/workflows/screens.yml)
+
 เกม Icebreaker / Quiz แบบเล่นสดสำหรับทีม MFEC ผู้จัดสร้างคำถามเองแบ่งเป็นหลายด่าน เปิดห้องขึ้นจอใหญ่ ทุกคนสแกน QR แล้วตอบจากมือถือของตัวเอง แข่งเก็บแต้มแบบเรียลไทม์จนถึงโพเดียม
 
 | จอใหญ่ (โปรเจกเตอร์) | มือถือผู้เล่น | ประกาศผล |
@@ -39,7 +42,10 @@ npm run dev
 | `npm run build` | build เว็บสำหรับ production |
 | `npm run bots -- <PIN> [จำนวน=50] [--ramp=20]` | ปล่อยบอตเข้าห้องเพื่อทดสอบโหลดหรือเดโม บอตตอบทุกข้อ แล้วสรุปเวลาที่ server ตอบรับ (p50/p95) ตอนจบ ใส่ `--url=` ถ้า game server ไม่ได้อยู่ที่ localhost:4000 |
 | `npm run crowd -- [--players=50] [--rooms=1]` | เล่นเกมทั้งเกมด้วยบอต แล้วตรวจรายงานท้ายเกมว่าคิดคะแนนถูกทุกข้อ (ดู[ทดสอบโหลด](#ทดสอบโหลด-npm-run-crowd)) |
+| `npm run e2e` | ตรวจทุกฉากบนเบราว์เซอร์จริง 16 ขนาดจอ (ลง dependency ใน `e2e/` ก่อน ดู [e2e/README](e2e/README.md)) |
 | `npm run users -- <คำสั่ง>` | จัดการบัญชีผู้สร้างเกม (ดู[บัญชีผู้สร้างเกม](#บัญชีผู้สร้างเกม)) |
+
+ทุก push และ PR เข้า `main` GitHub Actions จะรัน typecheck, unit test และ build บน Node 20 กับ 22 แล้วเล่นเกมจริงด้วยบอท 200 คน ส่วนตัวตรวจหน้าจอด้วยเบราว์เซอร์รันทุกคืนตี 2 (ดู[รายละเอียด](e2e/README.md#บน-ci))
 
 ลองระบบบัญชีบนเครื่อง: ใส่ `AUTH_MODE=local` ใน `apps/web/.env.development.local` เว็บจะใช้ฐานข้อมูล PGlite ใน `var/pglite` ไม่ต้องลง Postgres สร้างบัญชีด้วย `npm run users -- add ...` ตอนที่ `npm run dev` ไม่ได้รันอยู่ เพราะเปิดโฟลเดอร์นั้นได้ทีละ process
 

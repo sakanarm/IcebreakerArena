@@ -1,0 +1,93 @@
+name: screens
+
+# The browser checks: a real room, real pages, measured at every screen size the app supports. They open real
+# browser windows and play whole games, so they are far too slow for every push — they run every night at
+# 02:00 in Bangkok, and on demand from the Actions tab.
+on:
+  schedule:
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: screens
+  cancel-in-progress: false
+
+jobs:
+  fit:
+    name: the reveal screens
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      # a throwaway database for the run: the app falls back to an embedded one in dev, but a production build
+      # wants a real Postgres, and this exercises the migrations the way the production box gets them
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: icebreaker
+          POSTGRES_DB: icebreaker_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:icebreaker@localhost:5432/icebreaker_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/app
+      - run: npm run e2e:slider
+      # the second check runs even when the first found something: both reports in one night are worth more
+      - run: npm run e2e:reveal
+        if: ${{ !cancelled() }}
+      - name: keep the app's logs with the pictures
+        if: failure()
+        run: mkdir -p logs && cp "$RUNNER_TEMP"/*.log logs/ || true
+      - name: what the browser saw
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fit-${{ github.run_id }}
+          path: |
+            e2e/reveal-fit-*/
+            logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  sweep:
+    name: every scene, every screen
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: icebreaker
+          POSTGRES_DB: icebreaker_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:icebreaker@localhost:5432/icebreaker_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/app
+      # two pages at a time: a hosted runner has four cores, and a page that does not get one measures the
+      # wrong moment and reports a bug that is not there (e2e/README.md)
+      - run: npm run e2e -- --batch=2
+      - name: keep the app's logs with the pictures
+        if: failure()
+        run: mkdir -p logs && cp "$RUNNER_TEMP"/*.log logs/ || true
+      - name: what the browser saw
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sweep-${{ github.run_id }}
+          path: |
+            e2e/narrow-shots*/
+            logs/
+          if-no-files-found: ignore
+          retention-days: 7

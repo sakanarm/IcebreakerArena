@@ -1,0 +1,51 @@
+name: the app, built and running
+description: >-
+  Installs the workspaces and the browser checks, fetches the browser they drive, builds the web app,
+  starts the game server and the web app, and waits until both answer. Leaves their logs in RUNNER_TEMP.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: npm
+
+    - name: install the workspaces
+      shell: bash
+      run: npm ci
+
+    - name: install the browser checks
+      shell: bash
+      working-directory: e2e
+      # deliberately outside the root workspaces, so a deploy can never pull a browser onto the production box
+      run: npm ci
+
+    - name: fetch the browser the checks drive
+      shell: bash
+      working-directory: e2e
+      # the same version the checks were written against, read from their own package.json so the two never drift
+      run: |
+        ver=$(node -p "require('./package.json').dependencies['playwright-core']")
+        npx --yes playwright@"$ver" install --with-deps chromium
+        echo "E2E_BROWSER=$(node -p "require('playwright-core').chromium.executablePath()")" >> "$GITHUB_ENV"
+
+    - name: build the web app
+      shell: bash
+      run: npm run build
+
+    - name: start the game server and the web app
+      shell: bash
+      run: |
+        npm start -w @icebreaker/server > "$RUNNER_TEMP/game-server.log" 2>&1 &
+        npm start -w @icebreaker/web > "$RUNNER_TEMP/web.log" 2>&1 &
+        for _ in $(seq 1 90); do
+          if curl -fsS http://localhost:4000/health >/dev/null 2>&1 && curl -fsS http://localhost:3000/ >/dev/null 2>&1; then
+            echo "both up: $(curl -fsS http://localhost:4000/health)"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo 'the app did not come up'
+        tail -n 40 "$RUNNER_TEMP/game-server.log" "$RUNNER_TEMP/web.log"
+        exit 1

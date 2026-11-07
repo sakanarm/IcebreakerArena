@@ -1,13 +1,16 @@
 // Slider reveal at many widths, through a real room: four slider questions (short, wide, billion-scale, percent),
 // each answered by bots, then measured on the reveal screen. Checks that every number fits its room, nothing
 // clashes, and nothing sits under the Host's dock or the stats card.
-//   node slider-fit.mjs [--only=<view name substring>] [--base=http://localhost:3000] [--players=40]
+//   node slider-fit.mjs [--only=<view name substring>] [--base=http://localhost:3000] [--players=40] [--batch=4]
+// The views are played in batches, each batch its own room: more pages open at once than the machine has cores
+// starves them, and a starved page measures the wrong moment (see README).
 import { chromium } from 'playwright-core';
 
 import { require, launchOptions } from './lib/rig.mjs';
 const WEB = (process.argv.find((a) => a.startsWith('--base='))?.slice(7) ?? 'http://localhost:3000').replace(/\/$/, '');
 const ONLY = process.argv.find((a) => a.startsWith('--only='))?.slice(7) ?? '';
 const PLAYERS = Number(process.argv.find((a) => a.startsWith('--players='))?.slice(10) ?? 40);
+const BATCH = Math.max(1, Number(process.argv.find((a) => a.startsWith('--batch='))?.slice(8) ?? 4));
 const { io } = require('socket.io-client');
 // the game server: the dev port 4000 unless the base is a prod-style address (socket.io sits under the same mount)
 const DEV = new URL(WEB).port === '3000';
@@ -57,51 +60,6 @@ const guess = (g, k) => {
   return Math.round(v / s.step) * s.step + (s.min % s.step);
 };
 
-const host = io(ORIGIN, { path: `${MOUNT}/socket.io`, transports: ['websocket'], forceNew: true, reconnection: false });
-let S = null;
-host.on('stage:state', (s) => { if (!S || S.phase !== s.phase || S.question?.id !== s.question?.id) console.log('  phase', s.phase, s.question?.id ?? '', s.step); S = s; });
-const until = async (fn, what, ms = 30000) => {
-  const end = Date.now() + ms;
-  while (!(S && fn(S))) {
-    if (Date.now() > end) throw new Error(`timed out waiting for ${what} (phase ${S?.phase})`);
-    await sleep(40);
-  }
-};
-
-const created = await host.timeout(10000).emitWithAck('host:create', { game: game(Date.now().toString(36).slice(-5)) });
-if (!created.ok) throw new Error(`create: ${created.error}`);
-const { pin, hostToken, stageToken } = created;
-console.log(`room ${pin} on ${WEB}`);
-const bots = [];
-let skew = 0;
-for (let i = 0, best = Infinity; i < 5; i++) {
-  const sent = Date.now();
-  const at = await host.timeout(5000).emitWithAck('time:sync');
-  const rtt = Date.now() - sent;
-  if (rtt < best) [best, skew] = [rtt, at - (sent + rtt / 2)];
-}
-const answers = new Map(); // question id -> bots answered
-const qOf = (st) => st.question;
-for (let k = 0; k < PLAYERS; k++) {
-  const s = io(ORIGIN, { path: `${MOUNT}/socket.io`, transports: ['websocket'], forceNew: true, reconnection: false });
-  s.on('player:state', (st) => {
-    const q = qOf(st);
-    if (st.phase !== 'question' || !q || s.seen === q.id) return;
-    s.seen = q.id;
-    const g = GAMES[q.number - 1];
-    setTimeout(() => {
-      s.emit('player:answer', { questionId: q.id, value: guess(g, k) }, () => answers.set(q.id, (answers.get(q.id) ?? 0) + 1));
-    }, Math.max(0, q.startsAt - (Date.now() + skew)) + 200 + k * 5);
-  });
-  const j = await s.timeout(15000).emitWithAck('player:join', { pin, nickname: `ทดสอบ ${k + 1}`, avatar: '🦊' });
-  if (!j.ok) throw new Error(`join ${k}: ${j.error}`);
-  bots.push(s);
-}
-await until((s) => s.playerCount === PLAYERS, 'players');
-
-const browser = await chromium.launch({ ...launchOptions, headless: true });
-const fails = [];
-let checks = 0;
 // the page measurements, run in the browser once a reveal is on screen
 const measure = (prompt) => {
   const vw = innerWidth;
@@ -160,52 +118,137 @@ const measure = (prompt) => {
   return { out, texts: texts.length, dockTop: Math.round(dockTop), vw, ih: innerHeight, card: card ? R(card.getBoundingClientRect()) : 'none', col: R(col.getBoundingClientRect()) };
 };
 
-const pages = [];
-for (const [name, kind, width, height, phone] of VIEWS) {
-  const ctx = await browser.newContext({ locale: 'th-TH', viewport: { width, height }, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone, reducedMotion: 'reduce' });
-  await ctx.addInitScript(([pinNow, token]) => {
-    try {
-      localStorage.setItem(`ib.host.${pinNow}`, JSON.stringify(token));
-    } catch {}
-  }, [pin, hostToken]);
-  const page = await ctx.newPage();
-  await page.goto(kind === 'stage' ? `${WEB}/stage/${pin}#${stageToken}` : `${WEB}/host/${pin}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
-  pages.push({ name, page, ctx });
-}
-// the host steps the room: lobby, then each question's round card, question, reveal and leaderboard. Each question's
-// reveal is measured in every view once it is up
-host.emit('host:next', { step: S.step });
-for (const g of GAMES) {
-  const end = Date.now() + 120000;
-  while (!(S.phase === 'reveal' && S.question?.number === GAMES.indexOf(g) + 1)) {
-    if (Date.now() > end) throw new Error(`timed out reaching the reveal of ${g.id} (phase ${S.phase})`);
-    // a question ends on its own at its time limit, or once everyone has answered: the host steps past it then
-    if (S.phase === 'question' && S.question?.number === GAMES.indexOf(g) + 1 && Date.now() + skew < S.question.endsAt + 500) {
-      await sleep(100);
-      continue;
+// One room, played from the lobby to the last reveal, watched by this batch of views.
+// Returns what was measured; anything that goes wrong on the way throws with the room's own state in the message.
+async function playBatch(browser, views, tag) {
+  const host = io(ORIGIN, { path: `${MOUNT}/socket.io`, transports: ['websocket'], forceNew: true, reconnectionAttempts: 20 });
+  let S = null;
+  let room = null;
+  let drops = 0;
+  let closing = false;
+  host.on('stage:state', (s) => { if (!S || S.phase !== s.phase || S.question?.id !== s.question?.id) console.log('  phase', s.phase, s.question?.id ?? '', s.step); S = s; });
+  // a machine with every core busy can starve this process long enough to lose the socket: come back and say so,
+  // instead of pressing at a room that is no longer listening and blaming the screen it was left on
+  host.on('disconnect', (why) => { if (closing) return; drops++; console.log(`  the Host's socket dropped (${why})`); });
+  host.on('connect', () => { if (room) host.emit('host:attach', { pin: room.pin, hostToken: room.hostToken }); });
+  const where = () => `phase ${S?.phase}${S?.question ? ` of q${S.question.number}` : ''}, step ${S?.step}, host ${host.connected ? 'connected' : 'dropped'}${drops ? `, ${drops} drop(s)` : ''}`;
+  const until = async (fn, what, ms = 40000) => {
+    const end = Date.now() + ms;
+    while (!(S && fn(S))) {
+      if (Date.now() > end) throw new Error(`timed out waiting for ${what} (${where()})`);
+      await sleep(40);
     }
-    host.emit('host:next', { step: S.step });
-    await sleep(300);
-  }
-  await sleep(2900);
-  for (const { name, page } of pages) {
-    // a page can trail the room: wait until its reveal shows this question's prompt, then measure
-    const ready = Date.now() + 25000;
-    let measured;
-    do {
-      measured = await page.evaluate(measure, g.prompt).catch((e) => ({ out: [`measure threw: ${e.message}`] }));
-      if (!measured.out.length) break;
-      await sleep(300);
-    } while (Date.now() < ready);
+  };
+
+  const created = await host.timeout(10000).emitWithAck('host:create', { game: game(tag) });
+  if (!created.ok) throw new Error(`create: ${created.error}`);
+  const { pin, hostToken, stageToken } = created;
+  room = { pin, hostToken };
+  console.log(`room ${pin} on ${WEB}`);
+  const bots = [];
+  const pages = [];
+  const fails = [];
+  const refused = [];
+  let checks = 0;
+  try {
+    let skew = 0;
+    for (let i = 0, best = Infinity; i < 5; i++) {
+      const sent = Date.now();
+      const at = await host.timeout(5000).emitWithAck('time:sync');
+      const rtt = Date.now() - sent;
+      if (rtt < best) [best, skew] = [rtt, at - (sent + rtt / 2)];
+    }
+    for (let k = 0; k < PLAYERS; k++) {
+      const s = io(ORIGIN, { path: `${MOUNT}/socket.io`, transports: ['websocket'], forceNew: true, reconnection: false });
+      s.on('player:state', (st) => {
+        const q = st.question;
+        if (st.phase !== 'question' || !q || s.seen === q.id) return;
+        s.seen = q.id;
+        const g = GAMES[q.number - 1];
+        setTimeout(() => {
+          s.emit('player:answer', { questionId: q.id, value: guess(g, k) }, (r) => {
+            // a reveal drawn from answers the room never took is no test of anything
+            if (r && !r.ok) refused.push(`${q.id} bot ${k + 1}: ${r.error}`);
+          });
+        }, Math.max(0, q.startsAt - (Date.now() + skew)) + 200 + k * 5);
+      });
+      const j = await s.timeout(15000).emitWithAck('player:join', { pin, nickname: `ทดสอบ ${k + 1}`, avatar: '🦊' });
+      if (!j.ok) throw new Error(`join ${k}: ${j.error}`);
+      bots.push(s);
+    }
+    await until((s) => s.playerCount === PLAYERS, `all ${PLAYERS} players in the lobby`);
+
+    for (const [name, kind, width, height, phone] of views) {
+      const ctx = await browser.newContext({ locale: 'th-TH', viewport: { width, height }, deviceScaleFactor: 1, isMobile: phone, hasTouch: phone, reducedMotion: 'reduce' });
+      await ctx.addInitScript(([pinNow, token]) => {
+        try {
+          localStorage.setItem(`ib.host.${pinNow}`, JSON.stringify(token));
+        } catch {}
+      }, [pin, hostToken]);
+      const page = await ctx.newPage();
+      await page.goto(kind === 'stage' ? `${WEB}/stage/${pin}#${stageToken}` : `${WEB}/host/${pin}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+      pages.push({ name, page, ctx });
+    }
+
+    // the Host steps the room on. Only the lobby, a reveal and a leaderboard wait for a press: the round card goes
+    // on by itself, and a question ends at its time limit or once everyone has answered. Each press names the step
+    // it was made on, so it can never land on the screen after the one it was meant for — and the room is then
+    // given until it actually leaves that step, rather than pressed again blind
+    for (const [i, g] of GAMES.entries()) {
+      while (!(S.phase === 'reveal' && S.question?.number === i + 1)) {
+        const was = S.step;
+        const at = S.phase;
+        const number = S.question?.number ?? 0;
+        if (at === 'podium' || number > i + 1) throw new Error(`the room ran past the reveal of ${g.id} (${where()})`);
+        if (at === 'round' || at === 'question') await until((s) => s.step !== was, `the ${at} before ${g.id} to end`);
+        else {
+          host.emit('host:next', { step: was });
+          await until((s) => s.step !== was, `the room to leave the ${at} on the way to ${g.id}`, 20000);
+        }
+      }
+      await sleep(2900);
+      for (const { name, page } of pages) {
+        // a page can trail the room: wait until its reveal shows this question's prompt, then measure
+        const ready = Date.now() + 25000;
+        let measured;
+        do {
+          measured = await page.evaluate(measure, g.prompt).catch((e) => ({ out: [`measure threw: ${e.message}`] }));
+          if (!measured.out.length) break;
+          await sleep(300);
+        } while (Date.now() < ready);
+        checks++;
+        if (process.env.SHOW) console.log(`  ${name} ${g.id}: texts ${measured.texts} col ${measured.col} card ${measured.card} dock ${measured.dockTop} vw ${measured.vw}`);
+        if (measured.out.length) fails.push(`${name} ${g.id}: ${measured.out.slice(0, 4).join(' | ')}`);
+      }
+    }
     checks++;
-    if (process.env.SHOW) console.log(`  ${name} ${g.id}: texts ${measured.texts} col ${measured.col} card ${measured.card} dock ${measured.dockTop} vw ${measured.vw}`);
-    if (measured.out.length) fails.push(`${name} ${g.id}: ${measured.out.slice(0, 4).join(' | ')}`);
+    if (refused.length) fails.push(`${refused.length} of ${PLAYERS * GAMES.length} answers turned away: ${refused.slice(0, 3).join(', ')}`);
+    return { checks, fails };
+  } finally {
+    for (const { ctx } of pages) await ctx.close().catch(() => {});
+    for (const b of bots) b.close();
+    await host.timeout(5000).emitWithAck('host:close', { pin, hostToken }).catch(() => {});
+    closing = true;
+    host.close();
   }
 }
-for (const { ctx } of pages) await ctx.close();
+
+const browser = await chromium.launch({ ...launchOptions, headless: true });
+const batches = [];
+for (let i = 0; i < VIEWS.length; i += BATCH) batches.push(VIEWS.slice(i, i + BATCH));
+const fails = [];
+let checks = 0;
+for (const [i, views] of batches.entries()) {
+  console.log(`batch ${i + 1}/${batches.length}: ${views.map(([n]) => n).join(', ')}`);
+  try {
+    const r = await playBatch(browser, views, `${Date.now().toString(36).slice(-4)}${i + 1}`);
+    checks += r.checks;
+    fails.push(...r.fails);
+  } catch (e) {
+    fails.push(`batch ${i + 1} (${views.map(([n]) => n).join(', ')}): ${e.message}`);
+  }
+}
 await browser.close();
-for (const b of bots) b.close();
-host.close();
 console.log(fails.length ? fails.join('\n') : 'all clear');
 console.log(`${checks} checks, ${fails.length} failed`);
 process.exit(fails.length ? 1 : 0);
