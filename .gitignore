@@ -17,3 +17,7 @@ var/
 *.db
 *.db-wal
 *.db-shm
+
+# pictures and rects the browser checks write beside themselves
+e2e/narrow-shots*/
+e2e/reveal-fit-*/

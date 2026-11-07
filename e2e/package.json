@@ -1,0 +1,10 @@
+{
+  "name": "@icebreaker/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser checks for the Host page and the big screen. Deliberately outside the root workspaces, so that the npm ci and npm test that deploy.sh runs on the production box never pull a browser library onto it: install this one separately with npm install inside e2e/.",
+  "dependencies": {
+    "playwright-core": "1.64.1"
+  }
+}
