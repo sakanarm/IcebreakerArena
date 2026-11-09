@@ -23,6 +23,19 @@ export interface SliderSpec {
 /** 0 = no points, 1 = standard, 2 = double points */
 export type QuestionMultiplier = 0 | 1 | 2;
 
+/**
+ * Where a question's fact came from, when it was made from a page in the knowledge base
+ * rather than typed. Kept so anyone reviewing the game can go back and check the answer.
+ */
+export interface QuestionSource {
+  /** the page's path, e.g. topics/leave-policy.md */
+  path: string;
+  /** the page's title as it was read */
+  title?: string;
+  /** the [[…]] the fact itself ended with: the document the page was built from */
+  cite?: string;
+}
+
 export interface Question {
   id: string;
   type: QuestionType;
@@ -40,6 +53,10 @@ export interface Question {
   imageUrl?: string;
   /** slider only */
   slider?: SliderSpec;
+  /** why that is the answer, in one sentence; shown to whoever edits or reviews the game */
+  explanation?: string;
+  /** the page this question was made from, when it was not typed by hand */
+  source?: QuestionSource;
 }
 
 export interface Round {

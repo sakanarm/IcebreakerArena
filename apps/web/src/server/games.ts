@@ -3,7 +3,7 @@ import { lockWrites, type Db, type Sql } from './db';
 import { newId } from './session';
 
 /** where a saved game came from; 'local' rows carry the browser's game id so moving twice is harmless */
-export type GameOrigin = 'new' | 'sample' | 'import' | 'local' | 'copy' | 'catalog';
+export type GameOrigin = 'new' | 'sample' | 'import' | 'local' | 'copy' | 'catalog' | 'pika';
 
 export interface GameRecord {
   id: string;
@@ -39,7 +39,19 @@ export class TooLong extends Error {}
  * What a saved draft may hold: well above what the editor allows (LIMITS), so any draft the editor
  * makes saves, while junk can't fill the database. Image links share their limit with validateGame.
  */
-const CAP = { title: 300, prompt: 1000, option: 500, imageUrl: LIMITS.imageUrlMax, description: 2000, rounds: 40, questions: 200, options: 6, unit: 100 };
+const CAP = {
+  title: 300,
+  prompt: 1000,
+  option: 500,
+  imageUrl: LIMITS.imageUrlMax,
+  description: 2000,
+  rounds: 40,
+  questions: 200,
+  options: 6,
+  unit: 100,
+  explanation: 1000,
+  source: 1000,
+};
 
 function text(v: unknown, max: number): string {
   if (typeof v !== 'string') return '';
@@ -62,6 +74,19 @@ function draftSlider(v: Obj): SliderSpec {
   const num = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? n : NaN);
   const unit = text(v.unit, CAP.unit);
   return { min: num(v.min), max: num(v.max), step: num(v.step), answer: num(v.answer), margin: num(v.margin), ...(unit ? { unit } : {}) };
+}
+
+/**
+ * Where a question came from, when the quiz maker wrote it. Nobody types this, so it is kept or
+ * dropped whole: a draft must stay openable even if the note about itself is nonsense.
+ */
+function draftSource(v: unknown): Question['source'] | undefined {
+  if (!isObj(v)) return undefined;
+  const path = text(v.path, CAP.source);
+  if (!path) return undefined;
+  const title = text(v.title, CAP.title);
+  const cite = text(v.cite, CAP.source);
+  return { path, ...(title ? { title } : {}), ...(cite ? { cite } : {}) };
 }
 
 /** the editor's own id when it is a sensible one, else one made from the position */
@@ -90,6 +115,8 @@ export function normalizeDraft(input: unknown): Game | null {
         .map((q, qi): Question => {
           const imageUrl = text(q.imageUrl, CAP.imageUrl);
           const type = QUESTION_TYPES.includes(q.type as QuestionType) ? (q.type as QuestionType) : 'quiz';
+          const explanation = text(q.explanation, CAP.explanation);
+          const source = draftSource(q.source);
           return {
             id: idOr(q.id, `q${ri + 1}-${qi + 1}`),
             type,
@@ -100,6 +127,8 @@ export function normalizeDraft(input: unknown): Game | null {
             ...(q.multiplier === 0 || q.multiplier === 1 || q.multiplier === 2 ? { multiplier: q.multiplier } : {}),
             ...(imageUrl ? { imageUrl } : {}),
             ...(type === 'slider' ? { slider: draftSlider(isObj(q.slider) ? q.slider : {}) } : {}),
+            ...(explanation ? { explanation } : {}),
+            ...(source ? { source } : {}),
           };
         }),
     }));
@@ -193,6 +222,17 @@ export async function createGame(db: Db, ownerId: string, draft: Game, origin: '
   return db.tx(async (sql) => {
     await lockWrites(sql);
     return insertGame(sql, ownerId, draft, { origin, originRef });
+  });
+}
+
+/**
+ * A game built from someone's knowledge base. Always tainted: the pages it was made from are
+ * internal, so the game can be played and copied but never shared into the public catalog.
+ */
+export async function createPikaGame(db: Db, ownerId: string, draft: Game, projectId: string): Promise<GameRecord> {
+  return db.tx(async (sql) => {
+    await lockWrites(sql);
+    return insertGame(sql, ownerId, draft, { origin: 'pika', originRef: projectId, tainted: true });
   });
 }
 

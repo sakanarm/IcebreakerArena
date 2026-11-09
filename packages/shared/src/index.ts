@@ -8,6 +8,8 @@ export * from './text';
 export * from './nicknames';
 export * from './sample-games';
 export * from './timing';
+export * from './wiki';
+export * from './quiz-maker';
 
 export const MAX_PLAYERS_PER_ROOM = 1000;
 export const GAME_SERVER_PORT = 4000;

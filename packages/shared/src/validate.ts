@@ -1,6 +1,6 @@
 import { normalizeTyped, onScale } from './answers';
 import { cleanCover } from './cover';
-import type { Game, Question, QuestionMultiplier, QuestionType, Round, SliderSpec } from './types';
+import type { Game, Question, QuestionMultiplier, QuestionSource, QuestionType, Round, SliderSpec } from './types';
 
 export const LIMITS = {
   titleMax: 120,
@@ -14,6 +14,11 @@ export const LIMITS = {
   /** signed SharePoint or CDN links run long; the server refuses to keep more than this */
   imageUrlMax: 4096,
   descriptionMax: 300,
+  /** a question's "why", shown to whoever reviews the game */
+  explanationMax: 300,
+  /** a source page's path and the document it cites; both come from the knowledge base, not from typing */
+  sourcePathMax: 300,
+  sourceCiteMax: 300,
   /** a typed answer, and each accepted answer of a type question */
   typedMax: 40,
   /** slider numbers stay within ± this */
@@ -178,7 +183,36 @@ function checkQuestion(q: unknown, where: string, id: string, errors: string[]):
   if (imageUrl && !/^https:\/\/\S+$/.test(imageUrl)) errors.push(`${where}: ลิงก์รูปต้องขึ้นต้นด้วย https://`);
   else if (imageUrl.length > LIMITS.imageUrlMax) errors.push(`${where}: ลิงก์รูปยาวเกิน ${LIMITS.imageUrlMax} ตัวอักษร`);
 
-  return { id, type, prompt, options, correct, timeLimitS, multiplier, ...(imageUrl ? { imageUrl } : {}), ...(slider ? { slider } : {}) };
+  const explanation = str(qq.explanation);
+  if (explanation.length > LIMITS.explanationMax) errors.push(`${where}: คำอธิบายยาวเกิน ${LIMITS.explanationMax} ตัวอักษร`);
+  const source = checkSource(qq.source);
+
+  return {
+    id,
+    type,
+    prompt,
+    options,
+    correct,
+    timeLimitS,
+    multiplier,
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(slider ? { slider } : {}),
+    ...(explanation ? { explanation } : {}),
+    ...(source ? { source } : {}),
+  };
+}
+
+/**
+ * Where a question came from. Nobody types this — the quiz maker writes it — so an over-long
+ * field is cut rather than refused: a game must never become unplayable over a note about itself.
+ */
+function checkSource(input: unknown): QuestionSource | undefined {
+  if (!isObj(input)) return undefined;
+  const path = str(input.path).slice(0, LIMITS.sourcePathMax);
+  if (!path) return undefined;
+  const title = str(input.title).slice(0, LIMITS.titleMax);
+  const cite = str(input.cite).slice(0, LIMITS.sourceCiteMax);
+  return { path, ...(title ? { title } : {}), ...(cite ? { cite } : {}) };
 }
 
 /** a slider's numbers, named as the editor labels them */
