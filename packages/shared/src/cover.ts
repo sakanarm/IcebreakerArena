@@ -5,7 +5,7 @@ export const COVER_COLORS = ['orange', 'teal', 'pink', 'purple', 'blue', 'sky', 
 export type CoverColor = (typeof COVER_COLORS)[number];
 
 /** Covers drawn by hand that ship with the app: the built-in games use them, and any game can pick one. */
-export const COVER_ARTS = ['icebreaker', 'security', 'party', 'emoji', 'numbers', 'townhall', 'onboarding', 'thailand'] as const;
+export const COVER_ARTS = ['icebreaker', 'security', 'party', 'emoji', 'numbers', 'townhall', 'onboarding', 'thailand', 'wiki'] as const;
 export type CoverArt = (typeof COVER_ARTS)[number];
 
 /** room for the longest emoji sequences (families, couples with skin tones, subdivision flags) */

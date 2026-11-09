@@ -387,7 +387,66 @@ function thailand(id: string) {
   );
 }
 
-const ARTS: Record<CoverArt, (id: string) => ReactNode> = { icebreaker, security, party, emoji, numbers, townhall, onboarding, thailand };
+function wiki(id: string) {
+  return (
+    <>
+      <Backdrop id={id} stops={['#6c4bf4', '#0f9b8e']} vertical />
+      {/* the graph the pages hang in */}
+      <path
+        d="M30 48 L72 86 M30 48 L44 118 M44 118 L104 148 M72 86 L94 56 M292 40 L300 108 M292 40 L258 72"
+        stroke="#ffffff"
+        strokeWidth={2}
+        opacity={0.3}
+        {...round}
+      />
+      <Shape i={2} x={298} y={20} size={62} rotate={14} fill="#ffffff" opacity={0.1} />
+      <Shape i={0} x={20} y={164} size={78} rotate={-12} fill="#ffffff" opacity={0.1} />
+      {([[30, 48, 0], [44, 118, 1], [72, 86, 2], [292, 40, 3], [300, 108, 1]] as const).map(([x, y, i]) => (
+        <Shape key={`${x}-${y}`} i={i} x={x} y={y} size={15} fill="#ffffff" opacity={0.6} />
+      ))}
+      {/* a stack of pages, the newest in front */}
+      <rect x={118} y={44} width={102} height={112} rx={10} fill="#2a1b7a" opacity={0.3} transform="rotate(7 169 100)" />
+      <rect x={112} y={40} width={102} height={112} rx={10} fill="#d9d2ff" transform="rotate(4 163 96)" />
+      <rect x={100} y={34} width={108} height={120} rx={11} fill="#2a1b7a" opacity={0.3} transform="translate(0 6)" />
+      <rect x={100} y={34} width={108} height={120} rx={11} fill="#ffffff" />
+      <rect x={114} y={48} width={64} height={10} rx={5} fill="#ffc83d" />
+      <g fill="#cfd3ef">
+        <rect x={114} y={68} width={80} height={6} rx={3} />
+        <rect x={114} y={80} width={66} height={6} rx={3} />
+        <rect x={114} y={92} width={76} height={6} rx={3} />
+        <rect x={114} y={104} width={48} height={6} rx={3} />
+      </g>
+      {/* the page carries where it came from */}
+      <rect x={114} y={120} width={56} height={18} rx={9} fill="#0f9b8e" />
+      <path d="M122 125 h7 l3 3 v8 h-10 z" fill="#ffffff" />
+      <g fill="#ffffff" opacity={0.85}>
+        <rect x={137} y={127} width={25} height={3} rx={1.5} />
+        <rect x={137} y={133} width={16} height={3} rx={1.5} />
+      </g>
+      <circle cx={190} cy={129} r={12} fill="#6c4bf4" />
+      <text x={190} y={130} textAnchor="middle" dominantBaseline="central" fontFamily="Kanit, sans-serif" fontWeight={800} fontSize={15} fill="#ffffff">
+        1
+      </text>
+      {/* someone asking it a question */}
+      <rect x={216} y={58} width={82} height={52} rx={16} fill="#2a1b7a" opacity={0.3} transform="translate(0 5)" />
+      <path d="M232 106 L224 126 L250 109 Z" fill="#ffffff" />
+      <rect x={216} y={58} width={82} height={52} rx={16} fill="#ffffff" />
+      <text x={257} y={84} textAnchor="middle" dominantBaseline="central" fontFamily="Kanit, sans-serif" fontWeight={800} fontSize={32} fill="#6c4bf4">
+        ?
+      </text>
+      <g fill="#ffffff" opacity={0.5}>
+        <rect x={226} y={130} width={62} height={6} rx={3} />
+        <rect x={226} y={142} width={40} height={6} rx={3} />
+      </g>
+      <Sparkle x={104} y={24} r={7} fill="#ffc83d" />
+      <Sparkle x={200} y={26} r={5} />
+      <Sparkle x={16} y={136} r={5} />
+      <Sparkle x={310} y={152} r={6} />
+    </>
+  );
+}
+
+const ARTS: Record<CoverArt, (id: string) => ReactNode> = { icebreaker, security, party, emoji, numbers, townhall, onboarding, thailand, wiki };
 
 export function ArtDrawing({ art, id }: { art: CoverArt; id: string }) {
   return <>{ARTS[art](id)}</>;

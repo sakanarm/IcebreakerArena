@@ -33,6 +33,7 @@ export const ART_NAMES: Record<CoverArt, string> = {
   townhall: 'ทาวน์ฮอลล์',
   onboarding: 'ออกเดินทาง',
   thailand: 'เมืองไทย',
+  wiki: 'คลังความรู้',
 };
 
 /** Emojis to pick from in one tap; any other single emoji can be typed. */

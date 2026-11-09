@@ -9,7 +9,8 @@
     "typecheck": "tsc -p .",
     "test": "tsx --test src/limits.test.ts src/room.test.ts src/rooms.test.ts src/flow.test.ts",
     "bots": "tsx scripts/bots.ts",
-    "crowd": "tsx scripts/crowd.ts"
+    "crowd": "tsx scripts/crowd.ts",
+    "playthrough": "tsx scripts/playthrough.ts"
   },
   "dependencies": {
     "@pika-arena/shared": "*",
