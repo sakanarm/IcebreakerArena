@@ -187,6 +187,8 @@ async function playBatch(browser, views, tag) {
       }, [pin, hostToken]);
       const page = await ctx.newPage();
       await page.goto(kind === 'stage' ? `${WEB}/stage/${pin}#${stageToken}` : `${WEB}/host/${pin}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+      // the real typeface, not the stand-in the browser draws until the page's own Thai fonts arrive
+      await page.evaluate(() => document.fonts.ready.then(() => true)).catch(() => {});
       pages.push({ name, page, ctx });
     }
 

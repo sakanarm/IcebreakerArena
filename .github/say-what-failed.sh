@@ -15,7 +15,7 @@ for f in "$@"; do
   found=1
   name=$(basename "$f" .log)
   # the harnesses' own words: a failed check, a batch that never finished, a scene that never came
-  body=$(grep -E 'FAIL|did not finish|timed out|^[0-9]+ passed|dropped' "$f" | head -n 40)
+  body=$(grep -E -A 5 'FAIL|did not finish|timed out|^[0-9]+ passed|dropped' "$f" | head -n 60)
   [ -z "$body" ] && body=$(tail -n 30 "$f")
 
   if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then

@@ -27,6 +27,7 @@ const batches = Array.from({ length: Math.ceil(names.length / BATCH) }, (_, i) =
 console.log(`${names.length} views in ${batches.length} batches of up to ${BATCH}, games: ${games.join(', ')}\n`);
 
 let passed = 0;
+let failed = 0;
 const failures = [];
 const broke = [];
 for (const game of games)
@@ -44,14 +45,25 @@ for (const game of games)
       if (!/^\d+ passed/m.test(out)) broke.push(`${tag}: ${(e.message ?? '').split('\n')[0]}`);
     }
     passed += Number(out.match(/^(\d+) passed/m)?.[1] ?? 0);
-    const mine = out.split('\n').filter((l) => l.startsWith('FAIL '));
+    // a failed check, and the indented lines under it that say what was actually wrong: without them a run says
+    // only that a scene did not fit, which is the one thing nobody can act on
+    const lines = out.split('\n');
+    const mine = [];
+    let count = 0;
+    lines.forEach((l, k) => {
+      if (!l.startsWith('FAIL ')) return;
+      count++;
+      mine.push(l);
+      for (let n = k + 1; n < lines.length && /^\s{2,}\S/.test(lines[n]); n++) mine.push(lines[n]);
+    });
+    failed += count;
     failures.push(...mine);
     const late = Math.max(0, ...[...out.matchAll(/late by up to (\d+) ms/g)].map((m) => +m[1]));
-    console.log(`${tag}: ${batch.join(', ')}\n  ${mine.length ? `${mine.length} FAILED` : 'clean'}, timers late by up to ${late} ms, ${Math.round((Date.now() - started) / 1000)}s`);
+    console.log(`${tag}: ${batch.join(', ')}\n  ${count ? `${count} FAILED` : 'clean'}, timers late by up to ${late} ms, ${Math.round((Date.now() - started) / 1000)}s`);
   }
 
 console.log(`\n${'='.repeat(60)}\n${passed} passed`);
 if (broke.length) console.log(`${broke.length} batch(es) did not finish:\n  ${broke.join('\n  ')}`);
-if (failures.length) console.log(`${failures.length} FAILED\n${failures.join('\n')}`);
+if (failed) console.log(`${failed} FAILED\n${failures.join('\n')}`);
 else if (!broke.length) console.log('ALL PASSED');
-process.exit(failures.length || broke.length ? 1 : 0);
+process.exit(failed || broke.length ? 1 : 0);

@@ -28,7 +28,10 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 const tag = Date.now().toString(36).slice(-5);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const connect = () => io(GAME.url, { path: GAME.path, transports: ['websocket'], forceNew: true, reconnection: false });
+// the sockets come back the way the real pages do — the Host re-attaches, a player resumes with its own token.
+// A machine short of cores drops a websocket now and then, and a harness that gives up there spends the next two
+// minutes pressing a button nobody is holding and then blames the screen it was looking at.
+const connect = () => io(GAME.url, { path: GAME.path, transports: ['websocket'], forceNew: true, reconnectionAttempts: 20 });
 let failed = 0;
 let passed = 0;
 const check = (ok, what) => (ok ? passed++ : (console.log('FAIL', what), failed++), ok);
@@ -505,6 +508,9 @@ const judge = (game, phase, ms, scene) =>
   views.forEach((v, i) => {
     const m = ms[i];
     if (m.skipped) return;
+    // a page that sent nothing back used to crash the walk below, which buried the real reason under a stack trace
+    if (!m.scene || !Array.isArray(m.out))
+      return void check(false, `${game} ${phase} ${v.name}: the page sent no measurements back (${JSON.stringify(m ?? null).slice(0, 120)})`);
     // a scene that had already moved on would pass or fail for the wrong one
     if (scene) check(m.scene.startsWith(scene), `${game} ${phase} ${v.name}: measured the ${scene} scene (saw ${m.scene || 'none'})`);
     check(!m.out.length, `${game} ${phase} ${v.name}${m.out.length ? `\n    ${m.out.join('\n    ')}` : ''}`);
@@ -562,19 +568,32 @@ const shoot = async (game, phase, wait, strict, scene = '', known = false) => {
 async function play(label, game, strict) {
   const host = connect();
   let S = null;
+  let drops = 0;
+  let closing = false;
   host.on('stage:state', (s) => (S = s));
   const created = await host.timeout(10000).emitWithAck('host:create', { game });
   if (!created.ok) throw new Error(`host:create failed: ${created.error}`);
   const { pin, hostToken, stageToken } = created;
+  host.on('disconnect', (why) => {
+    if (closing) return;
+    drops++;
+    console.log(`${label}: the Host's socket dropped (${why})`);
+  });
+  host.on('connect', () => host.emit('host:attach', { pin, hostToken }));
   console.log(`${label}: PIN ${pin} on ${WEB}`);
+  // a room standing still because nobody is holding its button looks exactly like a scene that will not come,
+  // so every timeout says where the room really was and whether the Host was still connected to it
+  const where = () => `phase ${S?.phase}, step ${S?.step}, host ${host.connected ? 'connected' : 'dropped'}${drops ? `, ${drops} drop(s)` : ''}`;
   const until = async (fn, what, ms = 45000) => {
     const end = Date.now() + ms;
     while (!(S && fn(S))) {
-      if (Date.now() > end) throw new Error(`timed out waiting for ${what} (phase ${S?.phase})`);
+      if (Date.now() > end) throw new Error(`timed out waiting for ${what} (${where()})`);
       await sleep(40);
     }
   };
   const bots = [];
+  // answers the server would not take: the reason a scene never came, in the harness's own words
+  const refused = [];
   // question id -> let the bots answer it
   const gates = new Map();
   const gate = (id) => {
@@ -590,6 +609,8 @@ async function play(label, game, strict) {
       if (v.kind === 'host') await v.page.context().addInitScript(({ k, t }) => localStorage.setItem(k, t), { k: `ib.host.${pin}`, t: JSON.stringify(hostToken) });
       await v.page.goto(`${WEB}/${v.kind}/${pin}${v.kind === 'stage' ? `#${stageToken}` : ''}`);
       await v.page.locator('section[data-scene]').first().waitFor();
+      // the real typeface, not the stand-in the browser draws until the page's own Thai fonts arrive
+      await v.page.evaluate(() => document.fonts.ready.then(() => true)).catch(() => {});
     }
     await shoot(label, 'lobby-empty', 1500, strict);
     for (let k = 0; k < PLAYERS; k++) {
@@ -600,10 +621,20 @@ async function play(label, game, strict) {
         if (st.phase !== 'question' || !q || done.has(q.id)) return;
         done.add(q.id);
         // a while after answering opens, so the screens show the question with its answers still coming in
-        void gate(q.id).opened.then(() => setTimeout(() => s.emit('player:answer', { questionId: q.id, ...answerFor(game, q, k) }, () => {}), 200 + k * 250));
+        void gate(q.id).opened.then(() =>
+          setTimeout(
+            () =>
+              s.emit('player:answer', { questionId: q.id, ...answerFor(game, q, k) }, (r) => {
+                if (r && !r.ok) refused.push(`player ${k + 1} on ${q.id}: ${r.error}`);
+              }),
+            200 + k * 250,
+          ),
+        );
       });
       const j = await s.timeout(10000).emitWithAck('player:join', { pin, nickname: long(`${k + 1} นักเล่นสายฮาประจำทีมขาย`, 24), avatar: ['🦊', '🐼', '🐸', '🦄', '🐙', '🐯'][k] });
       if (!j.ok) throw new Error(`join: ${j.error}`);
+      // back as the same player, with the same score, the way the player's page comes back
+      s.on('connect', () => s.emit('player:resume', { pin, token: j.token }));
       bots.push(s);
     }
     await until((s) => s.playerCount === PLAYERS, 'players');
@@ -648,9 +679,11 @@ async function play(label, game, strict) {
   } catch (e) {
     check(false, `${label}: the game ran through: ${e.message}`);
   }
+  check(!refused.length, `${label}: every answer was taken${refused.length ? `\n  ${refused.join('\n  ')}` : ''}`);
   const closed = await host.timeout(10000).emitWithAck('host:close', { pin, hostToken }).catch(() => ({ ok: false }));
   check(closed.ok, `${label}: the room is closed`);
   for (const b of bots) b.close();
+  closing = true;
   host.close();
 }
 

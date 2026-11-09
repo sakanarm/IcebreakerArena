@@ -228,6 +228,8 @@ try {
       page.on('console', (m) => m.type() === 'error' && !/favicon|DevTools/.test(m.text()) && errors.push(`${name}: ${m.text()}`));
       await page.goto(`${WEB}/${kind}/${pin}${kind === 'stage' ? `#${stageToken}` : ''}`);
       await page.locator('main [role=img]').waitFor({ timeout: 20000 });
+      // the real typeface, not the stand-in the browser draws until the page's own Thai fonts arrive
+      await page.evaluate(() => document.fonts.ready.then(() => true)).catch(() => {});
       await sleep(2200);
       const file = `${OUT}${qid}-${q.type}-${name.replace(/\W+/g, '_')}`;
       const real = await page.evaluate(measure);
