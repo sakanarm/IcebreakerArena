@@ -47,7 +47,7 @@ jobs:
 
       - name: start the game server
         run: |
-          npm start -w @icebreaker/server > "$RUNNER_TEMP/game-server.log" 2>&1 &
+          npm start -w @pika-arena/server > "$RUNNER_TEMP/game-server.log" 2>&1 &
           for _ in $(seq 1 60); do
             curl -fsS http://localhost:4000/health >/dev/null 2>&1 && exit 0
             sleep 1

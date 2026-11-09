@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Game } from '@icebreaker/shared';
+import type { Game } from '@pika-arena/shared';
 import type { IO } from './io';
 import { EMPTY_LIMIT_MS, Rooms } from './rooms';
 

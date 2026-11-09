@@ -3,7 +3,7 @@
  *
  *   npm run bots -- <PIN> [count=50] [--url=http://localhost:4000] [--ramp=20]
  *
- * Behind a reverse proxy, pass the app's address: --url=https://example.com/icebreaker
+ * Behind a reverse proxy, pass the app's address: --url=https://example.com/PikaArena
  *
  * Each bot joins with a random nickname, answers every question at a random
  * moment within the time limit, and records how long the server took to
@@ -18,7 +18,7 @@ import {
   type PlayerState,
   type QuestionPublic,
   type ServerToClientEvents,
-} from '@icebreaker/shared';
+} from '@pika-arena/shared';
 
 const args = process.argv.slice(2);
 const flag = (name: string) => args.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];

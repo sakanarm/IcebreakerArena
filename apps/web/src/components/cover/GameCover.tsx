@@ -1,6 +1,6 @@
 'use client';
 
-import { coverColor, coverSeed, type Game } from '@icebreaker/shared';
+import { coverColor, coverSeed, type Game } from '@pika-arena/shared';
 import { useId, useMemo, type ReactNode } from 'react';
 import { ArtDrawing } from './arts';
 import { COVER_SHADES, type CoverShades } from './palette';

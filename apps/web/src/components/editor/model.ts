@@ -1,4 +1,4 @@
-import type { Game, Question, QuestionType, SliderSpec } from '@icebreaker/shared';
+import type { Game, Question, QuestionType, SliderSpec } from '@pika-arena/shared';
 
 export type Selection = { kind: 'game' } | { kind: 'round'; id: string } | { kind: 'question'; id: string };
 

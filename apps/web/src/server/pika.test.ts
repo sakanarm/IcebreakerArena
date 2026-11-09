@@ -14,7 +14,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, beforeEach, describe, test } from 'node:test';
-import { MAX_PAGES, validateGame, type Game } from '@icebreaker/shared';
+import { MAX_PAGES, validateGame, type Game } from '@pika-arena/shared';
 import { GET as documentsGET } from '@/app/api/pika/documents/route';
 import { POST as draftPOST } from '@/app/api/pika/draft/route';
 import { POST as factsPOST } from '@/app/api/pika/facts/route';
@@ -61,10 +61,10 @@ const PROJECT = 'icebreaking_sakan_pu';
 // ---------- the pages the fake knowledge base holds ----------
 
 const ARENA = [
-  '# IceBreaker Arena',
+  '# Pika Arena',
   '',
   '## Summary',
-  'IceBreaker Arena เป็นเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมในองค์กร',
+  'Pika Arena เป็นเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมในองค์กร',
   '',
   '## Details',
   '- ห้องเล่นหนึ่งห้องรองรับผู้เล่นพร้อมกันได้ 1000 คน [[sources/arena-notes.md]]',
@@ -91,7 +91,7 @@ const STACK = [
 ].join('\n');
 
 const PAGES: Record<string, { title: string; content: string }> = {
-  'topics/arena.md': { title: 'IceBreaker Arena', content: ARENA },
+  'topics/arena.md': { title: 'Pika Arena', content: ARENA },
   'systems/stack.md': { title: 'ระบบและเครื่องมือ', content: STACK },
 };
 
@@ -99,7 +99,7 @@ const DOCUMENTS = {
   documents: [
     {
       document_id: 'doc-1',
-      title: 'คู่มือ IceBreaker Arena.pdf',
+      title: 'คู่มือ Pika Arena.pdf',
       source_ref: 'uploads/arena.pdf',
       doc_date: '2026-10-20',
       ingested_date: '2026-10-21',
@@ -112,8 +112,8 @@ const DOCUMENTS = {
 };
 
 const HITS = [
-  { file_path: 'topics/arena.md', title: 'IceBreaker Arena', snippet: 'ห้องเล่นหนึ่งห้องรองรับผู้เล่น'.repeat(40), score: 0.91 },
-  { file_path: 'topics/arena.md', title: 'IceBreaker Arena', snippet: 'หน้าเดิมจากอีกท่อนหนึ่ง', score: 0.72 },
+  { file_path: 'topics/arena.md', title: 'Pika Arena', snippet: 'ห้องเล่นหนึ่งห้องรองรับผู้เล่น'.repeat(40), score: 0.91 },
+  { file_path: 'topics/arena.md', title: 'Pika Arena', snippet: 'หน้าเดิมจากอีกท่อนหนึ่ง', score: 0.72 },
   { file_path: 'systems/stack.md', title: 'ระบบและเครื่องมือ', snippet: 'Node.js และ pm2' },
   { title: 'ไม่มี path', snippet: 'แถวที่ไม่มีที่อยู่ของหน้า' },
 ];
@@ -347,7 +347,7 @@ describe('making a project', () => {
     assert.equal(project.key, ISSUED_KEY);
     assert.equal(project.clientId, 'client-2');
     assert.equal(lastCall('POST', '/api-keys')?.auth, `Bearer ${ORG_KEY}`);
-    assert.equal(lastCall('POST', '/api-keys')?.body.name, 'IceBreaker Arena');
+    assert.equal(lastCall('POST', '/api-keys')?.body.name, 'Pika Arena');
   });
 
   test('refuses rather than storing a project with no key', async () => {
@@ -420,7 +420,7 @@ describe('reading a project', () => {
     assert.equal(documents.length, 2);
     assert.deepEqual(documents[0], {
       documentId: 'doc-1',
-      title: 'คู่มือ IceBreaker Arena.pdf',
+      title: 'คู่มือ Pika Arena.pdf',
       sourceRef: 'uploads/arena.pdf',
       docDate: '2026-10-20',
       ingestedDate: '2026-10-21',
@@ -461,7 +461,7 @@ describe('reading a project', () => {
   test('a page comes back as the markdown it is', async () => {
     const page = await readPage(p, 'topics/arena.md');
     assert.equal(page?.path, 'topics/arena.md');
-    assert.equal(page?.title, 'IceBreaker Arena');
+    assert.equal(page?.title, 'Pika Arena');
     assert.ok(page?.content.includes('## Details'));
     assert.equal(lastCall('GET', '/pages')?.query.get('path'), 'topics/arena.md');
   });
@@ -568,17 +568,17 @@ describe('the review screen', () => {
     assert.deepEqual(
       body.pages.map((p: any) => [p.path, p.title, p.kept]),
       [
-        ['topics/arena.md', 'IceBreaker Arena', 3],
+        ['topics/arena.md', 'Pika Arena', 3],
         ['systems/stack.md', 'ระบบและเครื่องมือ', 3],
       ],
     );
-    assert.ok(body.pages[0].summary.startsWith('IceBreaker Arena เป็นเกมตอบคำถาม'));
+    assert.ok(body.pages[0].summary.startsWith('Pika Arena เป็นเกมตอบคำถาม'));
 
     assert.equal(facts.length, 6);
     assert.deepEqual(facts[0], {
       id: 'f1',
       page: 'topics/arena.md',
-      pageTitle: 'IceBreaker Arena',
+      pageTitle: 'Pika Arena',
       cite: 'sources/arena-notes.md',
       text: 'ห้องเล่นหนึ่งห้องรองรับผู้เล่นพร้อมกันได้ 1000 คน',
       type: 'slider',
@@ -635,7 +635,7 @@ describe('the review screen', () => {
     assert.ok(questions.length >= 5, `only ${questions.length} questions`);
     assert.deepEqual(
       game.rounds.map((r) => r.title),
-      ['IceBreaker Arena', 'ระบบและเครื่องมือ'],
+      ['Pika Arena', 'ระบบและเครื่องมือ'],
     );
     const checked = validateGame(game);
     assert.ok(checked.ok, JSON.stringify(checked));

@@ -1,5 +1,5 @@
 {
-  "name": "@icebreaker/server",
+  "name": "@pika-arena/server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "crowd": "tsx scripts/crowd.ts"
   },
   "dependencies": {
-    "@icebreaker/shared": "*",
+    "@pika-arena/shared": "*",
     "socket.io": "^4.8.4",
     "tsx": "^4.23.15"
   },

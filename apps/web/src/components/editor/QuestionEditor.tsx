@@ -15,7 +15,7 @@ import {
   type QuestionType,
   type Round,
   type SliderSpec,
-} from '@icebreaker/shared';
+} from '@pika-arena/shared';
 import { fmt, fmtValue, roundLabel, TYPE_ICON, TYPE_LABEL } from '@/lib/format';
 import { newId } from '@/lib/games';
 import { ANSWER_BG, ANSWER_NAMES, AnswerShape } from '../shapes';

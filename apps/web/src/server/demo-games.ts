@@ -1,4 +1,4 @@
-import { validateGame, type Game, type Question, type SliderSpec } from '@icebreaker/shared';
+import { validateGame, type Game, type Question, type SliderSpec } from '@pika-arena/shared';
 import { shareGame } from './catalog';
 import type { Db } from './db';
 import { createGame, listGames, normalizeDraft } from './games';

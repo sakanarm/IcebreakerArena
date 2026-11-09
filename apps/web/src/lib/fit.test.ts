@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sliderBin } from '@icebreaker/shared';
+import { sliderBin } from '@pika-arena/shared';
 import { AVERAGE_EMS, BEAD_PAD, COUNT_GAP, countsFit, ems, sizeFor } from './fit';
 
 test('fit: a number is never wider than worked out, nor much narrower', () => {

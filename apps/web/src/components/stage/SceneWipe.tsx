@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Phase } from '@icebreaker/shared';
+import type { Phase } from '@pika-arena/shared';
 import { ANSWER_BG, AnswerShape } from '../shapes';
 
 // a new round opens with its own full-screen intro, and a reveal stays on its question

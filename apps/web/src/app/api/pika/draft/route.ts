@@ -1,4 +1,4 @@
-import { FACT_MAX_CHARS, LIMITS, QUESTION_TYPES, buildGame, type FactPlan, type QuestionType } from '@icebreaker/shared';
+import { FACT_MAX_CHARS, LIMITS, QUESTION_TYPES, buildGame, type FactPlan, type QuestionType } from '@pika-arena/shared';
 import { requireUser } from '@/server/auth';
 import { getDb } from '@/server/db';
 import { TooManyGames, createPikaGame, normalizeDraft } from '@/server/games';

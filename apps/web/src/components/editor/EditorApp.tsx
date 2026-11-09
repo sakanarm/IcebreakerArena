@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useAnimate } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SAMPLE_GAMES, copyTitle, validateGame, type Game } from '@icebreaker/shared';
+import { SAMPLE_GAMES, copyTitle, validateGame, type Game } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type Account, type AccountUser } from '@/lib/account';
 import { ApiError, apiMessage, errorCode } from '@/lib/api';
 import { cloud, enqueue, isServerId } from '@/lib/cloud';
@@ -392,7 +392,7 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
   };
 
   const exportJson = () => {
-    const name = (game.title.trim() || 'icebreaker-game').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60);
+    const name = (game.title.trim() || 'pika-arena-game').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60);
     downloadText(`${name}.json`, JSON.stringify(dropBlankOptions(game), null, 2), 'application/json');
   };
 

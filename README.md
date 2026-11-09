@@ -1,4 +1,4 @@
-# MFEC IceBreaker Arena
+# MFEC Pika Arena
 
 [![checks](https://github.com/sakanarm/IcebreakerArena/actions/workflows/checks.yml/badge.svg)](https://github.com/sakanarm/IcebreakerArena/actions/workflows/checks.yml)
 [![screens](https://github.com/sakanarm/IcebreakerArena/actions/workflows/screens.yml/badge.svg)](https://github.com/sakanarm/IcebreakerArena/actions/workflows/screens.yml)
@@ -61,9 +61,9 @@ deploy/               สคริปต์ deploy และ config nginx สำ
 
 ต้องมี Node.js 20.9 ขึ้นไป และ pm2 (`npm install -g pm2`) วางได้สองแบบ
 
-### แบบที่ 1: หลัง nginx ใต้ path `/icebreaker` (แนะนำ)
+### แบบที่ 1: หลัง nginx ใต้ path `/PikaArena` (แนะนำ)
 
-ผู้เล่นเข้าทาง HTTPS ของโดเมนเดิม เช่น `https://<โดเมน>/icebreaker` ไม่ต้องเปิด port เพิ่ม เว็บกับ game server ฟังแค่ `127.0.0.1` แล้ว nginx ส่งต่อให้ ทั้งหน้าเว็บและ WebSocket ของเกม
+ผู้เล่นเข้าทาง HTTPS ของโดเมนเดิม เช่น `https://<โดเมน>/PikaArena` ไม่ต้องเปิด port เพิ่ม เว็บกับ game server ฟังแค่ `127.0.0.1` แล้ว nginx ส่งต่อให้ ทั้งหน้าเว็บและ WebSocket ของเกม
 
 ```bash
 git clone <repo> && cd <repo>
@@ -80,13 +80,13 @@ sudo bash deploy/nginx-enable.sh     # ครั้งแรกครั้ง�
 
 ระหว่าง build (ราว 1–2 นาที) เว็บที่รันอยู่ใช้งานไม่ได้ จึงควรอัปเดตช่วงที่ไม่มีกิจกรรม ถ้า build พังหรือถูกยกเลิกกลางทาง สคริปต์จะคืน build เดิมให้ และเว็บกลับมาทำงานแบบเดิมโดยไม่ต้อง restart ถ้าพังหลัง `git pull` ได้โค้ดใหม่มาแล้ว จะพิมพ์คำสั่ง `git checkout <commit เดิม> && bash deploy/deploy.sh` ไว้ให้ย้อนกลับ ส่วน `pm2 save` จะถูกข้ามพร้อมคำเตือน ถ้าตอนนั้น pm2 ไม่ได้รัน app อื่นที่เคย save ไว้ เพื่อไม่ให้ app เหล่านั้นหายจากรายการที่ pm2 เปิดคืนหลัง reboot
 
-ค่าเริ่มต้นคือ path `/icebreaker` เว็บ port `4231` และ game server port `4232` เปลี่ยนได้ด้วย `NEXT_PUBLIC_BASE_PATH`, `WEB_PORT`, `GAME_PORT` (ดู[ตั้งค่า](#ตั้งค่า)) ถ้าเปลี่ยน port หลังจาก deploy ไปแล้ว ให้ `pm2 delete icebreaker-server icebreaker-web` ก่อน เพราะ reload ไม่อ่าน args ใหม่ และต้องแก้ port ใน `deploy/nginx-icebreaker.conf` ให้ตรงกัน
+ค่าเริ่มต้นคือ path `/PikaArena` เว็บ port `4231` และ game server port `4232` เปลี่ยนได้ด้วย `NEXT_PUBLIC_BASE_PATH`, `WEB_PORT`, `GAME_PORT` (ดู[ตั้งค่า](#ตั้งค่า)) ถ้าเปลี่ยน port หลังจาก deploy ไปแล้ว ให้ `pm2 delete icebreaker-server icebreaker-web` ก่อน เพราะ reload ไม่อ่าน args ใหม่ และต้องแก้ port ใน `deploy/nginx-icebreaker.conf` ให้ตรงกัน
 
 `nginx-enable.sh` เพิ่มบรรทัด `include ".../deploy/nginx-icebreaker.conf";` ต่อจากบรรทัด include `.../deploy/nginx-*.conf` ของ app อื่น (หรือท้ายไฟล์ถ้าไม่มี) ลงในไฟล์ location ที่ `server { }` ของเว็บ include อยู่ (ค่าเริ่มต้น `/etc/nginx/snippets/apps-locations.conf` ถ้าไม่ใช่ให้ใส่ path ตามหลัง) สำรองไฟล์เดิมไว้ข้างกัน แล้วรัน `nginx -t` ถ้าไม่ผ่านจะคืนไฟล์เดิมและไม่ reload รันซ้ำได้ไม่มีผล ใน config มี
 
-- `/icebreaker/socket.io/` → game server พร้อม header สำหรับ WebSocket
-- `/icebreaker` และ `/icebreaker/...` → เว็บ
-- `/IceBreakerArena/...` → redirect 301 ไป `/icebreaker/...` เผื่อคนพิมพ์ชื่อเต็ม
+- `/PikaArena/socket.io/` → game server พร้อม header สำหรับ WebSocket
+- `/PikaArena` และ `/PikaArena/...` → เว็บ
+- `/IceBreaker...`, `/icebreakerarena/...` และ `/pikaarena/...` → redirect 301 ไป `/PikaArena/...` ชื่อเดิมและลิงก์ที่แจกไปแล้วยังใช้ได้
 
 ห้ามเปิด `/info` ของ game server ออกนอกเครื่อง เพราะบอก IP ภายในของเครื่อง config นี้ส่งต่อแค่ `/socket.io/`
 
@@ -141,17 +141,17 @@ pm2 restart ecosystem.config.js
 
 | ตัวแปร | ตั้งที่ | ค่าเริ่มต้น | ใช้ทำอะไร |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_BASE_PATH` | environment ตอน `npm run build` **และ** ตอน `pm2 start` ต้องเป็นค่าเดียวกัน | ว่าง (อยู่ที่ root) | path ที่เว็บอยู่หลัง reverse proxy เช่น `/icebreaker` เบราว์เซอร์จะต่อ game server ที่ `<path>/socket.io` บนโดเมนเดียวกัน |
+| `NEXT_PUBLIC_BASE_PATH` | environment ตอน `npm run build` **และ** ตอน `pm2 start` ต้องเป็นค่าเดียวกัน | ว่าง (อยู่ที่ root) | path ที่เว็บอยู่หลัง reverse proxy เช่น `/PikaArena` เบราว์เซอร์จะต่อ game server ที่ `<path>/socket.io` บนโดเมนเดียวกัน |
 | `BIND_HOST` | environment ตอน `pm2 start` | `0.0.0.0` | interface ที่ทั้งสอง process ฟัง หลัง proxy ใช้ `127.0.0.1` |
 | `WEB_PORT`, `GAME_PORT` | environment ตอน `pm2 start` ถ้าไม่มี base path ต้องตั้ง `GAME_PORT` ตอน `npm run build` ด้วย | `3000`, `4000` | port ของเว็บและ game server (`ecosystem.config.js` ส่งต่อเป็น `PORT`, `HOST` ให้ game server) ถ้าไม่มี base path เบราว์เซอร์จะต่อ game server ที่ `GAME_PORT` ของตอน build |
 | `NEXT_PUBLIC_GAME_SERVER_URL` | environment ตอน `npm run build` | ถ้ามี base path: โดเมนของหน้าเว็บ + base path ถ้าไม่มี: โฮสต์ของหน้าเว็บ + `:<GAME_PORT>` (`4000`) | ที่อยู่ game server ที่เบราว์เซอร์ต่อไป ใช้เมื่อ game server อยู่คนละที่กับเว็บ ถ้ามี path ใน URL จะต่อที่ `<path>/socket.io` |
 | `NEXT_PUBLIC_JOIN_BASE_URL` | environment ตอน `npm run build` | ที่อยู่ของหน้าเว็บที่เปิดอยู่ (รวม base path) | ที่อยู่ที่แสดงใต้ QR ให้ผู้เล่นพิมพ์เข้ามา |
 
-`deploy/deploy.sh` ตั้งค่าให้เองเป็น `NEXT_PUBLIC_BASE_PATH=/icebreaker`, `BIND_HOST=127.0.0.1`, `WEB_PORT=4231`, `GAME_PORT=4232` ถ้าไม่ได้ตั้งไว้ก่อน
+`deploy/deploy.sh` ตั้งค่าให้เองเป็น `NEXT_PUBLIC_BASE_PATH=/PikaArena`, `BIND_HOST=127.0.0.1`, `WEB_PORT=4231`, `GAME_PORT=4232` ถ้าไม่ได้ตั้งไว้ก่อน
 
 ค่า `NEXT_PUBLIC_*` ถูกฝังลงไปตอน build ถ้าเปลี่ยนต้อง `npm run build` ใหม่ และถ้าเว็บเปิดผ่าน HTTPS game server ก็ต้องเป็น HTTPS ด้วย เพราะเบราว์เซอร์ไม่ยอมให้หน้า HTTPS ต่อ `ws://` (แบบที่ 1 ได้ HTTPS จาก nginx อยู่แล้ว)
 
-บน Windows ถ้า build ใน Git Bash ให้ใส่ `MSYS_NO_PATHCONV=1` นำหน้า เช่น `MSYS_NO_PATHCONV=1 NEXT_PUBLIC_BASE_PATH=/icebreaker npm run build` ไม่งั้น Git Bash จะแปลง `/icebreaker` เป็น `C:/Program Files/Git/icebreaker` (`next.config.ts` จะแจ้ง error ให้)
+บน Windows ถ้า build ใน Git Bash ให้ใส่ `MSYS_NO_PATHCONV=1` นำหน้า เช่น `MSYS_NO_PATHCONV=1 NEXT_PUBLIC_BASE_PATH=/PikaArena npm run build` ไม่งั้น Git Bash จะแปลง `/PikaArena` เป็น `C:/Program Files/Git/PikaArena` (`next.config.ts` จะแจ้ง error ให้)
 
 ### บัญชีผู้สร้างเกม
 
@@ -193,7 +193,7 @@ npm run users -- demo <username> --share                # ใส่เกมเ�
 npm run crowd                                   # 1 ห้อง 50 คน
 npm run crowd -- --players=1000 --ramp=150      # เต็มห้องตาม MAX_PLAYERS_PER_ROOM
 npm run crowd -- --rooms=5 --players=60         # หลายห้องพร้อมกัน
-npm run crowd -- --url=https://dmhub.mfec.dev/icebreaker --players=200
+npm run crowd -- --url=https://dmhub.mfec.dev/PikaArena --players=200
 ```
 
 | ตัวเลือก | ค่าเริ่มต้น | ทำอะไร |

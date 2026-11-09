@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import type { PlayerMe, RoundInfo } from '@icebreaker/shared';
+import type { PlayerMe, RoundInfo } from '@pika-arena/shared';
 import { burst, shower } from '@/lib/confetti';
 import { fmt } from '@/lib/format';
 import { FALL_S, MEDAL_S, RIDER_S, medalFall, phoneRevealAt } from '@/lib/podium';

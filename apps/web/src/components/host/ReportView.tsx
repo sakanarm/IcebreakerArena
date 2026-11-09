@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
-import { sliderBinRanges, type GameReport, type QuestionType, type ReportPlayer, type ReportQuestion, type SliderSpec } from '@icebreaker/shared';
+import { sliderBinRanges, type GameReport, type QuestionType, type ReportPlayer, type ReportQuestion, type SliderSpec } from '@pika-arena/shared';
 import { downloadText, toCsv } from '@/lib/csv';
 import { fmt, fmtValue, percent, secondsLabel, TYPE_ICON, TYPE_LABEL } from '@/lib/format';
 import { getSocket } from '@/lib/socket';
@@ -47,7 +47,7 @@ export function ReportView({ open, onClose }: { open: boolean; onClose: () => vo
 
   const exportCsv = () => {
     if (!report) return;
-    const name = `icebreaker-${report.pin}-${tab === 'players' ? 'players' : 'questions'}.csv`;
+    const name = `pika-arena-${report.pin}-${tab === 'players' ? 'players' : 'questions'}.csv`;
     downloadText(name, toCsv(tab === 'players' ? playerRows(report.players) : questionRows(report.questions)));
   };
 

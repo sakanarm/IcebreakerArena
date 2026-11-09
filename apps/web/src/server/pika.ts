@@ -227,7 +227,7 @@ export async function ensureProject(email: string, displayName?: string): Promis
   const name = `IceBreaking ${displayName?.trim() || email.split('@')[0]}`;
   const created = obj(
     await call(key, 'POST', '/projects', {
-      body: { name, id: projectId, owner_username: email.trim(), description: 'คลังความรู้ส่วนตัวสำหรับสร้างเกม IceBreaker' },
+      body: { name, id: projectId, owner_username: email.trim(), description: 'คลังความรู้ส่วนตัวสำหรับสร้างเกมใน Pika Arena' },
     }),
   );
 
@@ -235,7 +235,7 @@ export async function ensureProject(email: string, displayName?: string): Promis
   let clientId = pick(created, 'client_id', 'clientId') || null;
   if (!projectKey) {
     // the project was already there: ask for a key of its own
-    const issued = obj(await call(key, 'POST', `/projects/${encodeURIComponent(projectId)}/api-keys`, { body: { name: 'IceBreaker Arena' } }));
+    const issued = obj(await call(key, 'POST', `/projects/${encodeURIComponent(projectId)}/api-keys`, { body: { name: 'Pika Arena' } }));
     projectKey = keyIn(issued);
     clientId = pick(issued, 'client_id', 'clientId') || clientId;
   }

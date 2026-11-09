@@ -3,7 +3,7 @@
 import { motion } from 'motion/react';
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { StageState } from '@icebreaker/shared';
+import type { StageState } from '@pika-arena/shared';
 import { fmt } from '@/lib/format';
 import { withBase } from '@/lib/paths';
 import { getSocket } from '@/lib/socket';

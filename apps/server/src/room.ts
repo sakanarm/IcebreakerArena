@@ -32,7 +32,7 @@ import {
   type Round,
   type RoundInfo,
   type StageState,
-} from '@icebreaker/shared';
+} from '@pika-arena/shared';
 import type { IO } from './io';
 
 /** the full leaderboard and answer counts reach the Stage at most 4 times a second */

@@ -132,7 +132,7 @@ export function HomeScreen() {
         </section>
 
         <footer className="mt-20 text-center text-sm text-white/40">
-          <p>MFEC IceBreaker Arena · ใช้ภายในองค์กร</p>
+          <p>MFEC Pika Arena · ใช้ภายในองค์กร</p>
           <p className="mt-1">By Sakan Punyanon</p>
         </footer>
       </div>

@@ -33,7 +33,7 @@ npm run e2e:reveal       # เฉพาะหน้าเฉลยของ quiz
 รันกับ production ได้ด้วยการใส่ base url:
 
 ```bash
-node e2e/slider-fit.mjs --base=https://dmhub.mfec.dev/icebreaker
+node e2e/slider-fit.mjs --base=https://dmhub.mfec.dev/PikaArena
 ```
 
 ตัวเลือกอื่นอยู่ในหัวคอมเมนต์ของแต่ละไฟล์ เช่น `--shots` (เก็บภาพ),

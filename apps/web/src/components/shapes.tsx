@@ -65,7 +65,7 @@ export function Logo({ small = false, compact = false }: { small?: boolean; comp
       </div>
       <div className={`leading-none ${compact ? 'whitespace-nowrap max-sm:hidden' : ''}`}>
         <div className={`font-display font-extrabold tracking-tight ${small ? 'text-xl' : 'text-3xl'}`}>
-          IceBreaker <span className="text-brand-2">Arena</span>
+          Pika <span className="text-brand-2">Arena</span>
         </div>
         <div className="mt-1 text-[10px] font-semibold tracking-[0.35em] text-white/55">MFEC</div>
       </div>

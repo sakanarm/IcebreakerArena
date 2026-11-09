@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Adds deploy/nginx-icebreaker.conf to a shared nginx site, then reloads nginx. Needs root:
+# (The app is Pika Arena now; the file keeps its old name so the include already in the shared
+# snippet keeps pointing at a file that exists. See the comment at the top of it.)
 #
 #   sudo bash deploy/nginx-enable.sh [locations-snippet]
 #
@@ -34,7 +36,7 @@ main() {
     END { exit !found }' "$snippet"; then
     echo "$snippet already includes $conf"
   else
-    backup="$snippet.bak-icebreaker-$(date +%Y%m%d-%H%M%S)"
+    backup="$snippet.bak-pika-arena-$(date +%Y%m%d-%H%M%S)"
     cp -p "$snippet" "$backup"
     echo "backup: $backup"
 
@@ -60,7 +62,7 @@ main() {
     exit 1
   fi
   systemctl reload nginx
-  echo "nginx reloaded: /icebreaker is live"
+  echo "nginx reloaded: /PikaArena is live"
 }
 
 die() {

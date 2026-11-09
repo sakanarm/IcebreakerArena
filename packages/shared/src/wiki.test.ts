@@ -3,17 +3,17 @@ import { test } from 'node:test';
 import { factKey, hasContactInfo, parseWikiPage } from './wiki';
 
 /** a page shaped the way the knowledge base writes them, down to the citation on every bullet */
-const PAGE = `# IceBreaker Arena
+const PAGE = `# Pika Arena
 
 ## Summary
-IceBreaker Arena เป็นระบบเกมตอบคำถามสำหรับกิจกรรมภายในของ MFEC
+Pika Arena เป็นระบบเกมตอบคำถามสำหรับกิจกรรมภายในของ MFEC
 ใช้งานผ่านเบราว์เซอร์โดยไม่ต้องติดตั้งแอป
 
 ## Details
 - **ความจุห้อง**: ห้องเกมหนึ่งห้องรองรับผู้เล่นพร้อมกันได้สูงสุด 1,000 คน [[sources/2026-11-09-arena-rules.md]]
 - ระบบเปิดใช้งานจริงครั้งแรกเมื่อ 20 ตุลาคม 2026 [[sources/2026-11-09-arena-rules.md]]
 - ฐานข้อมูลที่ใช้เก็บเกมคือ PostgreSQL
-  และรันกระบวนการด้วย pm2 [[systems/icebreaker-arena.md]]
+  และรันกระบวนการด้วย pm2 [[systems/pika-arena.md]]
   - เครื่อง production ใช้ Node เวอร์ชัน 20
 
 ## Related
@@ -23,7 +23,7 @@ IceBreaker Arena เป็นระบบเกมตอบคำถามสำ
 
 test('a page gives up its summary, its facts and the pages it points at', () => {
   const page = parseWikiPage(PAGE);
-  assert.match(page.summary, /^IceBreaker Arena เป็นระบบเกมตอบคำถาม/);
+  assert.match(page.summary, /^Pika Arena เป็นระบบเกมตอบคำถาม/);
   assert.match(page.summary, /ไม่ต้องติดตั้งแอป$/);
   assert.equal(page.facts.length, 3);
   assert.deepEqual(page.related, ['topics/kahoot-comparison.md', 'systems/pika.md']);
@@ -40,7 +40,7 @@ test('a fact keeps its own citation and loses the brackets and the markdown', ()
 test('a wrapped line and a nested bullet belong to the fact above them', () => {
   const third = parseWikiPage(PAGE).facts[2];
   assert.equal(third.text, 'ฐานข้อมูลที่ใช้เก็บเกมคือ PostgreSQL และรันกระบวนการด้วย pm2 เครื่อง production ใช้ Node เวอร์ชัน 20');
-  assert.equal(third.cite, 'systems/icebreaker-arena.md');
+  assert.equal(third.cite, 'systems/pika-arena.md');
 });
 
 test('a page written without headings still gives up its bullets', () => {

@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import type { LeaderRow, StageState } from '@icebreaker/shared';
+import type { LeaderRow, StageState } from '@pika-arena/shared';
 import { fmt, roundLabel } from '@/lib/format';
 import { sfx } from '@/lib/sfx';
 import { CountUp } from '../motion-bits';

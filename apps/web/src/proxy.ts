@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { GAME_SERVER_PORT } from '@icebreaker/shared';
+import { GAME_SERVER_PORT } from '@pika-arena/shared';
 import { contentSecurityPolicy, gameServerSources } from '@/lib/csp';
 import { BASE_PATH } from '@/lib/paths';
 
@@ -25,7 +25,7 @@ export function proxy(request: NextRequest) {
 // matchers must be literals: Next.js reads them at build time
 export const config = {
   matcher: [
-    // the home page on its own: under a base path the pattern below needs a slash after /icebreaker
+    // the home page on its own: under a base path the pattern below needs a slash after /PikaArena
     {
       source: '/',
       missing: [

@@ -11,7 +11,7 @@ import {
   randomNickname,
   validateGame,
   type ClientToServerEvents,
-} from '@icebreaker/shared';
+} from '@pika-arena/shared';
 import type { GameSocket, IO } from './io';
 import { MissLimiter, clientAddress } from './limits';
 import type { Room } from './room';

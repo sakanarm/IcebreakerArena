@@ -1,4 +1,4 @@
-import { LIMITS, QUESTION_TYPES, cleanCover, clip, copyTitle, type Game, type Question, type QuestionType, type Round, type SliderSpec } from '@icebreaker/shared';
+import { LIMITS, QUESTION_TYPES, cleanCover, clip, copyTitle, type Game, type Question, type QuestionType, type Round, type SliderSpec } from '@pika-arena/shared';
 import { lockWrites, type Db, type Sql } from './db';
 import { newId } from './session';
 

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { LIMITS, QUESTION_TYPES, SAMPLE_GAMES, TIME_CHOICES_S, sliderStart, validateGame, type Game } from '@icebreaker/shared';
+import { LIMITS, QUESTION_TYPES, SAMPLE_GAMES, TIME_CHOICES_S, sliderStart, validateGame, type Game } from '@pika-arena/shared';
 import { requireUser, upsertUser } from './auth';
 import { copyEntry, getEntry, listCatalog, reportEntry, shareGame, withdrawEntry } from './catalog';
 import { authMode, authModeProblem, authModeSource, dbSchema } from './config';

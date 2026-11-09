@@ -1,4 +1,4 @@
-import type { QuestionType } from '@icebreaker/shared';
+import type { QuestionType } from '@pika-arena/shared';
 
 export const fmt = (n: number) => Math.round(n).toLocaleString('th-TH');
 

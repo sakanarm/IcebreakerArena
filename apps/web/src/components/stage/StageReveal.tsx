@@ -2,7 +2,7 @@
 
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { sliderBin, type QuestionPublic, type RevealInfo, type StageState } from '@icebreaker/shared';
+import { sliderBin, type QuestionPublic, type RevealInfo, type StageState } from '@pika-arena/shared';
 import { AVERAGE_EMS, countsFit, ems, sizeFor } from '@/lib/fit';
 import { fmt, fmtValue, percent, secondsLabel } from '@/lib/format';
 import { sfx } from '@/lib/sfx';

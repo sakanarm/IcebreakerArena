@@ -1,4 +1,4 @@
-import type { QuestionPublic } from '@icebreaker/shared';
+import type { QuestionPublic } from '@pika-arena/shared';
 
 /** how an answer went in, which sets what the phone says while it waits for the reveal */
 export type WaitMood = 'fast' | 'close' | 'poll' | 'any';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AnswerSent, PlayerState, Result } from '@icebreaker/shared';
+import type { AnswerSent, PlayerState, Result } from '@pika-arena/shared';
 import { keepClockSynced, syncClock } from './clock';
 import { withBase } from './paths';
 import { getSocket } from './socket';

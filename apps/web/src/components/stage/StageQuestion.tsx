@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, type Transition, type Variants } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { leadInMs, type QuestionPublic, type StageState } from '@icebreaker/shared';
+import { leadInMs, type QuestionPublic, type StageState } from '@pika-arena/shared';
 import { useServerNow } from '@/lib/clock';
 import { fmt, fmtValue } from '@/lib/format';
 import { sfx } from '@/lib/sfx';

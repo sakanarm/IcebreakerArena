@@ -23,9 +23,9 @@ const fact = (text: string, page = 'topics/arena.md', extra: Partial<SourceFact>
 
 /** A set of facts the way a handful of pages would give them: every question type is reachable from it. */
 const FACTS: SourceFact[] = [
-  fact('ห้องเกมหนึ่งห้องรองรับผู้เล่นพร้อมกันได้สูงสุด 1,000 คน', 'topics/arena.md', { pageTitle: 'IceBreaker Arena', cite: 'sources/arena-rules.md' }),
-  fact('ผู้เล่นเข้าร่วมเกมได้โดยไม่ต้องสมัครสมาชิกก่อน', 'topics/arena.md', { pageTitle: 'IceBreaker Arena' }),
-  fact('ชื่อเล่นของทีมที่ดูแลระบบคือ ทีมน้ำแข็ง', 'topics/arena.md', { pageTitle: 'IceBreaker Arena' }),
+  fact('ห้องเกมหนึ่งห้องรองรับผู้เล่นพร้อมกันได้สูงสุด 1,000 คน', 'topics/arena.md', { pageTitle: 'Pika Arena', cite: 'sources/arena-rules.md' }),
+  fact('ผู้เล่นเข้าร่วมเกมได้โดยไม่ต้องสมัครสมาชิกก่อน', 'topics/arena.md', { pageTitle: 'Pika Arena' }),
+  fact('ชื่อเล่นของทีมที่ดูแลระบบคือ ทีมน้ำแข็ง', 'topics/arena.md', { pageTitle: 'Pika Arena' }),
   fact('ระบบเก็บข้อมูลเกมไว้ใน PostgreSQL ทุกห้อง', 'systems/stack.md', { pageTitle: 'สถาปัตยกรรมระบบ' }),
   fact('กระบวนการบนเครื่องจริงถูกดูแลด้วย pm2 ตลอดเวลา', 'systems/stack.md', { pageTitle: 'สถาปัตยกรรมระบบ' }),
   fact('หน้าเว็บของผู้เล่นสร้างด้วย Next.js เป็นหลัก', 'systems/stack.md', { pageTitle: 'สถาปัตยกรรมระบบ' }),
@@ -50,7 +50,7 @@ const allQuestions = (game: Game): Question[] => game.rounds.flatMap((r) => r.qu
 
 test('a number that belongs to something else is not a number to ask about', () => {
   assert.deepEqual(numberSpans('ประชุมเริ่ม 09:30 ที่ห้องใหญ่').length, 0);
-  assert.deepEqual(numberSpans('ดูได้ที่ /icebreaker/report ของระบบ').length, 0);
+  assert.deepEqual(numberSpans('ดูได้ที่ /PikaArena/report ของระบบ').length, 0);
   assert.deepEqual(numberSpans('ดูแลด้วย pm2 ตลอดเวลา').length, 0);
   assert.deepEqual(numberSpans('ใช้ Node เวอร์ชัน 20.20.0 บนเครื่องจริง').length, 0);
 });
@@ -175,7 +175,7 @@ test('every question says where it came from and why that is the answer', () => 
   }
   const cited = questions.find((q) => q.source?.cite);
   assert.equal(cited?.source?.cite, 'sources/arena-rules.md', 'the document the page itself cited is kept');
-  assert.equal(cited?.source?.title, 'IceBreaker Arena');
+  assert.equal(cited?.source?.title, 'Pika Arena');
 });
 
 test('the whole game passes the same check the editor uses', () => {

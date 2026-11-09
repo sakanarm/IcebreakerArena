@@ -1,4 +1,4 @@
-import { MAX_PAGES, SKIP_REASON, parseWikiPage, planFacts, type SourceFact } from '@icebreaker/shared';
+import { MAX_PAGES, SKIP_REASON, parseWikiPage, planFacts, type SourceFact } from '@pika-arena/shared';
 import { requireUser } from '@/server/auth';
 import { HttpError, guardMutation, handle, json, readJson } from '@/server/http';
 import { existingProject, readPage, type PikaProject } from '@/server/pika';

@@ -1,4 +1,4 @@
-import type { CoverArt } from '@icebreaker/shared';
+import type { CoverArt } from '@pika-arena/shared';
 import type { ReactNode } from 'react';
 import { Backdrop, INK, Shape, Sparkle } from './parts';
 

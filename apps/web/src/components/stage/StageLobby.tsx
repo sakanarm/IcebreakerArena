@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useEffect, useRef, useState } from 'react';
-import { MAX_PLAYERS_PER_ROOM, type StageState } from '@icebreaker/shared';
+import { MAX_PLAYERS_PER_ROOM, type StageState } from '@pika-arena/shared';
 import { burst } from '@/lib/confetti';
 import { fmt } from '@/lib/format';
 import { sfx } from '@/lib/sfx';

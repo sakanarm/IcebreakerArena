@@ -1,4 +1,4 @@
-import type { Game } from '@icebreaker/shared';
+import type { Game } from '@pika-arena/shared';
 import { dropBlankOptions } from './games';
 import { BASE_PATH } from './paths';
 import { getSocket } from './socket';

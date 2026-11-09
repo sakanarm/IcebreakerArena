@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import type { ReactNode } from 'react';
-import type { QuestionPublic } from '@icebreaker/shared';
+import type { QuestionPublic } from '@pika-arena/shared';
 import { TYPE_LABEL } from '@/lib/format';
 import { untimed } from '../player/PlayerQuestion';
 import { ANSWER_BG, AnswerShape } from '../shapes';

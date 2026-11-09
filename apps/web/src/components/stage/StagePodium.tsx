@@ -2,7 +2,7 @@
 
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from 'motion/react';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import type { Award, LeaderRow, StageState } from '@icebreaker/shared';
+import type { Award, LeaderRow, StageState } from '@pika-arena/shared';
 import { shower } from '@/lib/confetti';
 import { AWARDS_AT, CROWN_S, DRUMROLL_AT, FALL_S, MEDAL_S, PLACE_AT, RIDER_S, medalFall, type Place } from '@/lib/podium';
 import { sfx } from '@/lib/sfx';

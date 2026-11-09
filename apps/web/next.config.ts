@@ -10,13 +10,13 @@ const lanHosts = Object.values(networkInterfaces())
 
 const monorepoRoot = path.resolve(process.cwd(), '../..');
 
-// Behind a reverse proxy the app lives under a subpath such as `/icebreaker`. `next build` and
+// Behind a reverse proxy the app lives under a subpath such as `/PikaArena`. `next build` and
 // `next start` both read this file, so they must see the same value. '/x/' and 'x' become '/x'.
 const rawBasePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
 const basePath = rawBasePath.trim().replace(/\/+$/, '').replace(/^(?=[^/])/, '/');
-// Git Bash on Windows turns `/icebreaker` into `C:/Program Files/Git/icebreaker` unless MSYS_NO_PATHCONV=1
+// Git Bash on Windows turns `/PikaArena` into `C:/Program Files/Git/PikaArena` unless MSYS_NO_PATHCONV=1
 if (basePath && !/^(\/[\w.~-]+)+$/.test(basePath)) {
-  throw new Error(`NEXT_PUBLIC_BASE_PATH should look like /icebreaker, got "${rawBasePath}"`);
+  throw new Error(`NEXT_PUBLIC_BASE_PATH should look like /PikaArena, got "${rawBasePath}"`);
 }
 
 // Without a base path the browser dials the game server's own port (lib/socket.ts), so the build
@@ -30,7 +30,7 @@ const nextConfig: NextConfig = {
   basePath,
   // the normalized values are what the browser code sees (lib/paths.ts, lib/socket.ts)
   env: { NEXT_PUBLIC_BASE_PATH: basePath, NEXT_PUBLIC_GAME_PORT: gamePort },
-  transpilePackages: ['@icebreaker/shared'],
+  transpilePackages: ['@pika-arena/shared'],
   // the dev/test database loads its WASM from its own folder at run time; `pg` is external by default
   serverExternalPackages: ['@electric-sql/pglite'],
   allowedDevOrigins: lanHosts,

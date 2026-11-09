@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { LIMITS, type Game } from '@icebreaker/shared';
+import { LIMITS, type Game } from '@pika-arena/shared';
 import { blankQuestion, countQuestions, estimateMinutes } from '@/lib/games';
 import { ANSWER_BG } from '../shapes';
 import { CoverPicker } from './CoverPicker';

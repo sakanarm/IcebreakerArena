@@ -1,4 +1,4 @@
-import { GAME_SERVER_PORT } from '@icebreaker/shared';
+import { GAME_SERVER_PORT } from '@pika-arena/shared';
 import { lanAddresses, startGameServer } from './server';
 
 const port = Number(process.env.PORT ?? GAME_SERVER_PORT);

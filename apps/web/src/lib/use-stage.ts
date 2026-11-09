@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { StageState } from '@icebreaker/shared';
+import type { StageState } from '@pika-arena/shared';
 import { keepClockSynced, syncClock } from './clock';
 import { BASE_PATH } from './paths';
 import { gameServer, getSocket } from './socket';

@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import type { PlayerMe, PlayerState } from '@icebreaker/shared';
+import type { PlayerMe, PlayerState } from '@pika-arena/shared';
 import { burst } from '@/lib/confetti';
 import { fmt, fmtValue } from '@/lib/format';
 import { sfx, vibrate } from '@/lib/sfx';

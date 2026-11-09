@@ -1,4 +1,4 @@
-import { OPTION_COUNT, SAMPLE_GAMES, copyTitle, leadInMs, ROUND_INTRO_MS, type Game, type Question, type Round } from '@icebreaker/shared';
+import { OPTION_COUNT, SAMPLE_GAMES, copyTitle, leadInMs, ROUND_INTRO_MS, type Game, type Question, type Round } from '@pika-arena/shared';
 import { keys, load, save } from './storage';
 
 /** Games made in the editor live in this browser until the Phase 2 database arrives. */

@@ -10,7 +10,7 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: { default: 'MFEC IceBreaker Arena', template: '%s · MFEC IceBreaker Arena' },
+  title: { default: 'MFEC Pika Arena', template: '%s · MFEC Pika Arena' },
   description: 'เกมควิซและไอซ์เบรกเกอร์สำหรับทีม MFEC: สร้างคำถามเอง แข่งเก็บคะแนน หลายด่าน',
 };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { Reorder, useDragControls } from 'motion/react';
-import { LIMITS, type Game, type Question } from '@icebreaker/shared';
+import { LIMITS, type Game, type Question } from '@pika-arena/shared';
 import { TYPE_ICON } from '@/lib/format';
 import { blankQuestion, blankRound, countQuestions } from '@/lib/games';
 import { GameCover } from '../cover/GameCover';

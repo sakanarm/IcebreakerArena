@@ -4,7 +4,7 @@
  *   npm run crowd -- [--players=50] [--rooms=1] [--url=http://localhost:4000] [--ramp=100]
  *                    [--limit=10] [--payload=24] [--stage-payload=400] [--plain] [--quiet]
  *
- * Behind a reverse proxy, pass the app's address: --url=https://example.com/icebreaker
+ * Behind a reverse proxy, pass the app's address: --url=https://example.com/PikaArena
  *
  * `bots.ts` fills a room someone else opened and answers at random; this one opens the room, plays it to the
  * podium, and then says whether the server scored everyone the way it should have. So it is both the load test
@@ -37,7 +37,7 @@ import {
   type ServerToClientEvents,
   type StageState,
   validateGame,
-} from '@icebreaker/shared';
+} from '@pika-arena/shared';
 import { io, type Socket } from 'socket.io-client';
 
 type Sock = Socket<ServerToClientEvents, ClientToServerEvents>;

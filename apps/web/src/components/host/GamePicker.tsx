@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { SAMPLE_GAMES, validateGame, type Game } from '@icebreaker/shared';
+import { SAMPLE_GAMES, validateGame, type Game } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type AccountUser } from '@/lib/account';
 import { ApiError, apiMessage } from '@/lib/api';
 import { cloud, settled, type CatalogEntry, type GameRecord, type ReportReason } from '@/lib/cloud';

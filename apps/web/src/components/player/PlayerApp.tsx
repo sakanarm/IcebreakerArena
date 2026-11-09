@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import type { PlayerState } from '@icebreaker/shared';
+import type { PlayerState } from '@pika-arena/shared';
 import { withBase } from '@/lib/paths';
 import { sfx } from '@/lib/sfx';
 import { keys } from '@/lib/storage';

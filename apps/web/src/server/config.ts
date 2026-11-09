@@ -75,7 +75,7 @@ export function databaseUrl(): string | null {
   return readSecret('database-url') ?? (process.env.DATABASE_URL?.trim() || null);
 }
 
-/** The Postgres schema our tables live in: IB_DB_SCHEMA, else icebreaker. Never public, as the database may be shared. */
+/** The Postgres schema our tables live in: IB_DB_SCHEMA, else icebreaker. The name the tables have lived under since day one: a brand is not worth a migration. Never public, as the database may be shared. */
 export function dbSchema(): string {
   return process.env.IB_DB_SCHEMA?.trim() || 'icebreaker';
 }

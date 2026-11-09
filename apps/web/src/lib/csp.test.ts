@@ -23,8 +23,8 @@ test('csp: the game connection is allowed where lib/socket.ts opens it', () => {
   assert.deepEqual(gameServerSources('[::1]:3000', { basePath: '', port: '4000' }), ['http://[::1]:4000', 'ws://[::1]:4000']);
   for (const bad of ['', 'evil.com; script-src *', 'a b', "x'y", 'x:abc'])
     assert.deepEqual(gameServerSources(bad, { basePath: '', port: '4000' }), [], `a Host of ${JSON.stringify(bad)} adds nothing`);
-  assert.deepEqual(gameServerSources('example.com', { basePath: '/icebreaker', port: '4000' }), [], "'self' covers it behind a proxy");
-  assert.deepEqual(gameServerSources('x', { serverUrl: 'https://game.example.com/icebreaker', basePath: '', port: '4000' }), ['https://game.example.com', 'wss://game.example.com']);
+  assert.deepEqual(gameServerSources('example.com', { basePath: '/PikaArena', port: '4000' }), [], "'self' covers it behind a proxy");
+  assert.deepEqual(gameServerSources('x', { serverUrl: 'https://game.example.com/PikaArena', basePath: '', port: '4000' }), ['https://game.example.com', 'wss://game.example.com']);
   assert.deepEqual(gameServerSources('x', { serverUrl: 'http://10.0.0.5:4100', basePath: '/a', port: '4000' }), ['http://10.0.0.5:4100', 'ws://10.0.0.5:4100']);
   const policy = contentSecurityPolicy({ nonce: 'n', dev: false, connect: gameServerSources('localhost', { basePath: '', port: '4232' }) });
   assert.ok(policy.includes("connect-src 'self' http://localhost:4232 ws://localhost:4232;"));

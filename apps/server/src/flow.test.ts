@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { syncBuiltinESMExports } from 'node:module';
 import { after, before, mock, test } from 'node:test';
 import { io, type Socket } from 'socket.io-client';
-import type { ClientToServerEvents, Game, PlayerState, ServerToClientEvents, StageState } from '@icebreaker/shared';
+import type { ClientToServerEvents, Game, PlayerState, ServerToClientEvents, StageState } from '@pika-arena/shared';
 import { MissLimiter } from './limits';
 import { startGameServer, type GameServer } from './server';
 

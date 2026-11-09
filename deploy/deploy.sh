@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs, tests, builds and (re)starts MFEC IceBreaker Arena under pm2, behind nginx at /icebreaker.
+# Installs, tests, builds and (re)starts MFEC Pika Arena under pm2, behind nginx at /PikaArena.
 #
 #   bash deploy/deploy.sh                  the first install, and every update (it runs `git pull` itself)
 #   FORCE=1 bash deploy/deploy.sh          even while rooms are in use: every live game ends
@@ -18,7 +18,7 @@ main() {
   local root
   root=$(pwd -P)
 
-  export NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH-/icebreaker}
+  export NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH-/PikaArena}
   export BIND_HOST=${BIND_HOST:-127.0.0.1}
   export WEB_PORT=${WEB_PORT:-4231}
   export GAME_PORT=${GAME_PORT:-4232}
@@ -27,7 +27,7 @@ main() {
   # the same rule as apps/web/next.config.ts, which would otherwise rewrite 'x' or '/x/' to '/x'
   # behind our back and leave the health check below polling a URL that does not exist
   [[ -z $NEXT_PUBLIC_BASE_PATH || $NEXT_PUBLIC_BASE_PATH =~ ^(/[A-Za-z0-9_.~-]+)+$ ]] ||
-    die "NEXT_PUBLIC_BASE_PATH should look like /icebreaker, got \"$NEXT_PUBLIC_BASE_PATH\""
+    die "NEXT_PUBLIC_BASE_PATH should look like /PikaArena, got \"$NEXT_PUBLIC_BASE_PATH\""
   for port in "$WEB_PORT" "$GAME_PORT"; do
     # no leading zero, which bash arithmetic would read as octal
     [[ $port =~ ^[1-9][0-9]{0,4}$ ]] && ((port <= 65535)) || die "\"$port\" is not a port number"

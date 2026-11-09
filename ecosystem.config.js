@@ -2,7 +2,7 @@
 //
 // The defaults serve phones directly: web on :3000 and the game server on :4000, on every interface.
 // Behind a reverse proxy, give `npm run build` and `pm2 start` the same values (deploy/deploy.sh does):
-//   NEXT_PUBLIC_BASE_PATH=/icebreaker BIND_HOST=127.0.0.1 WEB_PORT=4231 GAME_PORT=4232
+//   NEXT_PUBLIC_BASE_PATH=/PikaArena BIND_HOST=127.0.0.1 WEB_PORT=4231 GAME_PORT=4232
 const path = require('node:path');
 
 const web = path.join(__dirname, 'apps/web');
@@ -10,6 +10,9 @@ const host = process.env.BIND_HOST || '0.0.0.0';
 const webPort = Number(process.env.WEB_PORT || 3000);
 const gamePort = Number(process.env.GAME_PORT || 4000);
 
+// The app is called Pika Arena, but these two keep the names they were started under. pm2's list of
+// what to bring back after a reboot is one file shared by every app on the server, and renaming means
+// deleting ours and writing that file again — a risk to other people's apps, for a word in `pm2 list`.
 module.exports = {
   apps: [
     {

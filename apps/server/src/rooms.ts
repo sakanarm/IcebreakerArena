@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import type { Game } from '@icebreaker/shared';
+import type { Game } from '@pika-arena/shared';
 import type { IO } from './io';
 import { Room } from './room';
 

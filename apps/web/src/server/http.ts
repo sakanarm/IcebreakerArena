@@ -1,4 +1,4 @@
-import { MESSAGE_MAX_BYTES } from '@icebreaker/shared';
+import { MESSAGE_MAX_BYTES } from '@pika-arena/shared';
 import { DbUnavailable } from './db';
 import { TooLong } from './games';
 

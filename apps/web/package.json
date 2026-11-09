@@ -1,5 +1,5 @@
 {
-  "name": "@icebreaker/web",
+  "name": "@pika-arena/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
   "dependencies": {
     "@fontsource/ibm-plex-sans-thai": "^5.3.0",
     "@fontsource/kanit": "^5.3.0",
-    "@icebreaker/shared": "*",
+    "@pika-arena/shared": "*",
     "canvas-confetti": "^1.9.4",
     "motion": "^14.3.0",
     "next": "^16.4.2",

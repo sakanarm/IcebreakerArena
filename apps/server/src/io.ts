@@ -1,5 +1,5 @@
 import type { Server, Socket } from 'socket.io';
-import type { ClientToServerEvents, ServerToClientEvents, SocketData } from '@icebreaker/shared';
+import type { ClientToServerEvents, ServerToClientEvents, SocketData } from '@pika-arena/shared';
 
 type InterServerEvents = Record<string, never>;
 

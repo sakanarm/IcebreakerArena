@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import type { Phase } from '@icebreaker/shared';
+import type { Phase } from '@pika-arena/shared';
 import { getSocket } from '@/lib/socket';
 import { hostedPins, keys, load, remove } from '@/lib/storage';
 import { warmHostSound } from '@/lib/use-sound';

@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { AVATARS, NICKNAME_MAX, cleanNickname, randomAvatar, randomNickname } from '@icebreaker/shared';
+import { AVATARS, NICKNAME_MAX, cleanNickname, randomAvatar, randomNickname } from '@pika-arena/shared';
 import { keys, load, type Profile } from '@/lib/storage';
 import { FloatingShapes } from '../shapes';
 

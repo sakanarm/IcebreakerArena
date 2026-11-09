@@ -1,4 +1,4 @@
-import type { Game } from '@icebreaker/shared';
+import type { Game } from '@pika-arena/shared';
 import type { CatalogEntry } from '@/server/catalog';
 import type { GameRecord } from '@/server/games';
 import { api } from './api';

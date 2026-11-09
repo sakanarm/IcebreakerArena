@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { COVER_ARTS, COVER_COLORS, coverColor, isCoverEmoji, type CoverColor, type Game, type GameCover as Cover } from '@icebreaker/shared';
+import { COVER_ARTS, COVER_COLORS, coverColor, isCoverEmoji, type CoverColor, type Game, type GameCover as Cover } from '@pika-arena/shared';
 import { GameCover } from '../cover/GameCover';
 import { ART_NAMES, COVER_SHADES, SUGGESTED_EMOJIS } from '../cover/palette';
 import type { Edit } from './model';

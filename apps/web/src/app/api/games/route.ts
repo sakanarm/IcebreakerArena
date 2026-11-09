@@ -1,4 +1,4 @@
-import { SAMPLE_GAMES } from '@icebreaker/shared';
+import { SAMPLE_GAMES } from '@pika-arena/shared';
 import { requireUser } from '@/server/auth';
 import { getDb } from '@/server/db';
 import { TooManyGames, createGame, listGames, normalizeDraft } from '@/server/games';

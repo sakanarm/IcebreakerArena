@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { LIMITS, sliderStart, type AnswerSent, type QuestionPublic } from '@icebreaker/shared';
+import { LIMITS, sliderStart, type AnswerSent, type QuestionPublic } from '@pika-arena/shared';
 import { serverNow, useServerNow } from '@/lib/clock';
 import { fmtValue, TYPE_LABEL } from '@/lib/format';
 import { sfx, vibrate } from '@/lib/sfx';

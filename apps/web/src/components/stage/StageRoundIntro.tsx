@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useEffect } from 'react';
-import { ROUND_INTRO_MS, type RoundInfo } from '@icebreaker/shared';
+import { ROUND_INTRO_MS, type RoundInfo } from '@pika-arena/shared';
 import { sfx } from '@/lib/sfx';
 import { ANSWER_BG, AnswerShape } from '../shapes';
 

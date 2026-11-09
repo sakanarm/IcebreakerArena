@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, usePresence, usePresenceData, useReducedMotion, type Variants } from 'motion/react';
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { StageState } from '@icebreaker/shared';
+import type { StageState } from '@pika-arena/shared';
 import { sfx } from '@/lib/sfx';
 import type { SoundControl } from '@/lib/use-sound';
 import { FloatingShapes, Logo } from '../shapes';

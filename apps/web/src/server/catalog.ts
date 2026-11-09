@@ -1,4 +1,4 @@
-import { validateGame, type Game } from '@icebreaker/shared';
+import { validateGame, type Game } from '@pika-arena/shared';
 import { countQuestions, dropBlankOptions } from '../lib/games';
 import { audit } from './audit';
 import { lockWrites, type Db, type Sql } from './db';

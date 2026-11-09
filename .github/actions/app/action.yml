@@ -37,8 +37,8 @@ runs:
     - name: start the game server and the web app
       shell: bash
       run: |
-        npm start -w @icebreaker/server > "$RUNNER_TEMP/game-server.log" 2>&1 &
-        npm start -w @icebreaker/web > "$RUNNER_TEMP/web.log" 2>&1 &
+        npm start -w @pika-arena/server > "$RUNNER_TEMP/game-server.log" 2>&1 &
+        npm start -w @pika-arena/web > "$RUNNER_TEMP/web.log" 2>&1 &
         for _ in $(seq 1 90); do
           if curl -fsS http://localhost:4000/health >/dev/null 2>&1 && curl -fsS http://localhost:3000/ >/dev/null 2>&1; then
             echo "both up: $(curl -fsS http://localhost:4000/health)"

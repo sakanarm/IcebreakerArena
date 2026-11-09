@@ -1,4 +1,4 @@
-import type { CoverArt, CoverColor } from '@icebreaker/shared';
+import type { CoverArt, CoverColor } from '@pika-arena/shared';
 
 export interface CoverShades {
   /** the color as a game maker reads it */
