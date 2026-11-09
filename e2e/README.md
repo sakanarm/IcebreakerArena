@@ -28,6 +28,7 @@
 npm run e2e              # สวีปเต็ม: 16 ขนาดจอ × 2 เกม แบ่งรันทีละ 4 (~15 นาที)
 npm run e2e:slider       # เฉพาะหน้าเฉลยของ slider
 npm run e2e:reveal       # เฉพาะหน้าเฉลยของ quiz / poll / true-false
+npm run e2e:samples      # เกมตัวอย่างบนหน้า /host ตอนยังไม่ได้ล็อกอิน แล้วเปิดห้องจากการ์ดหนึ่งใบ
 ```
 
 รันกับ production ได้ด้วยการใส่ base url:

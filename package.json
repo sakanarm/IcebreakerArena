@@ -16,6 +16,7 @@
     "e2e": "node e2e/sweep.mjs",
     "e2e:slider": "node e2e/slider-fit.mjs",
     "e2e:reveal": "node e2e/reveal-fit.mjs",
+    "e2e:samples": "node e2e/samples-signed-out.mjs",
     "bots": "npm run bots -w @pika-arena/server --",
     "crowd": "npm run crowd -w @pika-arena/server --",
     "playthrough": "npm run playthrough -w @pika-arena/server --",
