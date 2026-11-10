@@ -53,7 +53,11 @@ export interface Question {
   imageUrl?: string;
   /** slider only */
   slider?: SliderSpec;
-  /** why that is the answer, in one sentence; shown to whoever edits or reviews the game */
+  /**
+   * why that is the answer, in one sentence. It goes on the reveal, on the big screen and on every
+   * phone — except on a question that carries a `source`, where it was written out of a knowledge
+   * base page and `toRoomGame()` cuts it before the game reaches a room (ROADMAP 11.9).
+   */
   explanation?: string;
   /** the page this question was made from, when it was not typed by hand */
   source?: QuestionSource;
@@ -181,6 +185,8 @@ export interface RevealInfo {
    * question and player averages mean the same, so one "average time" never shows two numbers
    */
   avgMs: number | null;
+  /** why that is the answer, when the question carries one that may be shown (see Question.explanation) */
+  explanation?: string;
 }
 
 export interface LeaderRow {
@@ -267,6 +273,8 @@ export interface PlayerState {
   correctChoices: number[] | null;
   /** after reveal, for puzzle, type and slider */
   key: AnswerKey | null;
+  /** after reveal: why that is the answer, when the question carries one that may be shown */
+  explanation?: string;
 }
 
 // ---------- Report ----------
@@ -286,6 +294,8 @@ export interface ReportQuestion {
   correctCount: number;
   /** every answer sent, right or wrong, as on the reveal */
   avgMs: number | null;
+  /** why that is the answer, when the question carries one that may be shown */
+  explanation?: string;
 }
 
 export interface ReportPlayer {

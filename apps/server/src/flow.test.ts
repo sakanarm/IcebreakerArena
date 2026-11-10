@@ -679,3 +679,73 @@ test('an address that keeps missing is refused every lookup but one with the rig
     await own.close();
   }
 });
+
+test('the reveal teaches: an explanation reaches the screens and the report, but one written out of a wiki page never leaves the editor', async () => {
+  const game: Game = {
+    id: 'why',
+    title: 'Why test',
+    rounds: [
+      {
+        id: 'r1',
+        title: 'Warm-up',
+        questions: [
+          { id: 'mine', type: 'quiz', prompt: 'Q1', options: ['A', 'B'], correct: [0], timeLimitS: 5, explanation: 'เพราะ A มาก่อน B' },
+          {
+            id: 'wiki',
+            type: 'quiz',
+            prompt: 'Q2',
+            options: ['A', 'B'],
+            correct: [1],
+            timeLimitS: 5,
+            explanation: 'ประโยคนี้คัดมาจากหน้าในคลังความรู้',
+            source: { path: 'topics/secret.md', title: 'หน้าลับ' },
+          },
+        ],
+      },
+    ],
+  };
+
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game });
+  assert.ok(created.ok);
+  const player = await connect();
+  const mine = track<PlayerState>(player, 'player:state');
+  assert.ok((await player.emitWithAck('player:join', { pin: created.pin, nickname: 'Ploy', avatar: '🦊' })).ok);
+  await stage.until((s) => s.playerCount === 1);
+
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'round');
+  host.emit('host:next');
+  const q1 = (await stage.until((s) => s.phase === 'question')).question!;
+  assert.equal('explanation' in q1, false, 'the explanation never comes with the question, or it would give the answer away');
+  assert.equal('source' in q1, false);
+  await sleepUntil(q1.startsAt);
+  assert.ok((await player.emitWithAck('player:answer', { questionId: q1.id, choice: 0 })).ok);
+
+  const rev1 = await stage.until((s) => s.phase === 'reveal');
+  assert.equal(rev1.reveal?.explanation, 'เพราะ A มาก่อน B', 'the big screen says why');
+  assert.equal((await mine.until((s) => s.phase === 'reveal')).explanation, 'เพราะ A มาก่อน B', 'and so does the phone');
+
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'leaderboard');
+  host.emit('host:next');
+  const q2 = (await stage.until((s) => s.phase === 'question' && s.question?.number === 2)).question!;
+  await sleepUntil(q2.startsAt);
+  assert.ok((await player.emitWithAck('player:answer', { questionId: q2.id, choice: 1 })).ok);
+  const rev2 = await stage.until((s) => s.phase === 'reveal' && s.question?.number === 2);
+  assert.equal(rev2.reveal?.explanation, undefined, 'a wiki-built question explains nothing on the screens');
+  assert.equal((await mine.until((s) => s.phase === 'reveal' && s.question?.number === 2)).explanation, undefined);
+
+  host.emit('host:next');
+  await stage.until((s) => s.phase === 'podium');
+  const report = await host.emitWithAck('host:report');
+  assert.ok(report.ok);
+  assert.deepEqual(
+    report.report.questions.map((q) => q.explanation),
+    ['เพราะ A มาก่อน B', undefined],
+    'the host keeps the one they wrote and never gets the page back',
+  );
+  // nothing anywhere in what the room was handed mentions the page
+  assert.equal(JSON.stringify([rev1, rev2, report.report]).includes('secret.md'), false);
+});

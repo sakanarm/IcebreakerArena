@@ -117,7 +117,8 @@ function LeadIn({ q, now }: { q: QuestionPublic; now: number }) {
               key={secs}
               initial={{ scale: 2.2, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.3, opacity: 0 }}
+              // the number leaving goes quickly, so it is not still there under the one landing
+              exit={{ scale: 0.3, opacity: 0, transition: { duration: 0.15 } }}
               transition={{ type: 'spring', stiffness: 420, damping: 20 }}
               className="grid size-14 origin-bottom place-items-center rounded-full bg-white font-display text-3xl font-extrabold text-ink sm:size-20 sm:text-5xl low:size-16 low:text-4xl short:size-11 short:text-2xl"
             >

@@ -2,6 +2,7 @@
 
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'motion/react';
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { sliderBin, type QuestionPublic, type RevealInfo, type StageState } from '@pika-arena/shared';
 import { AVERAGE_EMS, countsFit, ems, sizeFor } from '@/lib/fit';
 import { fmt, fmtValue, percent, secondsLabel } from '@/lib/format';
@@ -29,7 +30,102 @@ export function StageReveal({ state }: { state: StageState }) {
       ) : (
         <TileReveal q={q} r={r} />
       )}
+      {r.explanation && <WhyBand text={r.explanation} />}
+      {r.explanation && <WhyChip text={r.explanation} />}
     </div>
+  );
+}
+
+/**
+ * One sentence under the scene saying why that is the answer — the part that turns a quiz into a
+ * lesson. It never grows past a fifth of the screen: the bars above keep their room, and a long
+ * sentence scrolls inside the band instead of pushing the scene off the bottom.
+ */
+function WhyBand({ text }: { text: string }) {
+  return (
+    <motion.div
+      data-why
+      initial={{ y: 18, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 1.1, type: 'spring', stiffness: 240, damping: 26 }}
+      className="glass mx-auto flex w-full max-w-6xl shrink-0 items-start gap-2 px-3 py-2 text-left sm:gap-3 sm:px-5 sm:py-3 low:gap-2 low:py-1.5 short:hidden"
+    >
+      <span aria-hidden className="shrink-0 text-xl leading-tight sm:text-3xl low:text-xl">
+        💡
+      </span>
+      <p className="min-w-0 overflow-y-auto text-sm leading-snug text-white/90 sm:text-xl sm:leading-snug low:text-base low:leading-snug" style={{ maxHeight: '20vh' }}>
+        {text}
+      </p>
+    </motion.div>
+  );
+}
+
+/**
+ * A phone on its side (or any screen under 500px tall) has no row to spare under the scene: the bars and the
+ * tiles already fill what the dock leaves. There the explanation waits in a chip in the header, in the row with
+ * the question counter and the sound buttons (a slot the stage leaves for it, so it takes its turn in that row
+ * and never lands on top of a button that only some tabs show), and opens over the scene when someone taps it.
+ * Both go through portals: the scene slides in under a transform, which would pin a fixed overlay to the scene
+ * instead of the screen.
+ */
+function WhyChip({ text }: { text: string }) {
+  const [slot, setSlot] = useState<Element | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => setSlot(document.querySelector('[data-why-slot]') ?? document.body), []);
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [open]);
+  if (!slot) return null;
+  // without the stage's header (nothing else shows a reveal today) it floats at the top middle instead
+  const floating = slot === document.body;
+  return (
+    <>
+      {createPortal(
+        <motion.button
+          type="button"
+          data-why-chip
+          onClick={() => setOpen(true)}
+          initial={{ y: -8, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 1.1 }}
+          className={`hidden items-center gap-1.5 rounded-full bg-gold px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink shadow-lg short:flex ${floating ? 'fixed top-2 left-1/2 z-30 -translate-x-1/2' : ''}`}
+          aria-haspopup="dialog"
+        >
+          <span aria-hidden>💡</span>
+          <span className="max-[30rem]:hidden">คำอธิบายเฉลย</span>
+        </motion.button>,
+        slot,
+      )}
+      {open &&
+        createPortal(
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" onClick={() => setOpen(false)} role="presentation">
+            <div
+              data-why
+              role="dialog"
+              aria-label="คำอธิบายเฉลย"
+              onClick={(e) => e.stopPropagation()}
+              className="glass flex max-h-full w-full max-w-xl items-start gap-3 bg-ink/90 px-4 py-3 text-left"
+            >
+              <span aria-hidden className="shrink-0 text-2xl leading-tight">
+                💡
+              </span>
+              <p className="max-h-[calc(100dvh-5rem)] min-w-0 flex-1 overflow-y-auto leading-snug text-white/90">{text}</p>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="grid size-8 shrink-0 place-items-center rounded-full bg-white/15 text-lg"
+                aria-label="ปิด"
+              >
+                ✕
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
@@ -470,7 +566,7 @@ function RevealStats({
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay, type: 'spring', stiffness: 260, damping: 24 }}
       // narrow on a phone, beside the bars: its lines wrap instead
-      className={`glass mb-2 flex shrink-0 flex-col gap-1.5 self-end px-3 py-3 text-sm sm:w-auto sm:min-w-64 sm:gap-3 sm:px-6 sm:py-5 sm:text-base low:gap-2 low:py-4 short:w-auto short:gap-1 short:py-1.5 short:mb-0 ${under ? 'max-sm:mb-0 max-sm:self-stretch portrait:mb-0 portrait:self-stretch' : 'w-32'}`}
+      className={`glass mb-2 flex shrink-0 flex-col gap-1.5 self-end px-3 py-3 text-sm sm:w-auto sm:min-w-64 sm:gap-3 sm:px-6 sm:py-5 sm:text-base low:gap-1.5 low:py-3 short:w-auto short:gap-1 short:py-1.5 short:mb-0 ${under ? 'max-sm:mb-0 max-sm:self-stretch portrait:mb-0 portrait:self-stretch' : 'w-32'}`}
     >
       {q.type === 'poll' ? (
         <div className={headline}>

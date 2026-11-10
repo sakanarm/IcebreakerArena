@@ -131,7 +131,19 @@ export function PlayerResult({ state }: { state: PlayerState }) {
 
       {showKey && <KeyView state={state} />}
 
-      <RankLine me={state.me} />
+      {state.explanation && (
+        <motion.div
+          initial={{ y: 12, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.8 }}
+          className="w-full max-w-sm rounded-2xl bg-black/25 px-4 py-3 text-left"
+        >
+          <p className="text-sm text-white/80">💡 ทำไมถึงเป็นคำตอบนี้</p>
+          <p className="mt-1 leading-snug">{state.explanation}</p>
+        </motion.div>
+      )}
+
+      <RankLine me={state.me} delay={state.explanation ? 1 : 0.9} />
     </div>
   );
 }

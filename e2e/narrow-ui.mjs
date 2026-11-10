@@ -109,6 +109,14 @@ const WORST = {
     },
   ],
 };
+// the reveal's explanation: the longest the editor allows in the worst game, a written one in the normal game, and
+// the last question of each without one, so the scene is measured both with the band and without it
+NORMAL.rounds.forEach((r) =>
+  r.questions.forEach((q, qi) => {
+    if (qi < r.questions.length - 1) q.explanation = 'เฉลยข้อนี้มาจากประกาศของบริษัทเมื่อต้นปี ใครพลาดไม่เป็นไร ข้อหน้ายังมีลุ้น';
+  }),
+);
+WORST.rounds.forEach((r) => r.questions.forEach((q, qi) => qi < r.questions.length - 1 && (q.explanation = long(T, 300))));
 for (const g of [NORMAL, WORST]) g.rounds.forEach((r, ri) => ((r.id = `r${ri + 1}`), r.questions.forEach((q, qi) => (q.id = `q${ri + 1}-${qi + 1}`))));
 
 const PLAYERS = 6;

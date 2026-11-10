@@ -23,6 +23,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const connect = () => io(GAME_AT.url, { path: GAME_AT.path, transports: ['websocket'], forceNew: true, reconnection: false });
 let failed = 0;
 let passed = 0;
+const innerHeightOf = (h) => h;
 const check = (ok, what) => (ok ? passed++ : (console.log('FAIL', what), failed++), ok);
 
 const GAME = {
@@ -33,8 +34,8 @@ const GAME = {
       id: 'r1',
       title: 'รอบเดียว',
       questions: [
-        { id: 'q1', type: 'quiz', prompt: 'ออฟฟิศใหม่ของเราอยู่ชั้นไหนของอาคาร', options: ['ชั้น 12', 'ชั้น 15', 'ชั้น 18', 'ชั้น 21'], correct: [1], timeLimitS: 30 },
-        { id: 'q2', type: 'poll', prompt: 'มื้อเที่ยงวันศุกร์นี้ อยากกินอะไรกันดี', options: ['ส้มตำ', 'ข้าวมันไก่', 'ชาบู', 'สลัด'], correct: [], timeLimitS: 30 },
+        { id: 'q1', type: 'quiz', prompt: 'ออฟฟิศใหม่ของเราอยู่ชั้นไหนของอาคาร', options: ['ชั้น 12', 'ชั้น 15', 'ชั้น 18', 'ชั้น 21'], correct: [1], timeLimitS: 30, explanation: 'ชั้น 15 คือชั้นที่ทีมเราย้ายเข้าไปเมื่อต้นปี ห้องประชุมใหญ่สองห้องกับมุมกาแฟอยู่ชั้นเดียวกัน ส่วนชั้น 12 เป็นของทีมขาย ชั้น 18 ยังปิดปรับปรุง และชั้น 21 เป็นห้องประชุมผู้บริหารที่ต้องจองล่วงหน้าทุกครั้ง จำสั้น ๆ ว่าบัตรเราแตะได้แค่ชั้น 15 เท่านั้นนะ' },
+        { id: 'q2', type: 'poll', prompt: 'มื้อเที่ยงวันศุกร์นี้ อยากกินอะไรกันดี', options: ['ส้มตำ', 'ข้าวมันไก่', 'ชาบู', 'สลัด'], correct: [], timeLimitS: 30, explanation: 'โหวตนี้ไม่มีถูกผิด เอาไว้ให้คนจัดเลี้ยงรู้ว่าจะสั่งอะไรมาให้' },
         { id: 'q3', type: 'truefalse', prompt: 'ทีมเราไปเที่ยวทะเลด้วยกันเมื่อปีที่แล้ว', options: ['จริง', 'เท็จ'], correct: [0], timeLimitS: 30 },
       ],
     },
@@ -117,7 +118,40 @@ const measure = () => {
       return { text: el.textContent.replace(/\s+/g, ' ').trim().slice(0, 30), wraps, inside };
     });
   const scrolls = main.scrollHeight - main.clientHeight;
+  // the explanation band under the scene: inside the margins, on the screen, its text not past its own box
+  const shownBox = (el) => el && el.getClientRects().length > 0 && el.getBoundingClientRect().height > 0;
+  const band = main.querySelector('[data-why]');
+  const why = shownBox(band)
+    ? (() => {
+        const w = band.getBoundingClientRect();
+        const text = band.querySelector('p');
+        const t = text.getBoundingClientRect();
+        return {
+          box: [r1(w.left), r1(w.right), r1(w.top), r1(w.bottom)],
+          into: r1(Math.max(0, lo - w.left, w.right - hi)),
+          onScreen: w.top >= -0.5 && w.bottom <= innerHeight + 0.5,
+          fits: text.scrollWidth <= text.clientWidth + 0.5,
+          h: r1(w.height),
+          capped: w.height <= innerHeight * 0.28,
+        };
+      })()
+    : null;
+  // on a screen under 500px tall the band gives way to a chip in the header's empty middle
+  const chipEl = document.querySelector('[data-why-chip]');
+  const chip = shownBox(chipEl)
+    ? (() => {
+        const c = chipEl.getBoundingClientRect();
+        const others = [...document.querySelectorAll('header span, header button, header a, header svg, header img')]
+          .filter((e) => !chipEl.contains(e) && e.getClientRects().length && !e.querySelector('span, button, svg, img'))
+          .map((e) => e.getBoundingClientRect())
+          .filter((o) => o.width && o.height);
+        const hit = others.some((o) => o.left < c.right - 0.5 && o.right > c.left + 0.5 && o.top < c.bottom - 0.5 && o.bottom > c.top + 0.5);
+        return { box: [r1(c.left), r1(c.right), r1(c.top), r1(c.bottom)], onScreen: c.left >= -0.5 && c.right <= innerWidth + 0.5 && c.top >= -0.5, clear: !hit };
+      })()
+    : null;
   return {
+    why,
+    chip,
     vw: innerWidth,
     lo: r1(lo),
     hi: r1(hi),
@@ -218,6 +252,8 @@ try {
     }
     seen++;
     const q = S.question;
+    // the public question has no explanation by design, and validation renames ids (q1 → q1-1): go by position
+    const def = GAME.rounds[0].questions[q.number - 1];
     const qid = `q${q.number}`;
     for (const [name, kind, width, height, touch] of VIEWS) {
       if (`${S.phase}:${S.question?.id}` !== was) throw new Error(`the reveal of ${qid} went on to ${S.phase} by itself`);
@@ -248,9 +284,53 @@ try {
         check(m.apart, `${at}: no count over the next one (${m.cols.map((c) => `${c.text} ${c.tl}..${c.tr}`).join(', ')})`);
         if (!m.narrow) check(!m.lines.some((l) => l.wraps), `${at}: the card's lines each on one line (${m.lines.filter((l) => l.wraps).map((l) => l.text).join(' | ')})`);
         check(m.lines.every((l) => l.inside), `${at}: the card's lines inside it (${m.lines.filter((l) => !l.inside).map((l) => l.text).join(' | ')})`);
+        if (def.explanation && height <= 500) {
+          check(!m.why, `${at}: no band under a scene with no room for one`);
+          check(!!m.chip, `${at}: the explanation waits in its chip`);
+          if (m.chip) {
+            check(m.chip.onScreen, `${at}: the chip on the screen (${m.chip.box.join(', ')})`);
+            check(m.chip.clear, `${at}: the chip clear of the header's own buttons (${m.chip.box.join(', ')})`);
+          }
+        } else if (def.explanation) {
+          check(!m.chip, `${at}: no chip where the band has room`);
+          check(!!m.why, `${at}: the explanation is on the screen`);
+          if (m.why) {
+            check(m.why.into <= 0.5, `${at}: the explanation inside the side margins (${m.why.box[0]}..${m.why.box[1]} of ${m.lo}..${m.hi})`);
+            check(m.why.onScreen, `${at}: the explanation not past the bottom (${m.why.box[2]}..${m.why.box[3]} of ${innerHeightOf(height)})`);
+            check(m.why.fits, `${at}: the explanation's words inside it`);
+            check(m.why.capped, `${at}: a long explanation scrolls inside its band instead of taking the screen (${m.why.h} px)`);
+          }
+        } else {
+          check(!m.why && !m.chip, `${at}: no band or chip where the question explains nothing`);
+        }
+      }
+      if (def.explanation && height <= 500 && real.chip) {
+        await page.locator('[data-why-chip]').click();
+        await sleep(300);
+        const panel = await page.evaluate(() => {
+          const d = document.querySelector('[role=dialog][data-why]');
+          if (!d) return null;
+          const b = d.getBoundingClientRect();
+          const p = d.querySelector('p');
+          return {
+            box: [Math.round(b.left), Math.round(b.right), Math.round(b.top), Math.round(b.bottom)],
+            onScreen: b.left >= -0.5 && b.right <= innerWidth + 0.5 && b.top >= -0.5 && b.bottom <= innerHeight + 0.5,
+            fits: p.scrollWidth <= p.clientWidth + 0.5,
+            reachable: p.scrollHeight <= p.clientHeight + 0.5 || getComputedStyle(p).overflowY === 'auto',
+          };
+        });
+        await page.screenshot({ path: `${file}-why.png` });
+        check(!!panel, `${qid}-${q.type} ${name}: tapping the chip opens the explanation`);
+        if (panel) {
+          check(panel.onScreen, `${qid}-${q.type} ${name}: the explanation panel whole on the screen (${panel.box.join(', ')})`);
+          check(panel.fits && panel.reachable, `${qid}-${q.type} ${name}: every word of the explanation readable in its panel`);
+        }
+        await page.keyboard.press('Escape');
+        await sleep(200);
+        check(!(await page.locator('[role=dialog][data-why]').count()), `${qid}-${q.type} ${name}: Escape closes the panel`);
       }
       console.log(
-        `${qid} ${name.padEnd(17)} bars ${real.cols.map((c) => c.w).join('/')} card ${Math.round(real.card[1] - real.card[0])} gap ${real.gap} into ${real.into}` +
+        `${qid} ${name.padEnd(17)} bars ${real.cols.map((c) => c.w).join('/')} card ${Math.round(real.card[1] - real.card[0])} gap ${real.gap} into ${real.into} why ${real.why ? real.why.h : '-'} scroll ${real.scrolls}` +
           ` | widest: bars ${wide.cols.map((c) => c.w).join('/')} card ${Math.round(wide.card[1] - wide.card[0])} into ${wide.into}`,
       );
       await ctx.close();

@@ -226,6 +226,12 @@ function QuestionsList({ questions }: { questions: ReportQuestion[] }) {
             </div>
             <p className="mt-2 text-lg font-semibold">{q.prompt}</p>
             <QuestionResult q={q} />
+            {q.explanation && (
+              <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-slate-600">
+                <span aria-hidden>💡 </span>
+                {q.explanation}
+              </p>
+            )}
           </li>
         );
       })}
@@ -394,7 +400,7 @@ function playerRows(players: ReportPlayer[]) {
 
 function questionRows(questions: ReportQuestion[]) {
   return [
-    ['ข้อ', 'ด่าน', 'ประเภท', 'คำถาม', 'ตัวเลือก 1', 'ตัวเลือก 2', 'ตัวเลือก 3', 'ตัวเลือก 4', 'คำตอบที่ถูก', 'จำนวนคนตอบ', 'ตอบถูก', '% ถูก', 'เวลาเฉลี่ย (วินาที)', 'ค่าเฉลี่ยที่ทาย'],
+    ['ข้อ', 'ด่าน', 'ประเภท', 'คำถาม', 'ตัวเลือก 1', 'ตัวเลือก 2', 'ตัวเลือก 3', 'ตัวเลือก 4', 'คำตอบที่ถูก', 'จำนวนคนตอบ', 'ตอบถูก', '% ถูก', 'เวลาเฉลี่ย (วินาที)', 'ค่าเฉลี่ยที่ทาย', 'คำอธิบายเฉลย'],
     ...questions.map((q) => {
       const poll = q.type === 'poll';
       // a puzzle's items have no counts: players order all of them, they don't pick one
@@ -413,6 +419,7 @@ function questionRows(questions: ReportQuestion[]) {
         poll ? null : percent(q.correctCount, q.answered),
         seconds(q.avgMs),
         q.type === 'slider' ? (q.average ?? null) : null,
+        q.explanation ?? null,
       ];
     }),
   ];

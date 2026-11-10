@@ -74,6 +74,8 @@ export function StageView({ state, join, sound, online, onKick, onExpect, docked
         <Logo small compact />
         {/* one row on a phone too: what doesn't fit (a reconnect and a muted tab at once) goes onto a second */}
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
+          {/* where a reveal on a short screen puts its explanation chip */}
+          <span data-why-slot className="contents" />
           {counter && (
             <span className="glass px-3 py-1 font-display text-base font-semibold whitespace-nowrap sm:px-4 sm:py-1.5 sm:text-lg short:py-1 short:text-base">
               ข้อ {counter.number} / {counter.total}

@@ -1,4 +1,4 @@
-import type { Game } from '@pika-arena/shared';
+import { toRoomGame, type Game } from '@pika-arena/shared';
 import { dropBlankOptions } from './games';
 import { BASE_PATH } from './paths';
 import { getSocket } from './socket';
@@ -14,7 +14,7 @@ const SERVER_DOWN = BASE_PATH
 /** Opens a live room for a game and keeps the host token, so a refresh stays the Host. */
 export async function createRoom(game: Game): Promise<CreateRoomResult> {
   try {
-    const res = await getSocket().timeout(8000).emitWithAck('host:create', { game: dropBlankOptions(game) });
+    const res = await getSocket().timeout(8000).emitWithAck('host:create', { game: toRoomGame(dropBlankOptions(game)) });
     if (res.ok) {
       save(keys.hostToken(res.pin), res.hostToken);
       return { ok: true, pin: res.pin };

@@ -360,6 +360,9 @@ export class Room {
       totalPlayers: this.players.size,
       correctCount,
       avgMs: answered ? Math.round(msSum / answered) : null,
+      // a question from a knowledge base has had its explanation cut already (toRoomGame), so whatever
+      // is still here is safe to put on the big screen
+      ...(q.explanation ? { explanation: q.explanation } : {}),
     };
     this.stats.set(q.id, this.revealInfo);
     this.setPhase('reveal');
@@ -467,6 +470,7 @@ export class Room {
       result: revealed ? (p.results.get(question.id) ?? null) : null,
       correctChoices: revealed ? this.current!.slot.q.correct : null,
       key: revealed ? answerKey(this.current!.slot.q) : null,
+      ...(revealed && this.current!.slot.q.explanation ? { explanation: this.current!.slot.q.explanation } : {}),
     };
   }
 
@@ -560,6 +564,7 @@ export class Room {
           answered: s.answered,
           correctCount: s.correctCount,
           avgMs: s.avgMs,
+          ...(q.explanation ? { explanation: q.explanation } : {}),
         }];
       }),
       players: players.map((p, i) => {

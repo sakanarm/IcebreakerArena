@@ -9,6 +9,7 @@ import {
   cleanNickname,
   randomAvatar,
   randomNickname,
+  toRoomGame,
   validateGame,
   type ClientToServerEvents,
 } from '@pika-arena/shared';
@@ -105,7 +106,9 @@ export function startGameServer(
       if (!allow()) return done({ ok: false, error: 'rate_limited' });
       const checked = validateGame(payload?.game);
       if (!checked.ok) return done({ ok: false, error: 'invalid_game', message: checked.errors.slice(0, 5).join('\n') });
-      const room = rooms.create(checked.game);
+      // source and knowledge-base explanations never enter a room: the Host screen, the big screen
+      // and every phone are fed from this game (ROADMAP 11.9)
+      const room = rooms.create(toRoomGame(checked.game));
       attachHost(socket, room);
       console.log(`[room ${room.pin}] created: ${room.game.title}`);
       done({ ok: true, pin: room.pin, hostToken: room.hostToken, stageToken: room.stageToken });

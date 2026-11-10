@@ -220,6 +220,33 @@ export function QuestionEditor({
           </div>
         )}
         <p className="mt-3 text-sm text-slate-500">{HINTS[q.type]}</p>
+
+        <div className="mt-5">
+          <FieldLabel htmlFor={`why-${q.id}`} extra={<Counter length={(q.explanation ?? '').length} max={LIMITS.explanationMax} />}>
+            {q.type === 'poll' ? 'คำอธิบายเพิ่มเติม' : 'คำอธิบายเฉลย'} <span className="font-normal text-slate-400">(ไม่บังคับ)</span>
+          </FieldLabel>
+          <textarea
+            id={`why-${q.id}`}
+            value={q.explanation ?? ''}
+            onChange={(e) =>
+              set((x) => {
+                const v = e.target.value;
+                if (v) x.explanation = v;
+                else delete x.explanation;
+              })
+            }
+            maxLength={LIMITS.explanationMax}
+            rows={2}
+            placeholder={q.type === 'poll' ? 'อยากบอกอะไรตอนเฉลยผลโหวต' : 'ทำไมถึงเป็นคำตอบนี้ — หนึ่งประโยคที่ผู้เล่นจะได้ความรู้กลับไป'}
+            className="field resize-none"
+          />
+          <p className="mt-2 text-sm text-slate-500">
+            {q.source
+              ? '🔒 ข้อนี้สร้างจากหน้าในคลังความรู้ คำอธิบายกับที่มาจะเห็นเฉพาะในหน้าสร้างเกมนี้ ไม่ถูกส่งเข้าห้องเล่น'
+              : 'ขึ้นบนจอใหญ่และบนมือถือทุกเครื่องตอนเฉลย และติดไปในรายงานท้ายเกมด้วย'}
+          </p>
+        </div>
+
         <Issues items={issues} />
       </div>
     </div>

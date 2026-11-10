@@ -58,7 +58,9 @@ await page.waitForSelector(`text=${pin}`, { timeout: 20000 });
 const lobby = await page.innerText('body');
 check(lobby.includes(TITLE), 'the lobby names the game');
 check(lobby.includes('/play'), 'the lobby tells players where to go');
-check(await page.locator('svg, canvas, img').first().isVisible(), 'the lobby draws the QR');
+// the QR itself (it carries a title), given the moment it takes to slide in
+const qr = page.locator('svg', { has: page.locator('title', { hasText: 'สแกนเพื่อเข้าร่วมเกม' }) });
+check(await qr.first().waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false), 'the lobby draws the QR');
 await page.waitForTimeout(2000); // it animates in; shoot it settled
 await shoot(page, 'lobby');
 
