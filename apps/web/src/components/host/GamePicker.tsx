@@ -8,7 +8,7 @@ import { SAMPLE_GAMES, validateGame, type Game } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type AccountUser } from '@/lib/account';
 import { ApiError, apiMessage } from '@/lib/api';
 import { cloud, settled, type CatalogEntry, type GameRecord, type ReportReason } from '@/lib/cloud';
-import { copyGame, countQuestions, deleteMyGame, dropBlankOptions, listMyGames, saveMyGame } from '@/lib/games';
+import { copyGame, countAsked, countQuestions, deleteMyGame, dropBlankOptions, listMyGames, questionsLabel, saveMyGame } from '@/lib/games';
 import { createRoom } from '@/lib/host';
 import { warmHostSound } from '@/lib/use-sound';
 import { AccountChip, switchedText } from '../AccountChip';
@@ -709,7 +709,7 @@ function GameCard({
           </span>
         )}
         <span className="absolute right-3 bottom-3 rounded-full bg-white px-3 py-1 text-sm font-semibold text-ink shadow-md">
-          {game.rounds.length} ด่าน · {countQuestions(game)} ข้อ
+          {game.rounds.length} ด่าน · {questionsLabel(countAsked(game), countQuestions(game))}
         </span>
       </div>
       <div className="flex flex-1 flex-col p-5">

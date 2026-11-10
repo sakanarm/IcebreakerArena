@@ -91,12 +91,20 @@ export function validateGame(input: unknown): ValidateResult {
     if (questionsIn.length === 0) errors.push(`${where}: ต้องมีอย่างน้อย 1 คำถาม`);
     questionCount += questionsIn.length;
     const subtitle = str(rr.subtitle);
+    // a bank asks some of its questions. More than it has is not an error: questions get deleted
+    // after the number was set, and "all of them" is what is left to mean
+    const bank = rr.draw !== undefined && rr.draw !== null;
+    if (bank && (typeof rr.draw !== 'number' || !Number.isInteger(rr.draw) || rr.draw < 1)) {
+      errors.push(`${where}: จำนวนข้อที่สุ่มมาถามต้องเป็นเลขจำนวนเต็มตั้งแต่ 1 ขึ้นไป`);
+    }
+    const draw = bank && typeof rr.draw === 'number' ? Math.min(rr.draw, questionsIn.length) : 0;
     return {
       id: `r${ri + 1}`,
       title: (str(rr.title) || where).slice(0, LIMITS.titleMax),
       ...(subtitle ? { subtitle: subtitle.slice(0, LIMITS.titleMax) } : {}),
       multiplier,
       timed: rr.timed !== false,
+      ...(draw >= 1 ? { draw } : {}),
       questions: questionsIn.map((q, qi) => checkQuestion(q, `${where} ข้อ ${qi + 1}`, `q${ri + 1}-${qi + 1}`, errors)),
     };
   });

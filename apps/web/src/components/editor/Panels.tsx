@@ -1,8 +1,9 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { LIMITS, type Game } from '@pika-arena/shared';
-import { blankQuestion, countQuestions, estimateMinutes } from '@/lib/games';
+import { useId, useState } from 'react';
+import { LIMITS, askedCount, isBank, type Game, type Round } from '@pika-arena/shared';
+import { blankQuestion, countAsked, countQuestions, estimateMinutes } from '@/lib/games';
 import { ANSWER_BG } from '../shapes';
 import { CoverPicker } from './CoverPicker';
 import type { Edit, Selection } from './model';
@@ -10,9 +11,11 @@ import { Counter, FieldLabel, IconButton, Issues, Segmented, Toggle } from './ui
 
 /** Name, description, cover and scoring options for the whole game. */
 export function GameSettings({ game, issues, edit, onDelete }: { game: Game; issues: string[]; edit: Edit; onDelete: (() => void) | null }) {
+  const [asked, written] = [countAsked(game), countQuestions(game)];
   const stats = [
     { label: 'ด่าน', value: game.rounds.length },
-    { label: 'คำถาม', value: countQuestions(game) },
+    // with a question bank: what one room asks, out of what is written
+    asked < written ? { label: `ข้อต่อรอบ จากคลัง ${written} ข้อ`, value: `🎲 ${asked}` } : { label: 'คำถาม', value: written },
     { label: 'นาทีโดยประมาณ', value: `~${estimateMinutes(game)}` },
   ];
   return (
@@ -91,6 +94,9 @@ export function RoundEditor({
   const total = game.rounds.length;
   const multiplier = round.multiplier ?? 1;
   const timed = round.timed !== false;
+  const count = round.questions.length;
+  const bank = isBank(round);
+  const asked = askedCount(round);
 
   const move = (to: number) =>
     edit((d) => {
@@ -131,7 +137,7 @@ export function RoundEditor({
 
       {/* what the big screen shows when this round starts */}
       <motion.div
-        key={`${multiplier}-${timed}`}
+        key={`${multiplier}-${timed}-${bank}`}
         initial={{ scale: 0.97 }}
         animate={{ scale: 1 }}
         className={`relative mt-4 overflow-hidden rounded-3xl p-6 text-center shadow-xl ${ANSWER_BG[ri % 4]}`}
@@ -144,7 +150,9 @@ export function RoundEditor({
         <div className="mt-3 flex flex-wrap justify-center gap-2 text-sm">
           {multiplier > 1 && <span className="rounded-full bg-gold px-3 py-1 font-bold text-ink">คะแนน ×{multiplier}</span>}
           {!timed && <span className="rounded-full bg-black/20 px-3 py-1">⏱️ ไม่นับความเร็ว</span>}
-          <span className="rounded-full bg-black/20 px-3 py-1">{round.questions.length} ข้อ</span>
+          <span data-round-count className="rounded-full bg-black/20 px-3 py-1">
+            {!bank ? `${count} ข้อ` : asked < count ? `🎲 สุ่ม ${asked} จาก ${count} ข้อ` : count > 1 ? `🎲 ${count} ข้อ สลับลำดับ` : `🎲 ${count} ข้อ`}
+          </span>
         </div>
       </motion.div>
 
@@ -191,11 +199,102 @@ export function RoundEditor({
           label="⚡ นับความเร็ว"
           hint={timed ? 'ตอบถูกเร็วได้แต้มมากกว่า (สูงสุด 1,000 ต่อข้อ)' : 'ตอบถูกได้ 1,000 เต็มทุกคน เหมาะกับคำถามที่ต้องใช้ความคิด'}
         />
+        <BankControl
+          round={round}
+          onChange={(draw) =>
+            edit((d) => {
+              if (draw === null) delete d.rounds[ri].draw;
+              else d.rounds[ri].draw = draw;
+            })
+          }
+        />
         <Issues items={issues} />
         <button type="button" onClick={addQuestion} className="btn btn-primary w-full">
           ＋ เพิ่มคำถามในด่านนี้
         </button>
       </div>
+    </div>
+  );
+}
+
+/** what a bank starts at: 10 of a big one, half of a small one */
+const firstDraw = (count: number) => Math.max(1, Math.min(10, Math.ceil(count / 2)));
+
+/**
+ * Makes the round a question bank: write many questions, and each room asks only some of them,
+ * drawn at random. The number is held to what the round has, so it can always be played.
+ */
+function BankControl({ round, onChange }: { round: Round; onChange: (draw: number | null) => void }) {
+  const id = useId();
+  const count = round.questions.length;
+  const bank = isBank(round);
+  const asked = askedCount(round);
+  // the box may hold half-typed text; undo and deleted questions change the number from outside
+  const [text, setText] = useState(String(asked));
+  const [seen, setSeen] = useState(asked);
+  if (seen !== asked) {
+    setSeen(asked);
+    setText(String(asked));
+  }
+  const set = (n: number) => {
+    const to = Math.max(1, Math.min(count, n));
+    setSeen(to);
+    setText(String(to));
+    onChange(to);
+  };
+
+  return (
+    <div>
+      <Toggle
+        on={bank}
+        onChange={(on) => onChange(on ? firstDraw(count) : null)}
+        label="🎲 สุ่มคำถามจากคลัง"
+        hint={
+          bank
+            ? 'เปิดห้องแต่ละครั้ง ระบบสุ่มคำถามของด่านนี้มาถามใหม่ ไม่ซ้ำข้อ และสลับลำดับทุกครั้ง'
+            : 'ใส่คำถามไว้เยอะ ๆ เป็นคลัง แล้วให้แต่ละรอบสุ่มมาถามแค่บางข้อ เล่นซ้ำก็ไม่เจอชุดเดิม'
+        }
+      />
+      {bank && (
+        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} data-bank className="mt-2 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-200">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <label htmlFor={id} className="font-display font-semibold">
+              แต่ละรอบถาม
+            </label>
+            <div className="flex items-center gap-1.5">
+              <IconButton label="ถามน้อยลง 1 ข้อ" onClick={() => set(asked - 1)} disabled={asked <= 1}>
+                −
+              </IconButton>
+              <input
+                id={id}
+                inputMode="numeric"
+                autoComplete="off"
+                value={text}
+                onChange={(e) => {
+                  const t = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+                  if (t === '' || Number(t) < 1) return setText(t);
+                  set(Number(t));
+                }}
+                onBlur={() => setText(String(asked))}
+                className="field w-20 px-2 text-center font-display text-xl font-bold tabular-nums"
+              />
+              <IconButton label="ถามเพิ่ม 1 ข้อ" onClick={() => set(asked + 1)} disabled={asked >= count}>
+                ＋
+              </IconButton>
+            </div>
+            <span className="text-slate-600">
+              ข้อ จากทั้งหมด <b className="text-ink">{count}</b> ข้อในด่านนี้
+            </span>
+          </div>
+          <p data-bank-note className="mt-2 text-sm text-slate-500">
+            {asked < count
+              ? `อีก ${count - asked} ข้อพักไว้รอบหน้า ทุกข้อมีโอกาสถูกสุ่มเท่ากัน คะแนนและรายงานนับเฉพาะข้อที่ถูกถาม`
+              : count > 1
+                ? `ตอนนี้ถามครบทั้ง ${count} ข้อ แค่สลับลำดับ ถ้าอยากให้แต่ละรอบได้ชุดต่างกัน เพิ่มคำถามในด่านนี้ หรือลดจำนวนที่ถาม`
+                : 'ด่านนี้มีข้อเดียว เพิ่มคำถามเข้าคลังก่อน แล้วค่อยเลือกว่าจะสุ่มมาถามกี่ข้อ'}
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   cleanNickname,
   randomAvatar,
   randomNickname,
+  drawGame,
   toRoomGame,
   validateGame,
   type ClientToServerEvents,
@@ -107,8 +108,9 @@ export function startGameServer(
       const checked = validateGame(payload?.game);
       if (!checked.ok) return done({ ok: false, error: 'invalid_game', message: checked.errors.slice(0, 5).join('\n') });
       // source and knowledge-base explanations never enter a room: the Host screen, the big screen
-      // and every phone are fed from this game (ROADMAP 11.9)
-      const room = rooms.create(toRoomGame(checked.game));
+      // and every phone are fed from this game (ROADMAP 11.9). A question bank is drawn here, once,
+      // so the room holds only the questions it will ask and every screen and the report agree.
+      const room = rooms.create(drawGame(toRoomGame(checked.game)));
       attachHost(socket, room);
       console.log(`[room ${room.pin}] created: ${room.game.title}`);
       done({ ok: true, pin: room.pin, hostToken: room.hostToken, stageToken: room.stageToken });

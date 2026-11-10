@@ -3,6 +3,8 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useId, useState } from 'react';
 import {
+  askedCount,
+  isBank,
   LIMITS,
   OPTION_COUNT,
   QUESTION_TYPES,
@@ -112,6 +114,11 @@ export function QuestionEditor({
           <h2 className="text-2xl font-extrabold">
             ข้อ {qi + 1} <span className="text-base font-normal text-white/60">จาก {count}</span>
           </h2>
+          {isBank(round) && askedCount(round) < count && (
+            <p data-bank-note className="mt-0.5 text-sm text-white/70">
+              🎲 ด่านนี้สุ่มถาม {askedCount(round)} จาก {count} ข้อ ข้อนี้จึงไม่ได้ถูกถามทุกรอบ
+            </p>
+          )}
         </div>
         <div className="flex gap-2 rounded-2xl bg-white p-1.5">
           <IconButton label="เลื่อนขึ้น" onClick={() => move(qi - 1)} disabled={qi === 0}>

@@ -152,3 +152,41 @@ test('a game that passes fits in one message to the game server, and one too big
   if (most.ok) assert.ok(gameBytes({ game: most.game }) < MESSAGE_MAX_BYTES && gameBytes(most.game) <= LIMITS.gameBytesMax);
   assert.ok(LIMITS.gameBytesMax < MESSAGE_MAX_BYTES);
 });
+
+// ---------- question banks ----------
+
+const banked = (draw: unknown, size = 5) =>
+  validateGame({
+    title: 'T',
+    rounds: [{ title: 'R', draw, questions: Array.from({ length: size }, (_, i) => ({ type: 'truefalse', prompt: `Q${i + 1}`, options: ['จริง', 'เท็จ'], correct: [0], timeLimitS: 10 })) }],
+  });
+
+test('a round keeps how many questions it draws, and drops it when it is not a bank', () => {
+  const res = banked(3);
+  assert.ok(res.ok);
+  assert.equal(res.game.rounds[0].draw, 3);
+  assert.equal(res.game.rounds[0].questions.length, 5);
+  for (const none of [undefined, null]) {
+    const plain = banked(none);
+    assert.ok(plain.ok);
+    assert.ok(!('draw' in plain.game.rounds[0]));
+  }
+});
+
+test('drawing more than the round has means all of them; a draw must be a whole number from 1', () => {
+  const over = banked(40);
+  assert.ok(over.ok);
+  assert.equal(over.game.rounds[0].draw, 5);
+  for (const bad of [0, -2, 2.5, '3', true, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const res = banked(bad);
+    assert.equal(res.ok, false, `draw ${String(bad)} passed`);
+    if (!res.ok) assert.ok(res.errors.includes('ด่าน 1: จำนวนข้อที่สุ่มมาถามต้องเป็นเลขจำนวนเต็มตั้งแต่ 1 ขึ้นไป'), res.errors.join(' | '));
+  }
+});
+
+test('a bank counts whole toward the size of a game, not just what it asks', () => {
+  const res = banked(1, LIMITS.questionsMax + 1);
+  assert.equal(res.ok, false);
+  if (!res.ok) assert.ok(res.errors.some((e) => e.includes(`ไม่เกิน ${LIMITS.questionsMax} ข้อ`)));
+  assert.equal(banked(1, LIMITS.questionsMax).ok, true);
+});

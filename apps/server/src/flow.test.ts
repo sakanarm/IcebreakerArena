@@ -749,3 +749,88 @@ test('the reveal teaches: an explanation reaches the screens and the report, but
   // nothing anywhere in what the room was handed mentions the page
   assert.equal(JSON.stringify([rev1, rev2, report.report]).includes('secret.md'), false);
 });
+
+test('a question bank: the room asks only the questions drawn for it, each once, and counts and reports those alone', async () => {
+  const bank = Array.from({ length: 8 }, (_, i) => ({ id: `b${i}`, type: 'truefalse' as const, prompt: `Bank ${i + 1}`, options: ['จริง', 'เท็จ'], correct: [0], timeLimitS: 5 }));
+  const game: Game = {
+    id: 'bank',
+    title: 'Bank test',
+    rounds: [
+      { id: 'r1', title: 'Bank', draw: 3, questions: bank },
+      { id: 'r2', title: 'Fixed', questions: [{ id: 'z', type: 'quiz', prompt: 'Last', options: ['A', 'B'], correct: [0], timeLimitS: 5 }] },
+    ],
+  };
+
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  const created = await host.emitWithAck('host:create', { game });
+  assert.ok(created.ok);
+  const player = await connect();
+  assert.ok((await player.emitWithAck('player:join', { pin: created.pin, nickname: 'Ploy', avatar: '🦊' })).ok);
+  await stage.until((s) => s.playerCount === 1);
+
+  host.emit('host:next');
+  const intro = await stage.until((s) => s.phase === 'round');
+  assert.equal(intro.round?.questionCount, 3, 'the round card counts what will be asked, not the bank');
+  host.emit('host:next');
+
+  const asked: string[] = [];
+  for (let n = 1; n <= 4; n++) {
+    const q = (await stage.until((s) => s.phase === 'question' && s.question?.number === n)).question!;
+    assert.equal(q.total, 4, 'three from the bank and the one fixed question');
+    assert.equal(q.roundIndex, n <= 3 ? 0 : 1);
+    asked.push(q.prompt);
+    await sleepUntil(q.startsAt);
+    assert.ok((await player.emitWithAck('player:answer', { questionId: q.id, choice: 0 })).ok);
+    await stage.until((s) => s.phase === 'reveal' && s.question?.number === n);
+    host.emit('host:next');
+    if (n === 4) break;
+    await stage.until((s) => s.phase === 'leaderboard');
+    host.emit('host:next');
+    if (n === 3) {
+      // the bank is used up after its three: the next round starts, it does not go on to a fourth
+      assert.equal((await stage.until((s) => s.phase === 'round' && s.round?.index === 1)).round?.questionCount, 1);
+      host.emit('host:next');
+    }
+  }
+  const drawn = asked.slice(0, 3);
+  assert.equal(new Set(drawn).size, 3, `no question twice: ${drawn.join(', ')}`);
+  assert.ok(drawn.every((p) => /^Bank [1-8]$/.test(p)), drawn.join(', '));
+  assert.equal(asked[3], 'Last', 'a round that is not a bank is asked as written');
+
+  await stage.until((s) => s.phase === 'podium');
+  const report = await host.emitWithAck('host:report');
+  assert.ok(report.ok);
+  assert.deepEqual(
+    report.report.questions.map((q) => q.prompt),
+    asked,
+    'the report has the questions that were asked, in the order they were asked',
+  );
+  assert.equal(report.report.players[0]?.correctCount, 4);
+});
+
+test('a bank that asks for more than it has asks them all; a draw that is not a count is refused before any room opens', async () => {
+  const round = (draw: unknown) => ({
+    id: 'r1',
+    title: 'Bank',
+    draw,
+    questions: [1, 2].map((i) => ({ id: `b${i}`, type: 'truefalse', prompt: `Bank ${i}`, options: ['จริง', 'เท็จ'], correct: [0], timeLimitS: 5 })),
+  });
+  const host = await connect();
+  const stage = track<StageState>(host, 'stage:state');
+  for (const bad of [0, -1, 1.5, 'all']) {
+    const refused = await host.emitWithAck('host:create', { game: { id: 'x', title: 'Bad bank', rounds: [round(bad)] } as unknown as Game });
+    assert.equal(refused.ok, false, `draw ${String(bad)}`);
+    if (!refused.ok) assert.equal(refused.error, 'invalid_game');
+  }
+  const created = await host.emitWithAck('host:create', { game: { id: 'x', title: 'Small bank', rounds: [round(99)] } as unknown as Game });
+  assert.ok(created.ok);
+  // a game starts once somebody is in it
+  const player = await connect();
+  assert.ok((await player.emitWithAck('player:join', { pin: created.pin, nickname: 'Ploy', avatar: '🦊' })).ok);
+  await stage.until((s) => s.playerCount === 1);
+  host.emit('host:next');
+  assert.equal((await stage.until((s) => s.phase === 'round')).round?.questionCount, 2);
+  host.emit('host:next');
+  assert.equal((await stage.until((s) => s.phase === 'question')).question?.total, 2);
+});

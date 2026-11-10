@@ -1,4 +1,4 @@
-import { OPTION_COUNT, SAMPLE_GAMES, copyTitle, leadInMs, ROUND_INTRO_MS, type Game, type Question, type Round } from '@pika-arena/shared';
+import { OPTION_COUNT, SAMPLE_GAMES, askedCount, copyTitle, leadInMs, ROUND_INTRO_MS, type Game, type Question, type Round } from '@pika-arena/shared';
 import { keys, load, save } from './storage';
 
 /** Games made in the editor live in this browser until the Phase 2 database arrives. */
@@ -50,8 +50,19 @@ export function copyGame(game: Game): Game {
   return copy;
 }
 
+/** every question written, a bank's included: what the size limit counts */
 export function countQuestions(game: Game) {
   return game.rounds.reduce((n, r) => n + r.questions.length, 0);
+}
+
+/** the questions one room asks: a question bank counts for what it draws */
+export function countAsked(game: Game) {
+  return game.rounds.reduce((n, r) => n + askedCount(r), 0);
+}
+
+/** "12 ข้อ", or "🎲 10 จาก 30 ข้อ" when a bank leaves some of them out of each room */
+export function questionsLabel(asked: number, written: number) {
+  return asked < written ? `🎲 ${asked} จาก ${written} ข้อ` : `${written} ข้อ`;
 }
 
 /**
@@ -87,7 +98,10 @@ export function estimateMinutes(game: Game): number {
   let ms = 0;
   for (const r of game.rounds) {
     ms += ROUND_INTRO_MS;
-    for (const q of r.questions) ms += leadInMs(q.prompt) + q.timeLimitS * 1000 + 10_000;
+    let all = 0;
+    for (const q of r.questions) all += leadInMs(q.prompt) + q.timeLimitS * 1000 + 10_000;
+    // a bank asks some of its questions: its average question, that many times
+    if (r.questions.length > 0) ms += (all * askedCount(r)) / r.questions.length;
   }
   return Math.max(1, Math.round(ms / 60_000));
 }

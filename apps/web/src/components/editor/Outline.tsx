@@ -1,7 +1,7 @@
 'use client';
 
 import { Reorder, useDragControls } from 'motion/react';
-import { LIMITS, type Game, type Question } from '@pika-arena/shared';
+import { LIMITS, askedCount, isBank, type Game, type Question } from '@pika-arena/shared';
 import { TYPE_ICON } from '@/lib/format';
 import { blankQuestion, blankRound, countQuestions } from '@/lib/games';
 import { GameCover } from '../cover/GameCover';
@@ -69,6 +69,16 @@ export function Outline({
             >
               <span className={`grid size-7 shrink-0 place-items-center rounded-lg text-sm font-bold text-white ${ANSWER_BG[ri % 4]}`}>{ri + 1}</span>
               <span className="min-w-0 flex-1 truncate font-display font-semibold">{r.title || `ด่าน ${ri + 1}`}</span>
+              {isBank(r) && (
+                <span
+                  role="img"
+                  aria-label={`สุ่ม ${askedCount(r)} จาก ${r.questions.length} ข้อ`}
+                  title={`สุ่ม ${askedCount(r)} จาก ${r.questions.length} ข้อ`}
+                  className="shrink-0 rounded-full px-2 text-xs font-bold whitespace-nowrap ring-1 ring-current/40"
+                >
+                  🎲 {askedCount(r)}/{r.questions.length}
+                </span>
+              )}
               {(r.multiplier ?? 1) > 1 && <span className="rounded-full bg-gold px-2 text-xs font-bold text-ink">×{r.multiplier}</span>}
               {roundWarn && <WarnDot />}
             </button>

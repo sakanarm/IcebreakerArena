@@ -110,6 +110,8 @@ export function normalizeDraft(input: unknown): Game | null {
       ...(typeof r.subtitle === 'string' ? { subtitle: text(r.subtitle, CAP.title) } : {}),
       ...(typeof r.multiplier === 'number' && Number.isFinite(r.multiplier) ? { multiplier: r.multiplier } : {}),
       ...(typeof r.timed === 'boolean' ? { timed: r.timed } : {}),
+      // a question bank's draw; anything that is not a count is no bank (validateGame says the rest)
+      ...(typeof r.draw === 'number' && Number.isInteger(r.draw) && r.draw >= 1 ? { draw: Math.min(r.draw, CAP.questions) } : {}),
       questions: list(r.questions, CAP.questions)
         .filter(isObj)
         .map((q, qi): Question => {

@@ -363,6 +363,27 @@ test('drafts lose NULs and half emoji; fields over what is kept are refused, not
   assert.equal(normalizeDraft({ rounds: [{ questions: [{ imageUrl: '' }] }] })!.rounds[0]!.questions[0]!.imageUrl, undefined);
 });
 
+test('a question bank: a draft keeps how many questions a room draws, drops a draw that is not a count, and saves and copies carry it', async () => {
+  const round = (draw: unknown) => ({ rounds: [{ title: 'r', draw, questions: [{ prompt: 'a' }, { prompt: 'b' }, { prompt: 'c' }] }] });
+  assert.equal(normalizeDraft(round(2))!.rounds[0]!.draw, 2);
+  assert.equal(normalizeDraft(round(9))!.rounds[0]!.draw, 9, 'more than the round has stays as typed: validateGame holds it to the round');
+  assert.equal(normalizeDraft(round(5000))!.rounds[0]!.draw, 200, 'never more than a round can keep');
+  for (const junk of [0, -1, 1.5, '3', null, undefined, true, NaN, Infinity, {}, [2]]) {
+    assert.equal('draw' in normalizeDraft(round(junk))!.rounds[0]!, false, String(JSON.stringify(junk)));
+  }
+  assert.equal('draw' in normalizeDraft({ rounds: [{ questions: [{ prompt: 'a' }] }] })!.rounds[0]!, false, 'a plain round stays plain');
+
+  const a = await newUser();
+  const banked = (draw: number) => ({ ...sample(), rounds: sample().rounds.map((r, i) => (i === 0 ? { ...r, draw } : r)) });
+  const rec = await createGame(db, a.id, normalizeDraft(banked(1))!, 'new');
+  assert.equal((await getGame(db, a.id, rec.id))!.game.rounds[0]!.draw, 1);
+  assert.equal('draw' in (await getGame(db, a.id, rec.id))!.game.rounds[1]!, false);
+  const saved = await saveGame(db, a.id, rec.id, normalizeDraft(banked(2))!, rec.version);
+  assert.ok(saved.ok);
+  assert.equal((await getGame(db, a.id, rec.id))!.game.rounds[0]!.draw, 2);
+  assert.equal((await copyGame(db, a.id, rec.id))!.game.rounds[0]!.draw, 2);
+});
+
 test('a cover keeps only known colors, pictures and one emoji, and goes along with saves, shares and copies', async () => {
   assert.deepEqual(normalizeDraft({ cover: { color: 'sky', emoji: ' 🚀 ', art: 'nope' } })!.cover, { color: 'sky', emoji: '🚀' });
   assert.deepEqual(normalizeDraft({ cover: { emoji: '👩🏽\u{200D}💻', art: 'party' } })!.cover, { emoji: '👩🏽\u{200D}💻', art: 'party' });

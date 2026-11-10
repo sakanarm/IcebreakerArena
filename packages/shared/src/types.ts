@@ -71,6 +71,12 @@ export interface Round {
   multiplier?: number;
   /** false = accuracy mode ("ไม่นับเวลา"): every correct answer scores 1,000 */
   timed?: boolean;
+  /**
+   * Makes the round a question bank: a room asks only this many of its questions, picked at random
+   * and in a random order when the room opens (`drawGame()`), so playing the game again brings a
+   * different set. Unset = every question, in the order written.
+   */
+  draw?: number;
   questions: Question[];
 }
 
