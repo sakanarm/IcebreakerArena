@@ -17,6 +17,8 @@ export interface GameRecord {
   sharedStatus: 'listed' | 'hidden' | null;
   /** built from content a report took down (this game, one it was copied from, or a copy of the reported entry): can't be shared until a curator clears it */
   held: boolean;
+  /** the game's exam link, while one is open; `stale`: the game was saved since the link's copy was made */
+  exam: { id: string; stale: boolean } | null;
   game: Game;
 }
 
@@ -157,6 +159,8 @@ type GameRow = {
   entry_id: string | null;
   entry_status: 'listed' | 'hidden' | null;
   held: boolean;
+  exam_id: string | null;
+  exam_version: number | null;
 };
 
 /**
@@ -164,9 +168,11 @@ type GameRow = {
  * Holds are few (one per takedown), so checking each game against all of them stays cheap.
  */
 const SELECT = `SELECT g.id, g.version, g.tainted, g.origin, g.updated_at, g.data, g.ancestors, e.id AS entry_id, e.status AS entry_status,
+    x.id AS exam_id, x.game_version AS exam_version,
     EXISTS (SELECT 1 FROM ib_catalog_entries h
              WHERE h.hold IS NOT NULL AND (h.hold ? g.id OR g.ancestors ?| ARRAY(SELECT jsonb_array_elements_text(h.hold)))) AS held
-  FROM ib_games g LEFT JOIN ib_catalog_entries e ON e.game_id = g.id AND e.status <> 'withdrawn'`;
+  FROM ib_games g LEFT JOIN ib_catalog_entries e ON e.game_id = g.id AND e.status <> 'withdrawn'
+       LEFT JOIN ib_exams x ON x.game_id = g.id`;
 
 const toRecord = (r: GameRow): GameRecord => ({
   id: r.id,
@@ -177,6 +183,7 @@ const toRecord = (r: GameRow): GameRecord => ({
   sharedEntryId: r.entry_id,
   sharedStatus: r.entry_status,
   held: r.held,
+  exam: r.exam_id ? { id: r.exam_id, stale: r.exam_version !== r.version } : null,
   game: { ...r.data, id: r.id },
 });
 
@@ -254,6 +261,7 @@ export async function saveGame(sql: Sql, ownerId: string, id: string, draft: Gam
 
 /**
  * Deleting a game leaves its catalog snapshot alone: what was shared stays shared until withdrawn.
+ * Its exam link goes with it (the row cascades), so a link never outlives the game it was opened for.
  * Copies keep the deleted game's id in their lineage, so a takedown still reaches them.
  */
 export async function deleteGame(sql: Sql, ownerId: string, id: string): Promise<boolean> {

@@ -3,13 +3,15 @@
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
-import { SAMPLE_GAMES, validateGame, type Game } from '@pika-arena/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
+import { SAMPLE_GAMES, buildExam, examSize, validateGame, type Game } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type AccountUser } from '@/lib/account';
 import { ApiError, apiMessage } from '@/lib/api';
 import { cloud, settled, type CatalogEntry, type GameRecord, type ReportReason } from '@/lib/cloud';
 import { copyGame, countAsked, countQuestions, deleteMyGame, dropBlankOptions, listMyGames, questionsLabel, saveMyGame } from '@/lib/games';
 import { createRoom } from '@/lib/host';
+import { withBase } from '@/lib/paths';
 import { warmHostSound } from '@/lib/use-sound';
 import { AccountChip, switchedText } from '../AccountChip';
 import { GameCover } from '../cover/GameCover';
@@ -18,6 +20,10 @@ import { FloatingShapes, Logo } from '../shapes';
 import { OpenRooms } from './OpenRooms';
 
 type Toast = { text: string; tone: 'bad' | 'good' };
+
+/** whether exam mode has anything to ask from this game (quiz and true/false questions with an answer) */
+const hasExam = (game: Game) => examSize(buildExam(dropBlankOptions(game))) > 0;
+const examHref = (game: Game, code = game.id) => (hasExam(game) ? `/exam/${code}` : null);
 
 /** Host home: pick one of your games, a sample, or a shared game, and open a live room for it. */
 export function GamePicker() {
@@ -110,7 +116,7 @@ export function GamePicker() {
         {ready && !user && (
           <Section title="เกมตัวอย่าง" note="เล่นได้ทันที">
             {SAMPLE_GAMES.map((g, i) => (
-              <GameCard key={g.id} game={g} index={i + 2} tag="ตัวอย่าง" busy={starting === g.id} locked={!!starting} onStart={start}>
+              <GameCard key={g.id} game={g} index={i + 2} tag="ตัวอย่าง" busy={starting === g.id} locked={!!starting} onStart={start} examHref={examHref(g)}>
                 {!accounts && <CopySampleButton game={g} />}
               </GameCard>
             ))}
@@ -125,7 +131,7 @@ export function GamePicker() {
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
-            className={`fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-lg items-start gap-3 rounded-2xl px-5 py-4 font-semibold shadow-2xl ${toast.tone === 'bad' ? 'bg-bad' : 'bg-good'}`}
+            className={`fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-[60] mx-auto flex max-w-lg items-start gap-3 rounded-2xl px-5 py-4 font-semibold shadow-2xl ${toast.tone === 'bad' ? 'bg-bad' : 'bg-good'}`}
           >
             <span aria-hidden>{toast.tone === 'bad' ? '⚠️' : '✓'}</span>
             <span className="flex-1">{toast.text}</span>
@@ -169,6 +175,7 @@ function BrowserGames({ starting, onStart }: { starting: string | null; onStart:
               locked={!!starting}
               onStart={onStart}
               fixHref={ready ? null : `/editor?id=${g.id}`}
+              examHref={examHref(g)}
             >
               {ready && <EditLink id={g.id} />}
               <DeleteButton title={g.title} onClick={() => remove(g)} />
@@ -212,6 +219,8 @@ function AccountGames({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [reporting, setReporting] = useState<CatalogEntry | null>(null);
+  /** the game whose exam link dialog is open; the dialog reads the record fresh from `games` */
+  const [examFor, setExamFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -267,7 +276,8 @@ function AccountGames({
 
   const remove = (rec: GameRecord) => {
     const shared = rec.sharedEntryId ? '\n\nฉบับที่แชร์ไว้ในคลังกลางจะยังอยู่ ถ้าไม่อยากให้อยู่ กด “ถอนออก” ก่อน' : '';
-    if (!confirm(`ลบเกม “${rec.game.title || 'ไม่มีชื่อ'}” ใช่ไหม? ลบแล้วกู้คืนไม่ได้${shared}`)) return;
+    const exam = rec.exam ? '\n\nลิงก์ข้อสอบของเกมนี้จะถูกปิดไปด้วย คนที่ได้ลิงก์ไปจะเปิดไม่ได้อีก' : '';
+    if (!confirm(`ลบเกม “${rec.game.title || 'ไม่มีชื่อ'}” ใช่ไหม? ลบแล้วกู้คืนไม่ได้${shared}${exam}`)) return;
     void act(`remove:${rec.id}`, async () => void (await cloud.remove(rec.id)));
   };
 
@@ -310,15 +320,23 @@ function AccountGames({
                 locked={busy}
                 onStart={onStart}
                 fixHref={ready ? null : `/editor?id=${rec.id}`}
+                examHref={examHref(rec.game, rec.id)}
                 footer={
-                  <ShareRow
-                    rec={rec}
-                    ready={ready}
-                    disabled={busy}
-                    working={working === `share:${rec.id}` || working === `withdraw:${rec.sharedEntryId}`}
-                    onShare={() => share(rec)}
-                    onWithdraw={() => rec.sharedEntryId && withdraw(rec.sharedEntryId, rec.game.title)}
-                  />
+                  <>
+                    {(rec.exam || (ready && hasExam(rec.game))) && (
+                      <FooterButton disabled={busy} onClick={() => setExamFor(rec.id)}>
+                        {working === `exam:${rec.id}` ? 'กำลังดำเนินการ…' : rec.exam ? (rec.exam.stale ? '🔗 ลิงก์ข้อสอบ (มีฉบับใหม่)' : '🔗 ลิงก์ข้อสอบ') : '🔗 เปิดลิงก์ข้อสอบ'}
+                      </FooterButton>
+                    )}
+                    <ShareRow
+                      rec={rec}
+                      ready={ready}
+                      disabled={busy}
+                      working={working === `share:${rec.id}` || working === `withdraw:${rec.sharedEntryId}`}
+                      onShare={() => share(rec)}
+                      onWithdraw={() => rec.sharedEntryId && withdraw(rec.sharedEntryId, rec.game.title)}
+                    />
+                  </>
                 }
               >
                 {ready && <EditLink id={rec.id} />}
@@ -331,7 +349,7 @@ function AccountGames({
 
       <Section title="คลังเกมกลาง" note="เกมตัวอย่างและเกมที่เพื่อนแชร์ไว้ เล่นได้ทันที หรือทำสำเนาไปแก้เป็นของคุณ">
         {SAMPLE_GAMES.map((g, i) => (
-          <GameCard key={g.id} game={g} index={i + 2} tag="ตัวอย่าง" busy={starting === g.id} locked={busy} onStart={onStart}>
+          <GameCard key={g.id} game={g} index={i + 2} tag="ตัวอย่าง" busy={starting === g.id} locked={busy} onStart={onStart} examHref={examHref(g)}>
             <Link href={`/editor?id=${g.id}`} className="btn bg-slate-100 px-4 text-base text-ink">
               📄 ทำสำเนาไปแก้
             </Link>
@@ -372,6 +390,20 @@ function AccountGames({
           </GameCard>
         ))}
       </Section>
+
+      <AnimatePresence>
+        {examFor && games?.some((g) => g.id === examFor) && (
+          <ExamLinkDialog
+            rec={games.find((g) => g.id === examFor)!}
+            working={working === `exam:${examFor}`}
+            onClose={() => setExamFor(null)}
+            onOpen={(again) =>
+              void act(`exam:${examFor}`, async () => (await cloud.openExam(examFor), again ? 'อัปเดตข้อสอบในลิงก์แล้ว ลิงก์เดิมใช้ต่อได้' : 'เปิดลิงก์ข้อสอบแล้ว'))
+            }
+            onCloseLink={() => void act(`exam:${examFor}`, async () => (await cloud.closeExam(examFor), 'ปิดลิงก์ข้อสอบแล้ว'))}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {reporting && (
@@ -519,6 +551,162 @@ function MoveBrowserGames({ user, onMoved, say }: { user: AccountUser; onMoved: 
         </div>
       )}
     </>
+  );
+}
+
+/** One of the user's games as an exam link: open it, hand it out (copy, QR code), bring it up to date, close it. */
+function ExamLinkDialog({
+  rec,
+  working,
+  onClose,
+  onOpen,
+  onCloseLink,
+}: {
+  rec: GameRecord;
+  working: boolean;
+  onClose: () => void;
+  /** `again`: bring the open link up to the game as it is now */
+  onOpen: (again: boolean) => void;
+  onCloseLink: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const ready = validateGame(dropBlankOptions(rec.game)).ok;
+  const blocked = rec.held || rec.sharedStatus === 'hidden';
+  // only ever rendered after a click, so `location` is there
+  const url = rec.exam ? `${location.origin}${withBase(`/exam/${rec.exam.id}`)}` : '';
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 2500);
+    return () => clearTimeout(t);
+  }, [copied]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+    } catch {
+      // no clipboard (an http page, a locked-down browser): select it for Ctrl+C instead
+      field.current?.select();
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/60 p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="exam-link-title"
+        initial={{ y: 20, scale: 0.97 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 20, scale: 0.97 }}
+        className="card w-full max-w-lg p-6 scheme-light"
+      >
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h2 id="exam-link-title" className="text-xl font-bold">
+              ลิงก์ข้อสอบ
+            </h2>
+            <p className="mt-0.5 truncate text-slate-500">{rec.game.title || 'เกมไม่มีชื่อ'}</p>
+          </div>
+          <button type="button" onClick={onClose} className="btn bg-slate-100 px-3 text-base text-ink" aria-label="ปิดหน้าต่าง">
+            ✕
+          </button>
+        </div>
+
+        {rec.exam ? (
+          <>
+            <p className="mt-4 text-slate-600">ใครได้ลิงก์นี้ทำข้อสอบได้ทันทีโดยไม่ต้องเข้าสู่ระบบ คำตอบและคะแนนเก็บไว้ในเครื่องของคนทำเท่านั้น</p>
+            <div className="mt-3 flex gap-2">
+              <input ref={field} readOnly value={url} aria-label="ลิงก์ข้อสอบ" onFocus={(e) => e.target.select()} className="field min-w-0 flex-1 text-sm" />
+              <button type="button" onClick={() => void copy()} className="btn btn-primary shrink-0 px-4 text-base" aria-live="polite">
+                {copied ? '✓ คัดลอกแล้ว' : 'คัดลอก'}
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col items-center gap-3 sm:flex-row sm:items-center">
+              <div className="rounded-xl border border-slate-200 bg-white p-2">
+                <QRCodeSVG value={url} size={148} level="M" marginSize={1} title="สแกนเพื่อเปิดข้อสอบ" />
+              </div>
+              <div className="flex flex-col gap-1 text-sm text-slate-600">
+                <p>ให้สแกน QR นี้ หรือส่งลิงก์ทางแชต</p>
+                <a href={withBase(`/exam/${rec.exam.id}`)} target="_blank" rel="noopener" className="font-semibold text-brand underline-offset-4 hover:underline">
+                  เปิดดูแบบคนทำข้อสอบ ↗
+                </a>
+              </div>
+            </div>
+
+            {blocked ? (
+              <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-bad">เกมนี้ถูกรายงาน ลิงก์จะเปิดไม่ได้จนกว่าผู้ดูแลจะตรวจเสร็จ</p>
+            ) : rec.exam.stale ? (
+              <div className="mt-4 rounded-xl bg-amber-50 p-3 text-sm">
+                <p className="font-semibold text-amber-900">คุณแก้เกมหลังจากเปิดลิงก์ ลิงก์ยังใช้ข้อสอบฉบับเดิมอยู่</p>
+                {ready ? (
+                  <button type="button" disabled={working} onClick={() => onOpen(true)} className="btn btn-primary mt-2 px-4 text-base">
+                    {working ? 'กำลังอัปเดต…' : '🔄 อัปเดตข้อสอบในลิงก์'}
+                  </button>
+                ) : (
+                  <p className="mt-1 text-amber-900">แก้เกมให้ครบก่อน จึงจะอัปเดตได้</p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500">ลิงก์ใช้ข้อสอบฉบับล่าสุดของเกมนี้ ถ้าแก้เกมภายหลัง กลับมากดอัปเดตที่นี่ ลิงก์เดิมใช้ต่อได้</p>
+            )}
+          </>
+        ) : (
+          <>
+            <ul className="mt-4 flex list-disc flex-col gap-1 pl-5 text-slate-600">
+              <li>ส่งลิงก์ให้ใครก็ได้ ทำข้อสอบได้โดยไม่ต้องมีบัญชี สุ่มข้อ ฝึกทีละข้อ หรือจำลองสอบจับเวลา</li>
+              <li>ใช้เฉพาะคำถามแบบควิซและจริง/เท็จ พร้อมเฉลยและคำอธิบาย</li>
+              <li>ลิงก์ใช้ข้อสอบฉบับ ณ ตอนที่เปิด แก้เกมภายหลังแล้วค่อยกดอัปเดต</li>
+            </ul>
+            {blocked ? (
+              <p className="mt-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-bad">เกมนี้ถูกรายงาน เปิดลิงก์ข้อสอบไม่ได้จนกว่าผู้ดูแลจะตรวจเสร็จ</p>
+            ) : !ready ? (
+              <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-900">แก้เกมให้ครบก่อน จึงจะเปิดลิงก์ข้อสอบได้</p>
+            ) : (
+              <button type="button" disabled={working} onClick={() => onOpen(false)} className="btn btn-primary mt-5 w-full text-base">
+                {working ? 'กำลังเปิดลิงก์…' : '🔗 เปิดลิงก์ข้อสอบ'}
+              </button>
+            )}
+          </>
+        )}
+
+        {rec.tainted && (
+          <p className="mt-4 rounded-xl bg-slate-100 p-3 text-sm text-slate-600">
+            🔒 เกมนี้มีคำถามจากข้อมูลภายใน คนที่ได้ลิงก์จะเห็นคำถามและเฉลย แต่ไม่เห็นคำอธิบายและแหล่งที่มาจากคลังความรู้ ส่งให้เฉพาะคนที่ควรเห็นเนื้อหานี้
+          </p>
+        )}
+
+        {rec.exam && (
+          <div className="mt-5 flex justify-between gap-2 border-t border-slate-100 pt-4">
+            <button
+              type="button"
+              disabled={working}
+              onClick={() => confirm('ปิดลิงก์ข้อสอบนี้ใช่ไหม? คนที่ได้ลิงก์ไปจะเปิดไม่ได้อีก ถ้าเปิดใหม่ภายหลังจะได้ลิงก์ใหม่') && onCloseLink()}
+              className="btn bg-slate-100 px-4 text-base text-bad"
+            >
+              ปิดลิงก์
+            </button>
+            <button type="button" onClick={onClose} className="btn bg-slate-100 px-4 text-base text-ink">
+              เสร็จ
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -673,6 +861,7 @@ function GameCard({
   locked,
   onStart,
   fixHref = null,
+  examHref = null,
   footer,
   children,
 }: {
@@ -687,6 +876,8 @@ function GameCard({
   onStart: (game: Game) => void;
   /** set when the game is incomplete: the main button leads to the editor instead of opening a room */
   fixHref?: string | null;
+  /** the game as an exam (/exam/<code>), when it has questions an exam can ask */
+  examHref?: string | null;
   /** a row of small actions under the buttons (sharing, reporting) */
   footer?: React.ReactNode;
   children: React.ReactNode;
@@ -728,7 +919,16 @@ function GameCard({
           )}
           {children}
         </div>
-        {footer && <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3">{footer}</div>}
+        {(footer || examHref) && (
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3">
+            {examHref && (
+              <Link href={examHref} className="rounded-lg px-1 text-sm font-semibold text-brand underline-offset-4 hover:underline">
+                📝 ทำเป็นข้อสอบ
+              </Link>
+            )}
+            {footer}
+          </div>
+        )}
       </div>
     </motion.article>
   );

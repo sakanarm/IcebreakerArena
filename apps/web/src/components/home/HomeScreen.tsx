@@ -39,6 +39,9 @@ export function HomeScreen() {
             <Link href="/editor" className="btn btn-ghost hidden px-4 text-base sm:inline-flex">
               สร้างเกม
             </Link>
+            <Link href="/exam" className="btn btn-ghost hidden px-4 text-base sm:inline-flex">
+              ข้อสอบ
+            </Link>
             {/* players come here for the PIN and never log in, so no login link here: only who is logged in */}
             <AccountChip loginLink={false} />
           </nav>
@@ -77,9 +80,10 @@ export function HomeScreen() {
           <HeroTiles />
         </section>
 
-        <section className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:mt-24">
+        <section className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:mt-24 lg:grid-cols-3">
           <ActionCard href="/host" color={1} title="จัดเกม (Host)" body="เลือกเกม เปิดห้อง แล้วคุมจังหวะบนจอใหญ่ด้วยปุ่มเดียว" cta="ไปหน้าจัดเกม" />
           <ActionCard href="/editor" color={3} title="สร้างเกมของทีม" body="คำถาม 6 แบบ ควิซ จริง/เท็จ โพล เรียงลำดับ พิมพ์คำตอบ ทายตัวเลข จัดเป็นด่านๆ" cta="เปิด Editor" />
+          <ActionCard href="/exam" color={0} title="โหมดข้อสอบ" body="ทำข้อสอบเลือกตอบคนเดียว สุ่มข้อจากคลัง เฉลยพร้อมคำอธิบาย ไม่ต้องเข้าสู่ระบบ" cta="เริ่มทำข้อสอบ" />
         </section>
 
         <section className="mt-16 lg:mt-24">

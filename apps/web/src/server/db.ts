@@ -276,6 +276,23 @@ const MIGRATIONS: string[] = [
     updated_at timestamptz NOT NULL DEFAULT now()
   );
   `,
+  // Exam links (exams.ts): one per game, serving a frozen copy of it to whoever holds the link.
+  // game_version is the game's version the copy was made from, so the owner sees when it is behind.
+  `
+  CREATE TABLE ib_exams (
+    id text PRIMARY KEY,
+    game_id text NOT NULL REFERENCES ib_games (id) ON DELETE CASCADE,
+    owner_id text NOT NULL REFERENCES ib_users (id) ON DELETE CASCADE,
+    title text NOT NULL,
+    data jsonb NOT NULL,
+    game_version integer NOT NULL,
+    rev integer NOT NULL DEFAULT 1,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  );
+  CREATE UNIQUE INDEX ib_exams_one_per_game ON ib_exams (game_id);
+  CREATE INDEX ib_exams_owner ON ib_exams (owner_id);
+  `,
 ];
 
 /** The version migrate() brings a database to. */

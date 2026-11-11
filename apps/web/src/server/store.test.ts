@@ -3,12 +3,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { LIMITS, QUESTION_TYPES, SAMPLE_GAMES, TIME_CHOICES_S, sliderStart, validateGame, type Game } from '@pika-arena/shared';
+import { LIMITS, QUESTION_TYPES, SAMPLE_GAMES, TIME_CHOICES_S, buildExam, examSize, sliderStart, validateGame, type Game } from '@pika-arena/shared';
 import { requireUser, upsertUser } from './auth';
 import { copyEntry, getEntry, listCatalog, reportEntry, shareGame, withdrawEntry } from './catalog';
 import { authMode, authModeProblem, authModeSource, dbSchema } from './config';
 import { SCHEMA_VERSION, checkSchemaName, connectPostgres, migrate, openPglite, type Db } from './db';
 import { DEMO_GAMES, SHARED_DEMO, addDemoGames } from './demo-games';
+import { closeExam, getExamLink, publishExam, readExam } from './exams';
 import {
   MAX_GAMES_PER_USER,
   TooLong,
@@ -16,6 +17,7 @@ import {
   clip,
   copyGame,
   createGame,
+  createPikaGame,
   deleteGame,
   findLocalGame,
   getGame,
@@ -453,7 +455,7 @@ test('the tables live in our own schema, never in public, and only a safe schema
   const where = await db.query<{ table_schema: string; n: number }>(
     "SELECT table_schema, count(*)::int AS n FROM information_schema.tables WHERE table_name LIKE 'ib\\_%' GROUP BY 1",
   );
-  assert.deepEqual(where, [{ table_schema: 'icebreaker', n: 8 }]);
+  assert.deepEqual(where, [{ table_schema: 'icebreaker', n: 9 }]);
   const [owner] = await db.query<{ owner: string }>("SELECT pg_get_userbyid(nspowner) AS owner FROM pg_namespace WHERE nspname = 'icebreaker'");
   assert.ok(owner, 'migrate made the schema');
 
@@ -783,4 +785,270 @@ test('password hashing runs at most 2 at a time and still answers every caller',
   assert.equal(new Set(hashes).size, 7);
   const checks = await Promise.all(hashes.map((h, i) => verifyPassword(`password-number-${i}`, h)));
   assert.deepEqual(checks, Array(7).fill(true));
+});
+
+// ---------- exam links ----------
+
+/** a complete game with two topics an exam can ask from, and questions an exam leaves out */
+const examGame = (title = 'ข้อสอบความปลอดภัย'): Game => ({
+  id: 'x',
+  title,
+  rounds: [
+    {
+      id: 'r1',
+      title: 'พื้นฐาน',
+      questions: [
+        { id: 'q1', type: 'quiz', prompt: 'รหัสผ่านแบบไหนปลอดภัยที่สุด', options: ['123456', 'ชื่อตัวเอง', 'วลียาวที่เดายาก', 'วันเกิด'], correct: [2], timeLimitS: 20, explanation: 'ยิ่งยาวยิ่งเดายาก' },
+        { id: 'q2', type: 'truefalse', prompt: 'ควรใช้รหัสผ่านเดียวกันทุกเว็บ', options: ['จริง', 'เท็จ'], correct: [1], timeLimitS: 10 },
+        { id: 'q3', type: 'poll', prompt: 'คุณใช้ password manager ไหม', options: ['ใช้', 'ไม่ใช้'], correct: [], timeLimitS: 20 },
+      ],
+    },
+    {
+      id: 'r2',
+      title: 'ขั้นตอน',
+      questions: [
+        { id: 'q4', type: 'puzzle', prompt: 'เรียงขั้นตอนเมื่อเจออีเมลหลอกลวง', options: ['หยุดก่อน', 'ตรวจผู้ส่ง', 'แจ้งทีม'], correct: [], timeLimitS: 30 },
+        { id: 'q5', type: 'type', prompt: 'MFA ย่อมาจากอะไร', options: ['multi-factor authentication'], correct: [], timeLimitS: 30 },
+        { id: 'q6', type: 'quiz', prompt: 'เจอ USB ตกอยู่ควรทำอย่างไร', options: ['เสียบดู', 'ส่งให้ทีม IT'], correct: [1], timeLimitS: 20 },
+      ],
+    },
+  ],
+});
+
+const linkOf = async (user: SessionUser, gameId: string) => {
+  const res = await publishExam(db, user, gameId);
+  assert.ok(res.ok, `publish refused: ${!res.ok && res.reason}`);
+  return res;
+};
+const examReason = async (user: SessionUser, gameId: string) => {
+  const res = await publishExam(db, user, gameId);
+  return res.ok ? 'ok' : res.reason;
+};
+
+test('an exam link serves a frozen copy: edits wait for an update, and the link survives it', async () => {
+  const a = await newUser();
+  const g = await createGame(db, a.id, examGame(), 'new');
+  assert.equal(g.exam, null);
+  assert.equal(await getExamLink(db, a.id, g.id), null);
+
+  const opened = await linkOf(a, g.id);
+  assert.equal(opened.created, true);
+  assert.match(opened.link.id, /^[\w-]{22}$/);
+  assert.notEqual(opened.link.id, g.id, 'the link is not the game id: knowing one gives nothing of the other');
+  assert.deepEqual([opened.link.rev, opened.link.questionCount, opened.link.topicCount], [1, 3, 2]);
+  assert.deepEqual(await getExamLink(db, a.id, g.id), opened.link);
+  assert.deepEqual((await getGame(db, a.id, g.id))!.exam, { id: opened.link.id, stale: false });
+  assert.deepEqual((await listGames(db, a.id)).find((x) => x.id === g.id)!.exam, { id: opened.link.id, stale: false });
+
+  // anyone holding the link reads the paper: only what an exam asks, topic by topic
+  const first = (await readExam(db, opened.link.id))!;
+  assert.equal(first.paper.title, 'ข้อสอบความปลอดภัย');
+  assert.deepEqual(
+    first.paper.topics.map((t) => [t.title, t.questions.map((q) => q.id)]),
+    [
+      // validateGame names questions by where they stand: round 1 question 1, …
+      ['พื้นฐาน', ['q1-1', 'q1-2']],
+      ['ขั้นตอน', ['q2-3']],
+    ],
+  );
+  assert.equal(first.paper.topics[0]!.questions[0]!.explanation, 'ยิ่งยาวยิ่งเดายาก');
+  const out = JSON.stringify(first);
+  for (const hidden of ['password manager', 'หยุดก่อน', 'multi-factor', g.id, a.id]) assert.ok(!out.includes(hidden), `"${hidden}" stays out of the paper`);
+
+  // the owner edits the game: the link keeps serving the copy and says it is behind
+  const edited = examGame('ข้อสอบความปลอดภัย v2');
+  edited.rounds[0]!.questions[0]!.prompt = 'แก้แล้ว';
+  const saved = await saveGame(db, a.id, g.id, edited, g.version);
+  assert.ok(saved.ok);
+  assert.deepEqual((await getGame(db, a.id, g.id))!.exam, { id: opened.link.id, stale: true });
+  assert.deepEqual((await readExam(db, opened.link.id))!.paper, first.paper);
+
+  // an update brings the copy up to date behind the same link
+  const updated = await linkOf(a, g.id);
+  assert.equal(updated.created, false);
+  assert.equal(updated.link.id, opened.link.id);
+  assert.equal(updated.link.rev, 2);
+  const second = (await readExam(db, opened.link.id))!;
+  assert.equal(second.rev, 2);
+  assert.equal(second.paper.title, 'ข้อสอบความปลอดภัย v2');
+  assert.equal(second.paper.topics[0]!.questions[0]!.prompt, 'แก้แล้ว');
+  assert.deepEqual((await getGame(db, a.id, g.id))!.exam, { id: opened.link.id, stale: false });
+  assert.equal((await db.query('SELECT 1 FROM ib_exams WHERE game_id = $1', [g.id])).length, 1, 'one link per game');
+
+  // closing ends it at once; opening again gives a new link, so an old one never comes back to life
+  assert.equal(await closeExam(db, a, g.id), true);
+  assert.equal(await readExam(db, opened.link.id), null);
+  assert.equal((await getGame(db, a.id, g.id))!.exam, null);
+  assert.equal(await closeExam(db, a, g.id), false, 'nothing left to close');
+  const reopened = await linkOf(a, g.id);
+  assert.equal(reopened.created, true);
+  assert.notEqual(reopened.link.id, opened.link.id);
+  assert.equal(await readExam(db, opened.link.id), null);
+
+  const log = await db.query<{ action: string }>("SELECT action FROM ib_audit_log WHERE user_id = $1 AND action LIKE 'exam.%' ORDER BY id", [a.id]);
+  assert.deepEqual(
+    log.map((r) => r.action),
+    ['exam.open', 'exam.update', 'exam.close', 'exam.open'],
+  );
+});
+
+test("only the owner opens, updates or closes a game's exam link", async () => {
+  const [a, b] = [await newUser(), await newUser()];
+  const g = await createGame(db, a.id, examGame(), 'new');
+  assert.equal(await examReason(b, g.id), 'not_found');
+  const { link } = await linkOf(a, g.id);
+  assert.equal(await examReason(b, g.id), 'not_found');
+  assert.equal(await closeExam(db, b, g.id), false);
+  assert.equal(await getExamLink(db, b.id, g.id), null);
+  assert.equal((await readExam(db, link.id))!.rev, 1, 'untouched by the other user');
+  // a game id, a made-up id and junk are no links
+  for (const nope of [g.id, 'A'.repeat(22), '', "x' OR '1'='1"]) assert.equal(await readExam(db, nope), null, nope);
+});
+
+test('a link needs a complete game with at least one question an exam can ask', async () => {
+  const a = await newUser();
+  const half = await createGame(db, a.id, draft('half done'), 'new');
+  const refused = await publishExam(db, a, half.id);
+  assert.equal(!refused.ok && refused.reason, 'invalid');
+  assert.ok(!refused.ok && refused.reason === 'invalid' && refused.errors.length > 0);
+
+  const pollsOnly = examGame('แบบสำรวจ');
+  pollsOnly.rounds = [{ id: 'r1', title: 'ถามความเห็น', questions: [pollsOnly.rounds[0]!.questions[2]!] }];
+  assert.ok(validateGame(pollsOnly).ok, 'a complete game, just not an exam');
+  const g = await createGame(db, a.id, pollsOnly, 'new');
+  assert.equal(await examReason(a, g.id), 'no_questions');
+  assert.equal((await getGame(db, a.id, g.id))!.exam, null);
+
+  // an open link is left as it was when the game later stops being complete
+  const good = await createGame(db, a.id, examGame(), 'new');
+  const { link } = await linkOf(a, good.id);
+  const broken = examGame();
+  broken.rounds[0]!.questions[0]!.prompt = '';
+  assert.ok((await saveGame(db, a.id, good.id, broken, good.version)).ok);
+  assert.equal(await examReason(a, good.id), 'invalid');
+  const still = (await readExam(db, link.id))!;
+  assert.equal(still.rev, 1);
+  assert.equal(still.paper.topics[0]!.questions[0]!.prompt, 'รหัสผ่านแบบไหนปลอดภัยที่สุด');
+});
+
+test('a paper from a Pika game goes out without the page it came from or the explanation written from it', async () => {
+  const a = await newUser();
+  const fromWiki = examGame('ควิซจากคลังความรู้');
+  fromWiki.rounds[0]!.questions[0] = {
+    ...fromWiki.rounds[0]!.questions[0]!,
+    explanation: 'ประโยคลับจากหน้าในคลังความรู้',
+    source: { path: 'topics/secret-policy.md', title: 'นโยบายภายใน', cite: 'เอกสารภายใน 2026' },
+  };
+  fromWiki.rounds[0]!.questions[1] = { ...fromWiki.rounds[0]!.questions[1]!, explanation: 'พิมพ์เองกับมือ' };
+  const g = await createPikaGame(db, a.id, normalizeDraft(fromWiki)!, 'project-1');
+  assert.equal(g.tainted, true);
+  assert.equal(g.game.rounds[0]!.questions[0]!.source?.path, 'topics/secret-policy.md', 'the owner keeps it');
+
+  // unlike the public catalog, a link is allowed: it shows what a room would see, to whoever was handed it
+  const { link } = await linkOf(a, g.id);
+  const exam = (await readExam(db, link.id))!;
+  const [q1, q2] = exam.paper.topics[0]!.questions;
+  assert.equal(q1!.explanation, undefined);
+  assert.equal(q2!.explanation, 'พิมพ์เองกับมือ');
+  // neither in what is served nor in what is stored
+  const [row] = await db.query<{ data: unknown }>('SELECT data FROM ib_exams WHERE id = $1', [link.id]);
+  for (const text of [JSON.stringify(exam), JSON.stringify(row!.data)]) {
+    for (const secret of ['ประโยคลับ', 'secret-policy', 'นโยบายภายใน', 'เอกสารภายใน']) assert.ok(!text.includes(secret), secret);
+  }
+  // and a row that somehow held them would still be cut on the way out
+  await db.query('UPDATE ib_exams SET data = $2 WHERE id = $1', [link.id, JSON.stringify(g.game)]);
+  const again = JSON.stringify(await readExam(db, link.id));
+  for (const secret of ['ประโยคลับ', 'secret-policy', 'นโยบายภายใน', 'เอกสารภายใน']) assert.ok(!again.includes(secret), secret);
+});
+
+test('a link goes with its game, and with its owner', async () => {
+  const a = await newUser();
+  const g = await createGame(db, a.id, examGame(), 'new');
+  const { link } = await linkOf(a, g.id);
+  assert.ok(await readExam(db, link.id));
+  assert.ok(await deleteGame(db, a.id, g.id));
+  assert.equal(await readExam(db, link.id), null);
+  assert.deepEqual(await db.query('SELECT 1 FROM ib_exams WHERE id = $1', [link.id]), []);
+
+  const gone = await newUser();
+  const g2 = await createGame(db, gone.id, examGame(), 'new');
+  const second = await linkOf(gone, g2.id);
+  await db.query('DELETE FROM ib_users WHERE id = $1', [gone.id]);
+  assert.equal(await readExam(db, second.link.id), null);
+});
+
+test('a takedown closes the way through a link too: no new link, and an open one stops answering', async () => {
+  const [a, b] = [await newUser(), await newUser()];
+  const g = await createGame(db, a.id, examGame(), 'new');
+  const copy = (await copyGame(db, a.id, g.id))!;
+  const { link } = await linkOf(a, g.id);
+  const copyLink = await linkOf(a, copy.id);
+  const other = await createGame(db, b.id, examGame(), 'new');
+  const otherLink = await linkOf(b, other.id);
+  const entry = await shareGame(db, a, copy.id);
+  assert.ok(entry.ok);
+
+  assert.deepEqual(await reportEntry(db, b.id, entry.entry.id, 'confidential', ''), { ok: true, hidden: true });
+  // the reported game and the game it was copied from are both held
+  assert.equal(await readExam(db, copyLink.link.id), null);
+  assert.equal(await readExam(db, link.id), null);
+  assert.equal(await examReason(a, copy.id), 'under_review');
+  assert.equal(await examReason(a, g.id), 'under_review');
+  // someone else's exam is untouched
+  assert.ok(await readExam(db, otherLink.link.id));
+  assert.equal(await examReason(b, other.id), 'ok');
+});
+
+test('copying a game does not copy its link, and a copy can have its own', async () => {
+  const a = await newUser();
+  const g = await createGame(db, a.id, examGame(), 'new');
+  const { link } = await linkOf(a, g.id);
+  const copy = (await copyGame(db, a.id, g.id))!;
+  assert.equal(copy.exam, null);
+  const own = await linkOf(a, copy.id);
+  assert.notEqual(own.link.id, link.id);
+  assert.equal((await readExam(db, own.link.id))!.paper.title, copy.game.title);
+});
+
+test('every sample game with exam questions can be opened as a link, and many links open at once', async () => {
+  const a = await newUser();
+  const games = await Promise.all(SAMPLE_GAMES.map((s) => createGame(db, a.id, structuredClone(s), 'sample')));
+  const results = await Promise.all(games.map((g) => publishExam(db, a, g.id)));
+  let open = 0;
+  for (const [i, res] of results.entries()) {
+    const size = examSize(buildExam(SAMPLE_GAMES[i]!));
+    if (size === 0) {
+      assert.equal(!res.ok && res.reason, 'no_questions', SAMPLE_GAMES[i]!.id);
+      continue;
+    }
+    assert.ok(res.ok, SAMPLE_GAMES[i]!.id);
+    open++;
+    assert.equal(res.link.questionCount, size);
+    assert.equal(examSize((await readExam(db, res.link.id))!.paper), size);
+  }
+  assert.ok(open >= 3);
+  // two requests for the same game at once end as one link, not two
+  const g = await createGame(db, a.id, examGame(), 'new');
+  const both = await Promise.all([publishExam(db, a, g.id), publishExam(db, a, g.id)]);
+  assert.ok(both[0].ok && both[1].ok);
+  assert.equal(both[0].ok && both[1].ok && both[0].link.id === both[1].link.id, true);
+  assert.deepEqual(both.map((r) => r.ok && r.created).sort(), [false, true]);
+});
+
+test('upgrading a database from before exam links keeps its games and gives them no link', async () => {
+  const old = await openPglite(undefined, 'icebreaker');
+  try {
+    await migrate(old, SCHEMA_VERSION - 1);
+    const u = await upsertUser(old, { issuer: 'test', subject: 'before-exams', name: 'Before' });
+    await old.query("INSERT INTO ib_games (id, owner_id, title, data, origin) VALUES ($1, $2, 'เกมเก่า', $3, 'new')", ['g'.repeat(22), u.id, JSON.stringify(examGame('เกมเก่า'))]);
+    await migrate(old);
+    assert.equal((await old.query<{ version: number }>('SELECT version FROM ib_schema'))[0]!.version, SCHEMA_VERSION);
+    const [rec] = await listGames(old, u.id);
+    assert.equal(rec!.game.title, 'เกมเก่า');
+    assert.equal(rec!.exam, null);
+    const res = await publishExam(old, u, rec!.id);
+    assert.ok(res.ok && res.created);
+  } finally {
+    await old.close();
+  }
 });

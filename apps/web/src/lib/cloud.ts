@@ -1,9 +1,10 @@
 import type { Game } from '@pika-arena/shared';
 import type { CatalogEntry } from '@/server/catalog';
+import type { ExamLink } from '@/server/exams';
 import type { GameRecord } from '@/server/games';
 import { api } from './api';
 
-export type { CatalogEntry, GameRecord };
+export type { CatalogEntry, ExamLink, GameRecord };
 export type ReportReason = 'confidential' | 'inappropriate' | 'other';
 
 /** Ids the server hands out: 22 url-safe characters. Browser games look like `g-…`. */
@@ -31,6 +32,10 @@ export const cloud = {
   importLocal: (localId: string, game: Game) => api<{ id: string; created: boolean; separate?: true }>('/games/import-local', { method: 'POST', body: { localId, game } }),
   /** the saved game a browser game was moved into (404 when it never was) */
   findLocal: (localId: string) => api<{ id: string }>(`/games/import-local?localId=${encodeURIComponent(localId)}`).then((r) => r.id),
+
+  /** opens the game's exam link, or brings the open one up to the game as it is now */
+  openExam: (gameId: string) => api<{ link: ExamLink }>(`/games/${gameId}/exam`, { method: 'POST' }).then((r) => r.link),
+  closeExam: (gameId: string) => api(`/games/${gameId}/exam`, { method: 'DELETE' }),
 
   catalog: () => api<{ entries: CatalogEntry[] }>('/catalog').then((r) => r.entries),
   share: (gameId: string) => api<{ entry: CatalogEntry; replaced: string | null }>('/catalog', { method: 'POST', body: { gameId } }),

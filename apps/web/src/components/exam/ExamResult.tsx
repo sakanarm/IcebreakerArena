@@ -1,0 +1,178 @@
+'use client';
+
+import { useState } from 'react';
+import { isRightChoice, scoreExam, type ExamItem } from '@pika-arena/shared';
+import { MODE_LABEL, duration, ranOut, usedMs, type Attempt } from '@/lib/exam';
+import { Bar, ExamHeader, Explanation, QuestionImage, ShownChoices, rightLetters, topicName } from './parts';
+
+/** under this share of right answers a topic is worth going over again */
+const REVISE_BELOW = 60;
+
+type Filter = 'all' | 'wrong' | 'skipped' | 'flagged';
+type Outcome = 'right' | 'wrong' | 'skipped';
+
+const OUTCOME: Record<Outcome, { label: string; tag: string }> = {
+  right: { label: 'ตอบถูก', tag: 'bg-emerald-50 text-emerald-700' },
+  wrong: { label: 'ตอบผิด', tag: 'bg-rose-50 text-rose-700' },
+  skipped: { label: 'ไม่ได้ตอบ', tag: 'bg-slate-100 text-slate-600' },
+};
+
+/**
+ * After a sitting: the score, how each topic went, and every question with its answer and the
+ * maker's explanation. The questions missed can be sat again on their own.
+ */
+export function ExamResult({
+  attempt,
+  onRetry,
+  onNew,
+}: {
+  attempt: Attempt;
+  /** sit these questions again, as practice */
+  onRetry: (items: ExamItem[]) => void;
+  /** back to the start page for another draw */
+  onNew: () => void;
+}) {
+  const { items, answers, flags } = attempt;
+  const score = scoreExam(items, answers);
+  const outcomes: Outcome[] = items.map((it, i) => (answers[i] == null ? 'skipped' : isRightChoice(it.question, answers[i]) ? 'right' : 'wrong'));
+  const missed = items.filter((_, i) => outcomes[i] !== 'right');
+  const flagged = flags.filter(Boolean).length;
+  const [filter, setFilter] = useState<Filter>('all');
+
+  const filters: { value: Filter; label: string; count: number }[] = [
+    { value: 'all', label: 'ทั้งหมด', count: score.total },
+    { value: 'wrong', label: 'ตอบผิด', count: score.wrong },
+    { value: 'skipped', label: 'ไม่ได้ตอบ', count: score.skipped },
+    { value: 'flagged', label: 'ติดธง', count: flagged },
+  ];
+  const listed = items
+    .map((_, i) => i)
+    .filter((i) => (filter === 'all' ? true : filter === 'flagged' ? flags[i] : outcomes[i] === filter));
+  const tone = score.percent >= 80 ? 'good' : score.percent < REVISE_BELOW ? 'low' : 'brand';
+
+  return (
+    <div className="exam-page">
+      <ExamHeader />
+      <main className="mx-auto max-w-3xl px-4 pt-8 pb-16">
+        <p className="text-sm font-semibold text-brand">ผลการทำข้อสอบ · {MODE_LABEL[attempt.mode]}</p>
+        <h1 className="mt-1 text-2xl leading-snug font-semibold text-balance wrap-anywhere sm:text-3xl">{attempt.title || 'ข้อสอบ'}</h1>
+
+        <section className="exam-card mt-6 p-5 sm:p-7" aria-label="คะแนน">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+            <p>
+              <span className="text-5xl font-semibold tabular-nums" data-exam-score>
+                {score.correct}
+              </span>
+              <span className="text-2xl font-semibold text-slate-500 tabular-nums"> / {score.total} ข้อ</span>
+            </p>
+            <p className="text-3xl font-semibold tabular-nums" data-exam-percent>
+              {score.percent}%
+            </p>
+          </div>
+          <div className="mt-4">
+            <Bar percent={score.percent} tone={tone} />
+          </div>
+          <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
+            {(
+              [
+                ['ถูก', score.correct, 'text-emerald-700'],
+                ['ผิด', score.wrong, 'text-rose-700'],
+                ['ไม่ได้ตอบ', score.skipped, 'text-slate-600'],
+              ] as const
+            ).map(([label, n, color]) => (
+              <div key={label} className="rounded-lg bg-slate-50 px-2 py-3">
+                <dd className={`text-2xl font-semibold tabular-nums ${color}`}>{n}</dd>
+                <dt className="text-sm text-slate-600">{label}</dt>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 text-sm text-slate-600">
+            ใช้เวลา {duration(usedMs(attempt))}
+            {ranOut(attempt) && <span className="font-semibold text-rose-700"> · หมดเวลา ระบบส่งข้อสอบให้อัตโนมัติ</span>}
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-200 pt-5">
+            {missed.length > 0 && (
+              <button type="button" onClick={() => onRetry(missed)} className="exam-btn exam-btn-primary">
+                ทำข้อที่พลาดอีกครั้ง ({missed.length} ข้อ)
+              </button>
+            )}
+            <button type="button" onClick={onNew} className={`exam-btn ${missed.length === 0 ? 'exam-btn-primary' : ''}`}>
+              สุ่มชุดใหม่
+            </button>
+          </div>
+        </section>
+
+        {score.topics.length > 1 && (
+          <section className="exam-card mt-4 p-5 sm:p-7" aria-labelledby="exam-topics-title">
+            <h2 id="exam-topics-title" className="text-lg font-semibold">
+              คะแนนรายหัวข้อ
+            </h2>
+            <ul className="mt-3 grid gap-4">
+              {score.topics.map((t, i) => (
+                <li key={t.id}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <p className="min-w-0 wrap-anywhere">
+                      {topicName(t.title, i)}
+                      {t.percent < REVISE_BELOW && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">ควรทวน</span>}
+                    </p>
+                    <p className="text-sm text-slate-600 tabular-nums">
+                      {t.correct} / {t.total} ข้อ ({t.percent}%)
+                    </p>
+                  </div>
+                  <div className="mt-1.5">
+                    <Bar percent={t.percent} tone={t.percent >= 80 ? 'good' : t.percent < REVISE_BELOW ? 'low' : 'brand'} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <section className="mt-8" aria-labelledby="exam-review-title">
+          <h2 id="exam-review-title" className="text-xl font-semibold">
+            เฉลยทุกข้อ
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="กรองข้อที่แสดง">
+            {filters
+              .filter((f) => f.value === 'all' || f.count > 0)
+              .map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => setFilter(f.value)}
+                  aria-pressed={filter === f.value}
+                  className={`exam-btn min-h-9 px-3 text-sm ${filter === f.value ? 'border-brand bg-brand/5 text-brand' : ''}`}
+                >
+                  {f.label} ({f.count})
+                </button>
+              ))}
+          </div>
+
+          <ol className="mt-4 grid gap-4">
+            {listed.map((i) => {
+              const it = items[i]!;
+              const outcome = outcomes[i]!;
+              return (
+                <li key={i} className="exam-card p-5 sm:p-6" data-exam-review={outcome}>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    <span className="font-semibold">ข้อ {i + 1}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${OUTCOME[outcome].tag}`}>{OUTCOME[outcome].label}</span>
+                    {flags[i] && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">⚑ ติดธง</span>}
+                    {it.topicTitle.trim() && <span className="min-w-0 wrap-anywhere text-slate-500">{it.topicTitle.trim()}</span>}
+                  </div>
+                  <h3 className="mt-2 text-lg leading-relaxed font-semibold wrap-anywhere whitespace-pre-line">{it.question.prompt}</h3>
+                  {it.question.imageUrl && <QuestionImage url={it.question.imageUrl} />}
+                  <ShownChoices question={it.question} answer={answers[i] ?? null} />
+                  {outcome === 'skipped' && <p className="mt-3 text-sm font-semibold text-slate-600">ไม่ได้ตอบข้อนี้ · คำตอบที่ถูกคือ {rightLetters(it.question)}</p>}
+                  <Explanation text={it.question.explanation} />
+                </li>
+              );
+            })}
+          </ol>
+          {listed.length === 0 && <p className="exam-card mt-4 p-5 text-slate-600">ไม่มีข้อในกลุ่มนี้</p>}
+        </section>
+      </main>
+    </div>
+  );
+}

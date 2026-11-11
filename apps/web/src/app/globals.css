@@ -247,6 +247,67 @@
     @apply pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/25;
   }
 
+  /* Exam mode: a plain, light page like any exam-practice site, inside an app that is otherwise a dark game.
+     The page's wrapper carries .exam-page; the rules on html and body make the whole window light with it,
+     so nothing dark shows around it or flashes before it. */
+  html:has(.exam-page) {
+    color-scheme: light;
+  }
+
+  body:has(.exam-page) {
+    background: #f4f6fb;
+    color: var(--color-ink);
+  }
+
+  .exam-page {
+    @apply min-h-dvh text-ink;
+    background: #f4f6fb;
+  }
+
+  .exam-page :is(h1, h2, h3) {
+    font-family: var(--font-sans);
+  }
+
+  /* the app's cyan focus ring is made for dark screens */
+  .exam-page :focus-visible {
+    outline-color: var(--color-brand);
+  }
+
+  .exam-card {
+    @apply rounded-xl border border-slate-200 bg-white;
+    box-shadow: 0 1px 2px rgb(22 19 63 / 0.05);
+  }
+
+  .exam-btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-ink select-none;
+    transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+  }
+
+  .exam-btn:hover:not(:disabled) {
+    @apply border-slate-400 bg-slate-50;
+  }
+
+  .exam-btn:disabled {
+    opacity: 0.45;
+  }
+
+  .exam-btn-primary {
+    @apply border-brand bg-brand text-white;
+  }
+
+  .exam-btn-primary:hover:not(:disabled) {
+    border-color: #2f48d8;
+    background-color: #2f48d8;
+  }
+
+  .exam-btn-quiet {
+    @apply border-transparent bg-transparent text-brand;
+  }
+
+  .exam-btn-quiet:hover:not(:disabled) {
+    @apply border-transparent bg-brand/10;
+  }
+
   .wipe-shut-down,
   .wipe-shut-up,
   .wipe-open-down,
