@@ -148,13 +148,13 @@ export function ExamRun({
 
   return (
     <div className="exam-page">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
+      <header className="sticky top-0 z-20 border-b border-ex-line bg-night/85 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4">
           <button type="button" onClick={() => onLeave(tally())} className="exam-btn exam-btn-quiet -ml-2 min-h-10 shrink-0 px-2 text-sm" aria-label="ออกจากข้อสอบ กลับมาทำต่อได้">
             ← ออก
           </button>
           <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {attempt.title || 'ข้อสอบ'} <span className="font-normal text-slate-500">· {MODE_LABEL[mode]}</span>
+            {attempt.title || 'ข้อสอบ'} <span className="font-normal text-ex-soft">· {MODE_LABEL[mode]}</span>
           </p>
           {attempt.deadline !== null && <Countdown deadline={attempt.deadline} onTimeUp={finish} />}
           <button type="button" onClick={handIn} className="exam-btn exam-btn-primary min-h-10 shrink-0 px-3 text-sm">
@@ -162,14 +162,14 @@ export function ExamRun({
           </button>
         </div>
         <div
-          className="h-1 bg-slate-100"
+          className="h-1 bg-white/[0.06]"
           role="progressbar"
           aria-label={mode === 'mock' ? 'ข้อที่ตอบแล้ว' : 'ข้อที่ทำแล้ว'}
           aria-valuemin={0}
           aria-valuemax={items.length}
           aria-valuenow={done}
         >
-          <div className="h-full bg-brand transition-[width] duration-200" style={{ width: `${(done * 100) / items.length}%` }} />
+          <div className="h-full bg-linear-to-r from-brand to-brand-2 transition-[width] duration-200" style={{ width: `${(done * 100) / items.length}%` }} />
         </div>
       </header>
 
@@ -177,8 +177,8 @@ export function ExamRun({
         <section aria-label={`ข้อ ${at + 1} จาก ${items.length}`}>
           <article className="exam-card p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-              <p className="text-sm text-slate-500">
-                <span className="font-semibold text-ink">
+              <p className="text-sm text-ex-soft">
+                <span className="font-semibold text-ex-fg">
                   ข้อ {at + 1} / {items.length}
                 </span>
                 {item.topicTitle.trim() && <span className="wrap-anywhere"> · {item.topicTitle.trim()}</span>}
@@ -187,7 +187,7 @@ export function ExamRun({
                 type="button"
                 onClick={() => put('flags', !flags[at])}
                 aria-pressed={flags[at]}
-                className={`exam-btn min-h-9 px-2.5 text-sm ${flags[at] ? 'border-amber-500 bg-amber-50 text-amber-800 hover:not-disabled:border-amber-500 hover:not-disabled:bg-amber-100' : 'text-slate-600'}`}
+                className={`exam-btn min-h-9 px-2.5 text-sm ${flags[at] ? 'border-gold/70 bg-gold/10 text-gold hover:not-disabled:border-gold hover:not-disabled:bg-gold/15' : 'text-ex-muted'}`}
               >
                 <span aria-hidden>{flags[at] ? '⚑' : '⚐'}</span> {flags[at] ? 'ติดธงไว้' : 'ติดธงกลับมาดู'}
               </button>
@@ -210,7 +210,7 @@ export function ExamRun({
                     aria-checked={answer === i}
                     aria-disabled={shown}
                     onClick={() => choose(i)}
-                    className={`${choiceBox(look)} ${shown ? 'cursor-default' : 'hover:border-brand'}`}
+                    className={`${choiceBox(look)} ${shown ? 'cursor-default' : 'hover:border-ex-accent'}`}
                   >
                     <ChoiceBody index={i} text={text} look={look} mine={answer === i} />
                   </button>
@@ -220,7 +220,7 @@ export function ExamRun({
 
             {shown && (
               <div className="mt-5" role="status">
-                <p className={`font-semibold ${right ? 'text-emerald-700' : 'text-rose-700'}`}>
+                <p className={`font-semibold ${right ? 'text-ex-good' : 'text-ex-bad'}`}>
                   {right ? '✓ ถูกต้อง' : answer === null ? `ข้อนี้ไม่ได้ตอบ คำตอบที่ถูกคือ ${rightLetters(q)}` : `✕ ยังไม่ถูก คำตอบที่ถูกคือ ${rightLetters(q)}`}
                 </p>
                 <Explanation text={q.explanation} />
@@ -270,7 +270,7 @@ export function ExamRun({
               </>
             )}
           </div>
-          <p className="mt-3 hidden text-sm text-slate-500 lg:block">
+          <p className="mt-3 hidden text-sm text-ex-soft lg:block">
             แป้นลัด: 1–{Math.min(q.options.length, 9)} หรือ A–{letter(q.options.length - 1)} เลือกคำตอบ · Enter {mode === 'practice' ? 'ตรวจ / ข้อต่อไป' : 'ข้อถัดไป'} · ← → เปลี่ยนข้อ · F ติดธง
           </p>
         </section>
@@ -278,7 +278,7 @@ export function ExamRun({
         <nav aria-label="ทุกข้อ" className="exam-card p-4 lg:sticky lg:top-20">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="font-semibold">ทุกข้อ</h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-ex-soft">
               {mode === 'mock' ? `ตอบแล้ว ${answeredCount(attempt)}` : `ทำแล้ว ${done}`} / {items.length}
             </p>
           </div>
@@ -292,23 +292,23 @@ export function ExamRun({
                     onClick={() => go(i)}
                     aria-current={i === at ? 'step' : undefined}
                     aria-label={`ข้อ ${i + 1}: ${CELL[state].label}${flags[i] ? ' ติดธงไว้' : ''}`}
-                    className={`relative grid h-11 w-full place-items-center rounded-md border text-sm font-semibold ${CELL[state].box} ${i === at ? 'ring-2 ring-brand ring-offset-2' : ''}`}
+                    className={`relative grid h-11 w-full place-items-center rounded-lg border text-sm font-semibold ${CELL[state].box} ${i === at ? 'ring-2 ring-brand-2 ring-offset-2 ring-offset-ex-card' : ''}`}
                   >
                     {i + 1}
-                    {flags[i] && <span className="absolute -top-1 -right-1 size-3 rounded-full border-2 border-white bg-amber-500" aria-hidden />}
+                    {flags[i] && <span className="absolute -top-1 -right-1 size-3 rounded-full border-2 border-ex-card bg-gold" aria-hidden />}
                   </button>
                 </li>
               );
             })}
           </ol>
-          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600" aria-hidden>
+          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ex-muted" aria-hidden>
             {(mode === 'mock' ? (['answered', 'open'] as const) : (['right', 'wrong', 'open'] as const)).map((s) => (
               <li key={s} className="flex items-center gap-1.5">
                 <span className={`size-3 rounded-sm border ${CELL[s].box}`} /> {CELL[s].legend}
               </li>
             ))}
             <li className="flex items-center gap-1.5">
-              <span className="size-3 rounded-full bg-amber-500" /> ติดธง
+              <span className="size-3 rounded-full bg-gold" /> ติดธง
             </li>
           </ul>
         </nav>
@@ -326,7 +326,7 @@ export function ExamRun({
             <p>ตอบครบทั้ง {items.length} ข้อแล้ว ส่งแล้วจะแก้คำตอบไม่ได้</p>
           ) : (
             <p>
-              ยังเหลือ <strong className="font-semibold text-rose-700">{unanswered.length} ข้อ</strong> ที่ยังไม่ได้{mode === 'mock' ? 'ตอบ' : 'ทำ'} (ข้อ{' '}
+              ยังเหลือ <strong className="font-semibold text-ex-bad">{unanswered.length} ข้อ</strong> ที่ยังไม่ได้{mode === 'mock' ? 'ตอบ' : 'ทำ'} (ข้อ{' '}
               {unanswered
                 .slice(0, 12)
                 .map((i) => i + 1)
@@ -344,12 +344,12 @@ export function ExamRun({
 type CellState = 'open' | 'picked' | 'answered' | 'right' | 'wrong' | 'skipped';
 
 const CELL: Record<CellState, { box: string; label: string; legend: string }> = {
-  open: { box: 'border-slate-300 bg-white text-slate-700 hover:border-brand', label: 'ยังไม่ได้ทำ', legend: 'ยังไม่ได้ทำ' },
-  picked: { box: 'border-brand bg-white text-brand', label: 'เลือกไว้ ยังไม่ได้ตรวจ', legend: 'เลือกไว้' },
+  open: { box: 'border-ex-line-strong bg-ex-raised text-ex-muted hover:border-ex-accent hover:text-ex-fg', label: 'ยังไม่ได้ทำ', legend: 'ยังไม่ได้ทำ' },
+  picked: { box: 'border-ex-accent bg-brand/15 text-ex-accent', label: 'เลือกไว้ ยังไม่ได้ตรวจ', legend: 'เลือกไว้' },
   answered: { box: 'border-brand bg-brand text-white', label: 'ตอบแล้ว', legend: 'ตอบแล้ว' },
-  right: { box: 'border-emerald-600 bg-emerald-600 text-white', label: 'ตอบถูก', legend: 'ถูก' },
-  wrong: { box: 'border-rose-600 bg-rose-600 text-white', label: 'ตอบผิด', legend: 'ผิด' },
-  skipped: { box: 'border-slate-400 bg-slate-400 text-white', label: 'ดูเฉลยโดยไม่ได้ตอบ', legend: 'ไม่ได้ตอบ' },
+  right: { box: 'border-ex-good bg-ex-good text-night', label: 'ตอบถูก', legend: 'ถูก' },
+  wrong: { box: 'border-ex-bad bg-ex-bad text-night', label: 'ตอบผิด', legend: 'ผิด' },
+  skipped: { box: 'border-ex-soft/60 bg-ex-soft/40 text-ex-fg', label: 'ดูเฉลยโดยไม่ได้ตอบ', legend: 'ไม่ได้ตอบ' },
 };
 
 function cellState(a: Attempt, i: number): CellState {
@@ -378,7 +378,7 @@ function Countdown({ deadline, onTimeUp }: { deadline: number; onTimeUp: () => v
     <p
       role="timer"
       aria-label={`เหลือเวลา ${clock(left)}`}
-      className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${low ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-700'}`}
+      className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${low ? 'bg-ex-bad/15 text-ex-bad' : 'bg-white/[0.06] text-ex-fg'}`}
     >
       <span aria-hidden>⏱ </span>
       {clock(left)}

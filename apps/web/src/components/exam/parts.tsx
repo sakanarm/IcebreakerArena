@@ -1,34 +1,16 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import type { ExamQuestion } from '@pika-arena/shared';
 import { letter } from '@/lib/exam';
+import { SiteNav } from '../SiteNav';
 
-/** The bar over every exam page but the paper itself: where this is, and the way back. */
+/** The bar over every exam page but the paper itself: the app's own menu, with ข้อสอบ as the place you are. */
 export function ExamHeader() {
   return (
-    <header className="border-b border-slate-200 bg-white">
-      <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 text-sm">
-        <Link href="/" className="rounded font-semibold text-ink hover:text-brand">
-          MFEC Pika Arena
-        </Link>
-        <span className="text-slate-300" aria-hidden>
-          /
-        </span>
-        <Link href="/exam" className="rounded font-semibold whitespace-nowrap text-slate-600 hover:text-brand">
-          โหมดข้อสอบ
-        </Link>
-        <nav aria-label="ไปที่อื่น" className="ml-auto flex items-center gap-1">
-          <Link href="/host" className="rounded-md px-2 py-1.5 font-semibold whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-ink max-[359px]:hidden" data-testid="exam-nav-host">
-            เกมของฉัน
-          </Link>
-          <Link href="/create" className="rounded-md px-2 py-1.5 font-semibold whitespace-nowrap text-brand hover:bg-brand/10" data-testid="exam-nav-create">
-            ＋ สร้างข้อสอบ
-          </Link>
-        </nav>
-      </div>
-    </header>
+    <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-5">
+      <SiteNav here="exam" />
+    </div>
   );
 }
 
@@ -46,7 +28,7 @@ export function QuestionImage({ url }: { url: string }) {
       alt="ภาพประกอบคำถาม"
       referrerPolicy="no-referrer"
       onError={() => setBroken(url)}
-      className="mt-4 max-h-72 max-w-full rounded-lg border border-slate-200 object-contain"
+      className="mt-4 max-h-72 max-w-full rounded-xl border border-ex-line object-contain"
     />
   );
 }
@@ -55,11 +37,11 @@ export function QuestionImage({ url }: { url: string }) {
 export type ChoiceLook = 'idle' | 'chosen' | 'right' | 'wrong' | 'rest';
 
 const LOOK: Record<ChoiceLook, { box: string; badge: string }> = {
-  idle: { box: 'border-slate-300 bg-white', badge: 'border-slate-300 bg-white text-slate-600' },
-  chosen: { box: 'border-brand bg-brand/5 ring-1 ring-brand', badge: 'border-brand bg-brand text-white' },
-  right: { box: 'border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600', badge: 'border-emerald-600 bg-emerald-600 text-white' },
-  wrong: { box: 'border-rose-500 bg-rose-50 ring-1 ring-rose-500', badge: 'border-rose-600 bg-rose-600 text-white' },
-  rest: { box: 'border-slate-200 bg-white text-slate-500', badge: 'border-slate-200 bg-white text-slate-400' },
+  idle: { box: 'border-ex-line-strong bg-ex-raised', badge: 'border-ex-line-strong bg-ex-card text-ex-muted' },
+  chosen: { box: 'border-ex-accent bg-brand/20 ring-1 ring-ex-accent', badge: 'border-brand bg-brand text-white' },
+  right: { box: 'border-ex-good/80 bg-ex-good/10 ring-1 ring-ex-good/80', badge: 'border-ex-good bg-ex-good text-night' },
+  wrong: { box: 'border-ex-bad/80 bg-ex-bad/10 ring-1 ring-ex-bad/80', badge: 'border-ex-bad bg-ex-bad text-night' },
+  rest: { box: 'border-ex-line bg-transparent text-ex-soft', badge: 'border-ex-line bg-transparent text-ex-soft' },
 };
 
 /** which look option `i` takes once the answer is shown */
@@ -84,13 +66,13 @@ export function ChoiceBody({ index, text, look, mine }: { index: number; text: s
           </span>
         )}
         {text}
-        {note && <span className={`mt-0.5 block text-sm font-semibold ${look === 'right' ? 'text-emerald-700' : 'text-rose-700'}`}>{note}</span>}
+        {note && <span className={`mt-0.5 block text-sm font-semibold ${look === 'right' ? 'text-ex-good' : 'text-ex-bad'}`}>{note}</span>}
       </span>
     </>
   );
 }
 
-export const choiceBox = (look: ChoiceLook) => `flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 ${LOOK[look].box}`;
+export const choiceBox = (look: ChoiceLook) => `flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors ${LOOK[look].box}`;
 
 /** A question's options with the answer shown: for the review after a sitting. */
 export function ShownChoices({ question, answer }: { question: ExamQuestion; answer: number | null }) {
@@ -112,9 +94,9 @@ export function ShownChoices({ question, answer }: { question: ExamQuestion; ans
 export function Explanation({ text }: { text?: string }) {
   if (!text?.trim()) return null;
   return (
-    <div className="mt-4 rounded-lg border-l-4 border-brand bg-slate-50 px-4 py-3">
-      <p className="text-sm font-semibold text-brand">คำอธิบาย</p>
-      <p className="mt-1 leading-relaxed wrap-anywhere whitespace-pre-line text-slate-700">{text.trim()}</p>
+    <div className="mt-4 rounded-xl border border-ex-line border-l-4 border-l-ex-accent bg-ex-raised px-4 py-3">
+      <p className="text-sm font-semibold text-ex-accent">คำอธิบาย</p>
+      <p className="mt-1 leading-relaxed wrap-anywhere whitespace-pre-line text-ex-fg">{text.trim()}</p>
     </div>
   );
 }
@@ -168,12 +150,12 @@ export function ConfirmDialog({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4" onClick={(e) => e.target === e.currentTarget && onCancel()}>
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="exam-confirm-title" className="exam-card w-full max-w-md p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby="exam-confirm-title" className="exam-card w-full max-w-md p-6 shadow-2xl">
         <h2 id="exam-confirm-title" className="text-xl font-semibold">
           {title}
         </h2>
-        <div className="mt-3 leading-relaxed text-slate-700">{children}</div>
+        <div className="mt-3 leading-relaxed text-ex-fg">{children}</div>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button ref={first} type="button" onClick={onCancel} className="exam-btn">
             {cancel}
@@ -189,9 +171,9 @@ export function ConfirmDialog({
 
 /** A thin bar filled to `percent`. */
 export function Bar({ percent, tone = 'brand' }: { percent: number; tone?: 'brand' | 'good' | 'low' }) {
-  const fill = tone === 'good' ? 'bg-emerald-600' : tone === 'low' ? 'bg-amber-500' : 'bg-brand';
+  const fill = tone === 'good' ? 'bg-ex-good' : tone === 'low' ? 'bg-gold' : 'bg-linear-to-r from-brand to-brand-2';
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-200" aria-hidden>
+    <div className="h-2 overflow-hidden rounded-full bg-white/10" aria-hidden>
       <div className={`h-full rounded-full ${fill}`} style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} />
     </div>
   );

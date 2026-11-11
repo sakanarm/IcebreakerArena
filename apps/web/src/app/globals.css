@@ -26,6 +26,20 @@
   --color-good: #17b26a;
   --color-bad: #ef4155;
 
+  /* Exam mode and the admin pages: the app's night, calmed down for reading. Every text color here is
+     at least 4.5:1 on ex-card, and ex-fg/ex-muted well over 7:1, so long questions read without strain. */
+  --color-ex-card: #15173f;
+  --color-ex-raised: #1c1f4d;
+  --color-ex-hover: #24285e;
+  --color-ex-line: #2b2f66;
+  --color-ex-line-strong: #3e4389;
+  --color-ex-fg: #eceefb;
+  --color-ex-muted: #b3b7d8;
+  --color-ex-soft: #8d92bd;
+  --color-ex-accent: #93a3ff;
+  --color-ex-good: #3fdc9a;
+  --color-ex-bad: #ff8593;
+
   --animate-float: float 16s ease-in-out infinite;
   --animate-wiggle: wiggle 2.6s ease-in-out infinite;
   --animate-bob: bob 2.2s ease-in-out infinite;
@@ -247,65 +261,67 @@
     @apply pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/25;
   }
 
-  /* Exam mode: a plain, light page like any exam-practice site, inside an app that is otherwise a dark game.
-     The page's wrapper carries .exam-page; the rules on html and body make the whole window light with it,
-     so nothing dark shows around it or flashes before it. */
-  html:has(.exam-page) {
-    color-scheme: light;
-  }
-
-  body:has(.exam-page) {
-    background: #f4f6fb;
-    color: var(--color-ink);
-  }
-
+  /* Exam mode: a calm reading page in the app's own night colors. The game's glow stays at the top, faint,
+     and solid cards carry the text, so a long paper is easy on the eyes and still looks like Pika Arena. */
   .exam-page {
-    @apply min-h-dvh text-ink;
-    background: #f4f6fb;
+    @apply min-h-dvh text-ex-fg;
+    background:
+      radial-gradient(1100px 480px at 50% -200px, rgb(87 52 222 / 0.34), transparent 70%),
+      radial-gradient(700px 480px at 105% 100%, rgb(0 140 200 / 0.1), transparent 65%),
+      var(--color-night);
+    background-attachment: fixed;
   }
 
+  /* questions and answers read in the text face; page titles opt into the display face with font-display */
   .exam-page :is(h1, h2, h3) {
     font-family: var(--font-sans);
   }
 
-  /* the app's cyan focus ring is made for dark screens */
-  .exam-page :focus-visible {
-    outline-color: var(--color-brand);
-  }
-
   .exam-card {
-    @apply rounded-xl border border-slate-200 bg-white;
-    box-shadow: 0 1px 2px rgb(22 19 63 / 0.05);
+    @apply rounded-2xl border border-ex-line bg-ex-card;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.6);
   }
 
   .exam-btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-ink select-none;
-    transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ex-line-strong bg-ex-raised px-4 py-2 text-base font-semibold text-ex-fg select-none;
+    transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease, color 120ms ease;
   }
 
   .exam-btn:hover:not(:disabled) {
-    @apply border-slate-400 bg-slate-50;
+    @apply border-ex-accent/60 bg-ex-hover;
   }
 
   .exam-btn:disabled {
-    opacity: 0.45;
+    opacity: 0.4;
   }
 
   .exam-btn-primary {
     @apply border-brand bg-brand text-white;
+    box-shadow: 0 6px 18px -8px rgb(61 90 254 / 0.8);
   }
 
   .exam-btn-primary:hover:not(:disabled) {
-    border-color: #2f48d8;
-    background-color: #2f48d8;
+    border-color: #5873ff;
+    background-color: #5873ff;
   }
 
   .exam-btn-quiet {
-    @apply border-transparent bg-transparent text-brand;
+    @apply border-transparent bg-transparent text-ex-accent;
   }
 
   .exam-btn-quiet:hover:not(:disabled) {
-    @apply border-transparent bg-brand/10;
+    @apply border-transparent bg-white/[0.06];
+  }
+
+  /* a box to type into, on the dark cards */
+  .exam-field {
+    @apply rounded-xl border border-ex-line-strong bg-night/60 text-ex-fg outline-none placeholder:text-ex-soft;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .exam-field:focus {
+    @apply border-ex-accent;
+    box-shadow: 0 0 0 1px var(--color-ex-accent);
   }
 
   .wipe-shut-down,

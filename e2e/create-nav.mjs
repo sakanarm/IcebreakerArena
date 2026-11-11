@@ -112,12 +112,13 @@ const cardsMakeSense = async (page, label) => {
 
   // the exam pages link back to games and to create
   await page.goto(`${WEB}/exam`, { waitUntil: 'networkidle' });
-  check((await page.getByTestId('exam-nav-create').getAttribute('href')) === `${MOUNT}/create`, '/exam has a create link in its header');
-  check((await page.getByTestId('exam-nav-host').getAttribute('href')) === `${MOUNT}/host`, 'and a link to the games');
+  check((await page.getByTestId('nav-create').getAttribute('href')) === `${MOUNT}/create`, '/exam has the app menu, with a create link');
+  check((await page.getByTestId('nav-host').getAttribute('href')) === `${MOUNT}/host`, 'and a link to the games');
+  check((await page.getByTestId('nav-exam').getAttribute('aria-current')) === 'page', 'and ข้อสอบ marked as the place you are');
   check((await page.locator(`main a[href="${MOUNT}/create"]`).count()) === 1, 'and a create card at the bottom');
   const sample = await page.locator(`main a[href^="${MOUNT}/exam/"]`).first().getAttribute('href');
   await page.goto(`${WEB}${sample.slice(MOUNT.length)}`, { waitUntil: 'networkidle' });
-  check((await page.getByTestId('exam-nav-create').count()) === 1, `a sample exam's start page keeps the header links (${sample.slice(MOUNT.length)})`);
+  check((await page.getByTestId('nav-create').count()) === 1, `a sample exam's start page keeps the app menu (${sample.slice(MOUNT.length)})`);
   await ctx.close();
 }
 
@@ -138,8 +139,7 @@ for (const [w, h] of [
     check(await noSideScroll(page), `${w}px: ${p} never scrolls sideways`);
   }
   await page.goto(`${WEB}/exam`, { waitUntil: 'networkidle' });
-  check(await page.getByTestId('exam-nav-create').isVisible(), `${w}px: the exam header's create link shows`);
-  check((await page.getByTestId('exam-nav-host').isVisible()) === w >= 359, `${w}px: and its games link ${w >= 359 ? 'shows' : 'hides'}`);
+  for (const id of ['nav-host', 'nav-exam', 'nav-create']) check(await page.getByTestId(id).isVisible(), `${w}px: the exam page's menu shows ${id}`);
   await shoot(page, `2-anon-exam-${w}`);
   await ctx.close();
 }

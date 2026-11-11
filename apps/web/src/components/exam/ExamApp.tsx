@@ -99,7 +99,7 @@ export function ExamApp({ code }: { code: string }) {
   if (loaded.status === 'loading') {
     return (
       <Plain>
-        <p className="text-slate-600" role="status">
+        <p className="text-ex-muted" role="status">
           กำลังเปิดข้อสอบ…
         </p>
       </Plain>
@@ -109,7 +109,7 @@ export function ExamApp({ code }: { code: string }) {
     return (
       <Plain>
         <h1 className="text-2xl font-semibold">ไม่พบข้อสอบนี้</h1>
-        <p className="mt-2 leading-relaxed text-slate-600">
+        <p className="mt-2 leading-relaxed text-ex-muted">
           {loaded.login
             ? 'ถ้านี่เป็นเกมของคุณ เข้าสู่ระบบก่อนแล้วจะเปิดได้ ถ้าได้ลิงก์มาจากคนอื่น ลิงก์อาจถูกปิดไปแล้ว'
             : 'ลิงก์อาจพิมพ์ผิด หรือเจ้าของปิดลิงก์ข้อสอบนี้ไปแล้ว ลองขอลิงก์ใหม่จากคนที่ส่งมาให้'}
@@ -131,7 +131,7 @@ export function ExamApp({ code }: { code: string }) {
     return (
       <Plain>
         <h1 className="text-2xl font-semibold">เปิดข้อสอบไม่ได้</h1>
-        <p className="mt-2 leading-relaxed text-slate-600">{loaded.message}</p>
+        <p className="mt-2 leading-relaxed text-ex-muted">{loaded.message}</p>
         <button
           type="button"
           onClick={() => {
@@ -152,7 +152,7 @@ export function ExamApp({ code }: { code: string }) {
     return (
       <Plain>
         <h1 className="text-2xl font-semibold wrap-anywhere">{paper.title || 'ข้อสอบ'}</h1>
-        <p className="mt-2 leading-relaxed text-slate-600">
+        <p className="mt-2 leading-relaxed text-ex-muted">
           ยังไม่มีคำถามที่ทำเป็นข้อสอบได้ ข้อสอบใช้เฉพาะคำถามแบบควิซและจริง/เท็จที่มีเฉลย
         </p>
         {(origin === 'own' || origin === 'browser') && (
