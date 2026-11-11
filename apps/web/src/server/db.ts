@@ -293,6 +293,20 @@ const MIGRATIONS: string[] = [
   CREATE UNIQUE INDEX ib_exams_one_per_game ON ib_exams (game_id);
   CREATE INDEX ib_exams_owner ON ib_exams (owner_id);
   `,
+  // "ถาม AI" in exam mode (ai.ts): how many questions each person asked a day and the tokens they
+  // used, for the daily allowance and to see who uses how much. What was asked is not kept.
+  // who is u:<user id> for someone logged in, otherwise a:<keyed hash of their address>.
+  `
+  CREATE TABLE ib_ai_usage (
+    day date NOT NULL,
+    who text NOT NULL,
+    asks integer NOT NULL DEFAULT 0,
+    tokens_in bigint NOT NULL DEFAULT 0,
+    tokens_out bigint NOT NULL DEFAULT 0,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (day, who)
+  );
+  `,
 ];
 
 /** The version migrate() brings a database to. */

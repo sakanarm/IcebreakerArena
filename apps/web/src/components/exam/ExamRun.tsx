@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isRightChoice } from '@pika-arena/shared';
 import { MODE_LABEL, answeredCount, clock, doneCount, letter, type Attempt } from '@/lib/exam';
+import type { AiPaper } from '@/lib/exam-ai';
+import { AskAi } from './AskAi';
 import { ChoiceBody, ConfirmDialog, Explanation, QuestionImage, choiceBox, rightLetters, shownLook, topicName, type ChoiceLook } from './parts';
 
 /** a pause longer than this is not time spent on the paper (the lid was shut, the tab was left) */
@@ -18,8 +20,11 @@ export function ExamRun({
   onChange,
   onFinish,
   onLeave,
+  ai,
 }: {
   attempt: Attempt;
+  /** where the server finds this paper for "ถาม AI"; null when it can't */
+  ai: AiPaper | null;
   onChange: (change: (a: Attempt) => Attempt) => void;
   /** hand the paper in; `spentMs` is the time spent on it so far */
   onFinish: (spentMs: number) => void;
@@ -219,6 +224,7 @@ export function ExamRun({
                   {right ? '✓ ถูกต้อง' : answer === null ? `ข้อนี้ไม่ได้ตอบ คำตอบที่ถูกคือ ${rightLetters(q)}` : `✕ ยังไม่ถูก คำตอบที่ถูกคือ ${rightLetters(q)}`}
                 </p>
                 <Explanation text={q.explanation} />
+                <AskAi paper={ai} question={q} chosen={answer} />
               </div>
             )}
           </article>

@@ -455,7 +455,7 @@ test('the tables live in our own schema, never in public, and only a safe schema
   const where = await db.query<{ table_schema: string; n: number }>(
     "SELECT table_schema, count(*)::int AS n FROM information_schema.tables WHERE table_name LIKE 'ib\\_%' GROUP BY 1",
   );
-  assert.deepEqual(where, [{ table_schema: 'icebreaker', n: 9 }]);
+  assert.deepEqual(where, [{ table_schema: 'icebreaker', n: 10 }]);
   const [owner] = await db.query<{ owner: string }>("SELECT pg_get_userbyid(nspowner) AS owner FROM pg_namespace WHERE nspname = 'icebreaker'");
   assert.ok(owner, 'migrate made the schema');
 
@@ -1038,7 +1038,9 @@ test('every sample game with exam questions can be opened as a link, and many li
 test('upgrading a database from before exam links keeps its games and gives them no link', async () => {
   const old = await openPglite(undefined, 'icebreaker');
   try {
-    await migrate(old, SCHEMA_VERSION - 1);
+    // v3: the last schema before exam links (v4)
+    await migrate(old, 3);
+    assert.deepEqual(await old.query("SELECT 1 FROM information_schema.tables WHERE table_name = 'ib_exams'"), []);
     const u = await upsertUser(old, { issuer: 'test', subject: 'before-exams', name: 'Before' });
     await old.query("INSERT INTO ib_games (id, owner_id, title, data, origin) VALUES ($1, $2, 'เกมเก่า', $3, 'new')", ['g'.repeat(22), u.id, JSON.stringify(examGame('เกมเก่า'))]);
     await migrate(old);

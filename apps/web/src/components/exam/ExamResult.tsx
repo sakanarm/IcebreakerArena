@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { isRightChoice, scoreExam, type ExamItem } from '@pika-arena/shared';
 import { MODE_LABEL, duration, ranOut, usedMs, type Attempt } from '@/lib/exam';
+import type { AiPaper } from '@/lib/exam-ai';
+import { AskAi } from './AskAi';
 import { Bar, ExamHeader, Explanation, QuestionImage, ShownChoices, rightLetters, topicName } from './parts';
 
 /** under this share of right answers a topic is worth going over again */
@@ -25,8 +27,11 @@ export function ExamResult({
   attempt,
   onRetry,
   onNew,
+  ai,
 }: {
   attempt: Attempt;
+  /** where the server finds this paper for "ถาม AI"; null when it can't */
+  ai: AiPaper | null;
   /** sit these questions again, as practice */
   onRetry: (items: ExamItem[]) => void;
   /** back to the start page for another draw */
@@ -166,6 +171,7 @@ export function ExamResult({
                   <ShownChoices question={it.question} answer={answers[i] ?? null} />
                   {outcome === 'skipped' && <p className="mt-3 text-sm font-semibold text-slate-600">ไม่ได้ตอบข้อนี้ · คำตอบที่ถูกคือ {rightLetters(it.question)}</p>}
                   <Explanation text={it.question.explanation} />
+                  <AskAi paper={ai} question={it.question} chosen={answers[i] ?? null} />
                 </li>
               );
             })}

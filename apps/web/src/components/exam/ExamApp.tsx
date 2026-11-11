@@ -15,6 +15,7 @@ import {
   type ExamSetup,
   type LoadedPaper,
 } from '@/lib/exam';
+import { aiPaper } from '@/lib/exam-ai';
 import { ExamResult } from './ExamResult';
 import { ExamRun } from './ExamRun';
 import { ExamStart } from './ExamStart';
@@ -130,6 +131,7 @@ export function ExamApp({ code }: { code: string }) {
   }
 
   const { paper, origin } = loaded;
+  const ai = aiPaper(code, origin);
   if (examSize(paper) === 0) {
     return (
       <Plain>
@@ -147,12 +149,13 @@ export function ExamApp({ code }: { code: string }) {
   }
 
   if (view === 'run' && attempt && attempt.finishedAt === null) {
-    return <ExamRun attempt={attempt} onChange={change} onFinish={finish} onLeave={leave} />;
+    return <ExamRun attempt={attempt} onChange={change} onFinish={finish} onLeave={leave} ai={ai} />;
   }
   if (view === 'result' && attempt && attempt.finishedAt !== null) {
     return (
       <ExamResult
         attempt={attempt}
+        ai={ai}
         onRetry={(items: ExamItem[]) => {
           setAttempt(attemptOf(code, attempt.title, items, 'practice'));
           setView('run');
