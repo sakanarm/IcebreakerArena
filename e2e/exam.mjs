@@ -482,7 +482,12 @@ if (who) {
   misses();
   await box.getByRole('button', { name: 'ปิดลิงก์' }).click();
   await mp.getByText('ปิดลิงก์ข้อสอบแล้ว').waitFor({ timeout: 10000 });
-  check((await textOf(card2.getByRole('button', { name: /🔗/ }))) === '🔗 เปิดลิงก์ข้อสอบ', 'closed: the card offers to open a link again');
+  // the message comes first and the card follows once the list is fetched again, which takes a moment on a busy server
+  const reopen = await card2
+    .getByRole('button', { name: '🔗 เปิดลิงก์ข้อสอบ', exact: true })
+    .waitFor({ timeout: 10000 })
+    .then(() => true, () => false);
+  check(reopen, 'closed: the card offers to open a link again');
   check((await fetch(`${WEB}/api/exams/${code}`)).status === 404, 'the closed link answers 404');
   await gp.reload({ waitUntil: 'networkidle' });
   await gp.getByRole('heading', { name: 'ไม่พบข้อสอบนี้' }).waitFor({ timeout: 10000 });
