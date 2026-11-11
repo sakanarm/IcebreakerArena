@@ -165,7 +165,18 @@ test('AI is off without a usable file, and the file is read again on every reque
   setAi({});
   const c = aiConfig()!;
   assert.deepEqual(
-    { model: c.model, effort: c.effort, maxTokens: c.maxTokens, fallbacks: c.fallbacks, perPersonPerDay: c.perPersonPerDay, perDay: c.perDay, who: c.who },
+    {
+      model: c.model,
+      effort: c.effort,
+      maxTokens: c.maxTokens,
+      fallbacks: c.fallbacks,
+      perPersonPerDay: c.perPersonPerDay,
+      perDay: c.perDay,
+      who: c.who,
+      quizPerPersonPerDay: c.quizPerPersonPerDay,
+      quizEffort: c.quizEffort,
+      structuredOutput: c.structuredOutput,
+    },
     { ...AI_DEFAULTS },
   );
   assert.deepEqual((await read(await GET(new Request('http://localhost/api/exam-ai')))).body, { enabled: true, needsLogin: false });
@@ -175,6 +186,12 @@ test('AI is off without a usable file, and the file is read again on every reque
   const odd = aiConfig()!;
   assert.deepEqual([odd.effort, odd.maxTokens, odd.perPersonPerDay, odd.who], ['low', 4000, 10000, 'anyone']);
   assert.deepEqual(odd.headers, { 'X-Gateway': 'a' });
+  setAi({ quizPerPersonPerDay: 0, quizEffort: 'max', structuredOutput: 'no' });
+  const quiz = aiConfig()!;
+  assert.deepEqual([quiz.quizPerPersonPerDay, quiz.quizEffort, quiz.structuredOutput], [AI_DEFAULTS.quizPerPersonPerDay, 'medium', true]);
+  setAi({ quizPerPersonPerDay: 5000, quizEffort: 'high', structuredOutput: false });
+  const set = aiConfig()!;
+  assert.deepEqual([set.quizPerPersonPerDay, set.quizEffort, set.structuredOutput], [1000, 'high', false]);
 
   // without accounts there is no database to count in, so no AI either
   process.env.AUTH_MODE = 'off';

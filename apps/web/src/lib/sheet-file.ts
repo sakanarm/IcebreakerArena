@@ -63,18 +63,28 @@ export function decodeText(bytes: Uint8Array): string | null {
 
 const trim = (rows: string[][]) => rows.slice(0, MAX_ROWS).map((r) => r.slice(0, MAX_COLS));
 
-class SheetError extends Error {}
+/** what went wrong opening a zip, so a Word or PowerPoint reader (doc-text.ts) can say it in its own words */
+export type ZipProblem = 'broken' | 'locked' | 'big' | 'method' | 'other';
+
+export class SheetError extends Error {
+  constructor(
+    message: string,
+    readonly kind: ZipProblem = 'other',
+  ) {
+    super(message);
+  }
+}
 
 // ---------- zip ----------
 
-interface ZipEntry {
+export interface ZipEntry {
   method: number;
   compressed: number;
   size: number;
   offset: number;
 }
 
-function readZip(bytes: Uint8Array): Map<string, ZipEntry> {
+export function readZip(bytes: Uint8Array): Map<string, ZipEntry> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   // the end-of-central-directory record sits in the last 64 KB + 22 bytes
   let eocd = -1;
@@ -84,15 +94,15 @@ function readZip(bytes: Uint8Array): Map<string, ZipEntry> {
       break;
     }
   }
-  if (eocd < 0) throw new SheetError('ไฟล์ Excel นี้เสียหรือยังบันทึกไม่เสร็จ ลองบันทึกใหม่');
+  if (eocd < 0) throw new SheetError('ไฟล์ Excel นี้เสียหรือยังบันทึกไม่เสร็จ ลองบันทึกใหม่', 'broken');
   const count = view.getUint16(eocd + 10, true);
   let at = view.getUint32(eocd + 16, true);
   const entries = new Map<string, ZipEntry>();
   const utf8 = new TextDecoder();
   for (let n = 0; n < count; n++) {
-    if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new SheetError('ไฟล์ Excel นี้เสีย ลองบันทึกใหม่');
+    if (at + 46 > bytes.length || view.getUint32(at, true) !== 0x02014b50) throw new SheetError('ไฟล์ Excel นี้เสีย ลองบันทึกใหม่', 'broken');
     const flags = view.getUint16(at + 8, true);
-    if (flags & 1) throw new SheetError('ไฟล์นี้ตั้งรหัสผ่านไว้: เอารหัสผ่านออกใน Excel ก่อน แล้วอัปโหลดใหม่');
+    if (flags & 1) throw new SheetError('ไฟล์นี้ตั้งรหัสผ่านไว้: เอารหัสผ่านออกใน Excel ก่อน แล้วอัปโหลดใหม่', 'locked');
     const method = view.getUint16(at + 10, true);
     const compressed = view.getUint32(at + 20, true);
     const size = view.getUint32(at + 24, true);
@@ -101,7 +111,7 @@ function readZip(bytes: Uint8Array): Map<string, ZipEntry> {
     const commentLen = view.getUint16(at + 32, true);
     const local = view.getUint32(at + 42, true);
     const name = utf8.decode(bytes.subarray(at + 46, at + 46 + nameLen));
-    if (local + 30 > bytes.length || view.getUint32(local, true) !== 0x04034b50) throw new SheetError('ไฟล์ Excel นี้เสีย ลองบันทึกใหม่');
+    if (local + 30 > bytes.length || view.getUint32(local, true) !== 0x04034b50) throw new SheetError('ไฟล์ Excel นี้เสีย ลองบันทึกใหม่', 'broken');
     const offset = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
     entries.set(name.replace(/^\//, ''), { method, compressed, size, offset });
     at += 46 + nameLen + extraLen + commentLen;
@@ -109,8 +119,8 @@ function readZip(bytes: Uint8Array): Map<string, ZipEntry> {
   return entries;
 }
 
-async function inflate(bytes: Uint8Array, entry: ZipEntry, budget: { left: number }): Promise<string> {
-  if (entry.size > budget.left) throw new SheetError('ไฟล์นี้ใหญ่เกินกว่าจะเป็นคลังคำถาม');
+export async function inflate(bytes: Uint8Array, entry: ZipEntry, budget: { left: number }): Promise<string> {
+  if (entry.size > budget.left) throw new SheetError('ไฟล์นี้ใหญ่เกินกว่าจะเป็นคลังคำถาม', 'big');
   const data = bytes.subarray(entry.offset, entry.offset + entry.compressed);
   let out: Uint8Array;
   if (entry.method === 0) out = data;
@@ -126,7 +136,7 @@ async function inflate(bytes: Uint8Array, entry: ZipEntry, budget: { left: numbe
       // the size in the directory can lie; count what actually comes out
       if (total > budget.left) {
         await reader.cancel();
-        throw new SheetError('ไฟล์นี้ใหญ่เกินกว่าจะเป็นคลังคำถาม');
+        throw new SheetError('ไฟล์นี้ใหญ่เกินกว่าจะเป็นคลังคำถาม', 'big');
       }
       chunks.push(value);
     }
@@ -136,7 +146,7 @@ async function inflate(bytes: Uint8Array, entry: ZipEntry, budget: { left: numbe
       out.set(c, p);
       p += c.length;
     }
-  } else throw new SheetError('ไฟล์ Excel นี้บีบอัดแบบที่เปิดไม่ได้ ลองบันทึกใหม่เป็น .xlsx');
+  } else throw new SheetError('ไฟล์ Excel นี้บีบอัดแบบที่เปิดไม่ได้ ลองบันทึกใหม่เป็น .xlsx', 'method');
   budget.left -= out.length;
   return new TextDecoder().decode(out);
 }

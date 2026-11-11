@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useAnimate } from 'motion/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { SAMPLE_GAMES, copyTitle, validateGame, type Game } from '@pika-arena/shared';
+import { SAMPLE_GAMES, buildExam, copyTitle, examSize, validateGame, type Game } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type Account, type AccountUser } from '@/lib/account';
 import { ApiError, apiMessage, errorCode } from '@/lib/api';
 import { cloud, enqueue, isServerId } from '@/lib/cloud';
@@ -101,6 +101,8 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
   const [keptHere, setKeptHere] = useState(false);
   const [sel, setSel] = useState<Selection>({ kind: 'game' });
   const [saveState, setSaveState] = useState<SaveState>('new');
+  /** the id the game was last saved under, which is also its exam link */
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
@@ -131,6 +133,7 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
   }, [game]);
 
   const showUrl = (gameId: string) => {
+    if (alive.current) setSavedId(gameId);
     if (alive.current && new URLSearchParams(location.search).get('id') !== gameId) history.replaceState(null, '', withBase(`/editor?id=${gameId}`));
   };
 
@@ -145,6 +148,8 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
       setGame(found ?? blankGame());
       setSel(first ? { kind: 'question', id: first.id } : { kind: 'game' });
       setSaveState(opts.saved ? 'saved' : 'new');
+      // a game opened already saved can be tried as an exam at once, before any edit saves it again
+      setSavedId(!found || !opts.saved ? null : s.kind === 'cloud' ? s.id : found.id);
       setTainted(!!opts.tainted);
       if (opts.note) setToast(opts.note);
     };
@@ -347,6 +352,8 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
     const res = validateGame(dropBlankOptions(game));
     return res.ok ? [] : res.errors;
   }, [game]);
+  /** quiz and true/false questions with an answer, the ones exam mode asks */
+  const examCount = useMemo(() => (game ? examSize(buildExam(dropBlankOptions(game))) : 0), [game]);
 
   if (loadError) {
     return (
@@ -600,6 +607,20 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
           </button>
           <div className={`${outlineOpen ? 'block' : 'hidden'} mt-3 lg:mt-0 lg:block`}>
             <Outline game={game} sel={sel} errors={errors} edit={edit} onSelect={select} />
+            {examCount > 0 && savedId && saveState === 'saved' && (
+              <Link
+                href={`/exam/${savedId}`}
+                target="_blank"
+                data-testid="editor-exam"
+                className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 font-semibold hover:bg-white/10"
+              >
+                <span className="min-w-0">
+                  📝 ทดลองทำเป็นข้อสอบ
+                  <span className="block text-xs font-normal text-white/55">{examCount} ข้อที่ใช้เป็นข้อสอบได้ · เปิดในแท็บใหม่</span>
+                </span>
+                <span aria-hidden>↗</span>
+              </Link>
+            )}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button type="button" onClick={() => fileInput.current?.click()} className={`btn btn-ghost px-3 text-sm ${tainted ? 'col-span-2' : ''}`}>
                 ⬆️ นำเข้า JSON

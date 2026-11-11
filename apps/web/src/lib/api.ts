@@ -17,6 +17,13 @@ export const setPageUser = (id: string | null) => {
   pageUser = id;
 };
 
+/** the headers `api` sends with a request that changes something, for a caller that reads the answer itself */
+export function mutationHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'x-ib-req': '1', 'content-type': 'application/json' };
+  if (pageUser) headers['x-ib-user'] = pageUser;
+  return headers;
+}
+
 /**
  * Calls the web app's own API. Requests that change something carry X-IB-Req, which the server
  * requires (a form or another site can't send it). Network failures become ApiError 'offline'.

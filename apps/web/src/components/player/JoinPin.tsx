@@ -1,6 +1,7 @@
 'use client';
 
 import { motion, useAnimate } from 'motion/react';
+import Link from 'next/link';
 import { useState } from 'react';
 import { FloatingShapes, Logo } from '../shapes';
 
@@ -60,6 +61,9 @@ export function JoinPin({ onSubmit, error }: { onSubmit: (pin: string) => Promis
         </button>
       </motion.form>
       <p className="relative text-center text-sm text-white/55">ดู PIN 6 หลักบนจอใหญ่ หรือสแกน QR Code ด้วยกล้องมือถือ</p>
+      <Link href="/exam" className="relative rounded-lg px-2 py-1 text-sm font-semibold text-brand-2 underline-offset-4 hover:underline" data-testid="join-exam">
+        ไม่มีเกมตอนนี้? ฝึกทำข้อสอบด้วยตัวเอง →
+      </Link>
     </div>
   );
 }

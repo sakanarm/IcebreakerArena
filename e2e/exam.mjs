@@ -111,6 +111,25 @@ check(BANK >= 8, `which says how big the bank is (${BANK} questions in 3 topics)
 check((await page.locator('main input[type=checkbox]').count()) === 4, 'three topics to pick, and the shuffle switch');
 check(/· ข้อสอบ · MFEC Pika Arena$/.test(await page.title()), `the tab is named after the paper (${await page.title()})`);
 await shoot(page, '02-start', true);
+{
+  // the paper's name stays in the tab after Next writes the route's own title, and leaves with the paper
+  const tab = await page.context().newPage();
+  watch(tab, 'title');
+  await tab.goto(`${WEB}/exam`, { waitUntil: 'networkidle' });
+  await tab.locator(`main a[href="${MOUNT}/exam/${SAMPLE}"]`).click();
+  await startPage(tab).waitFor({ timeout: 15000 });
+  await tab.waitForTimeout(1500);
+  check(/^รู้จัก Pika.* · ข้อสอบ · MFEC Pika Arena$/.test(await tab.title()), `a second later the tab still has the paper's name (${await tab.title()})`);
+  await tab.locator(`header a[href="${MOUNT}/exam"]`).first().click();
+  await tab.waitForURL((u) => u.pathname === `${MOUNT}/exam`, { timeout: 15000 });
+  await tab.waitForTimeout(1500);
+  check((await tab.title()) === 'โหมดข้อสอบ · MFEC Pika Arena', `back on /exam the tab is the index's again (${await tab.title()})`);
+  await tab.goBack();
+  await startPage(tab).waitFor({ timeout: 15000 });
+  await tab.waitForTimeout(1500);
+  check(/^รู้จัก Pika.* · ข้อสอบ · MFEC Pika Arena$/.test(await tab.title()), `and the browser's back button brings the paper's name back (${await tab.title()})`);
+  await tab.close();
+}
 
 // none of the topics: nothing to start
 await page.getByRole('button', { name: 'ไม่เลือกเลย' }).click();

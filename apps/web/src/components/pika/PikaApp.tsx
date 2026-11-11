@@ -6,10 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LIMITS, MAX_PAGES, buildQuestions, hasContactInfo, type FactPlan, type Question, type QuestionType } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type AccountUser } from '@/lib/account';
 import { ApiError, api, apiMessage, apiUpload, errorCode } from '@/lib/api';
-import { AccountChip } from '../AccountChip';
+import { SiteNav } from '../SiteNav';
 import { WaitingDots } from '../motion-bits';
 import { Notice } from '../Notice';
-import { FloatingShapes, Logo } from '../shapes';
+import { FloatingShapes } from '../shapes';
 
 // ---------- what the API answers ----------
 
@@ -184,17 +184,10 @@ function Maker({ user }: { user: AccountUser }) {
     <div className="relative min-h-dvh px-4 pt-6 pb-28 sm:px-5">
       <FloatingShapes opacity={0.06} />
       <div className="relative mx-auto max-w-4xl">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/host" aria-label="กลับไปที่เกมของฉัน">
-            <Logo small />
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <AccountChip />
-            <Link href="/host" className="btn btn-ghost px-4 text-base">
-              ← เกมของฉัน
-            </Link>
-          </div>
-        </header>
+        <SiteNav here="create" />
+        <Link href="/create" className="mt-6 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-white/60 hover:text-white">
+          ← วิธีสร้างอื่น
+        </Link>
 
         <div className="mt-8">
           <h1 className="text-3xl font-extrabold text-balance sm:text-4xl">ข้อสอบจากคลังความรู้</h1>

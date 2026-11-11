@@ -31,16 +31,16 @@ export function HomeScreen() {
       <FloatingShapes opacity={0.09} />
       <div className="relative mx-auto flex max-w-6xl flex-col px-5 pt-6 pb-16">
         <header className="flex items-center justify-between gap-4">
-          <Logo small />
+          <Logo small compact />
           <nav className="flex min-w-0 gap-2">
             <Link href="/host" className="btn btn-ghost px-4 text-base">
               จัดเกม
             </Link>
-            <Link href="/editor" className="btn btn-ghost hidden px-4 text-base sm:inline-flex">
-              สร้างเกม
-            </Link>
-            <Link href="/exam" className="btn btn-ghost hidden px-4 text-base sm:inline-flex">
+            <Link href="/exam" className="btn btn-ghost px-4 text-base">
               ข้อสอบ
+            </Link>
+            <Link href="/create" className="btn btn-ghost hidden px-4 text-base sm:inline-flex">
+              สร้างใหม่
             </Link>
             {/* players come here for the PIN and never log in, so no login link here: only who is logged in */}
             <AccountChip loginLink={false} />
@@ -82,7 +82,7 @@ export function HomeScreen() {
 
         <section className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:mt-24 lg:grid-cols-3">
           <ActionCard href="/host" color={1} title="จัดเกม (Host)" body="เลือกเกม เปิดห้อง แล้วคุมจังหวะบนจอใหญ่ด้วยปุ่มเดียว" cta="ไปหน้าจัดเกม" />
-          <ActionCard href="/editor" color={3} title="สร้างเกมของทีม" body="คำถาม 6 แบบ ควิซ จริง/เท็จ โพล เรียงลำดับ พิมพ์คำตอบ ทายตัวเลข จัดเป็นด่านๆ" cta="เปิด Editor" />
+          <ActionCard href="/create" color={3} title="สร้างเกมหรือข้อสอบ" body="ให้ AI ออกข้อสอบจากเอกสาร ดึงจากคลังความรู้ Pika นำเข้าจาก Excel หรือเขียนเองด้วยคำถาม 6 แบบ" cta="เลือกวิธีสร้าง" />
           <ActionCard href="/exam" color={0} title="โหมดข้อสอบ" body="ทำข้อสอบเลือกตอบคนเดียว สุ่มข้อจากคลัง เฉลยพร้อมคำอธิบาย ไม่ต้องเข้าสู่ระบบ" cta="เริ่มทำข้อสอบ" />
         </section>
 

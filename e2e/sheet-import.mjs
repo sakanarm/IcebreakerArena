@@ -69,7 +69,11 @@ const noSideScroll = (page) => page.evaluate(() => document.documentElement.scro
     check(/\/login\?next=%2Fimport$/.test(href ?? ''), 'and its login link comes back to /import');
   }
   await page.goto(`${WEB}/exam`, { waitUntil: 'networkidle' });
-  check((await page.locator(`a[href="${MOUNT}/import"]`).count()) === 1, '/exam links to the import page');
+  check((await page.locator(`main a[href="${MOUNT}/create"]`).count()) === 1, '/exam links to the create page');
+  await page.goto(`${WEB}/create`, { waitUntil: 'networkidle' });
+  await page.locator('[data-testid=create-sheet]:not([data-state=loading])').waitFor({ timeout: 20000 });
+  const sheetHref = await page.getByTestId('create-sheet-go').getAttribute('href');
+  check(sheetHref === `${MOUNT}/import` || /\/login\?next=%2Fimport$/.test(sheetHref ?? ''), `and the create page leads to /import (${sheetHref})`);
   await ctx.close();
 }
 
@@ -207,7 +211,10 @@ if (who) {
 
   // the ways in
   await page.goto(`${WEB}/host`, { waitUntil: 'networkidle' });
-  check((await page.locator(`a[href="${MOUNT}/import"]`).count()) >= 1, '/host links to the import page');
+  check((await page.locator(`a[href="${MOUNT}/create"]`).count()) >= 1, '/host links to the create page');
+  await page.goto(`${WEB}/create`, { waitUntil: 'networkidle' });
+  await page.locator('[data-testid=create-sheet]:not([data-state=loading])').waitFor({ timeout: 20000 });
+  check((await page.getByTestId('create-sheet-go').getAttribute('href')) === `${MOUNT}/import`, 'which leads to the import page');
   await page.goto(`${WEB}/editor?id=${xid}`, { waitUntil: 'networkidle' });
   await page.locator(`a[href="${MOUNT}/import"]`).first().waitFor({ state: 'attached', timeout: 20000 }).catch(() => {});
   check((await page.locator(`a[href="${MOUNT}/import"]`).count()) >= 1, 'the editor links to the import page');

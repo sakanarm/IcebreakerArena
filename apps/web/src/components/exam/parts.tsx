@@ -16,9 +16,17 @@ export function ExamHeader() {
         <span className="text-slate-300" aria-hidden>
           /
         </span>
-        <Link href="/exam" className="rounded font-semibold text-slate-600 hover:text-brand">
+        <Link href="/exam" className="rounded font-semibold whitespace-nowrap text-slate-600 hover:text-brand">
           โหมดข้อสอบ
         </Link>
+        <nav aria-label="ไปที่อื่น" className="ml-auto flex items-center gap-1">
+          <Link href="/host" className="rounded-md px-2 py-1.5 font-semibold whitespace-nowrap text-slate-600 hover:bg-slate-100 hover:text-ink max-[359px]:hidden" data-testid="exam-nav-host">
+            เกมของฉัน
+          </Link>
+          <Link href="/create" className="rounded-md px-2 py-1.5 font-semibold whitespace-nowrap text-brand hover:bg-brand/10" data-testid="exam-nav-create">
+            ＋ สร้างข้อสอบ
+          </Link>
+        </nav>
       </div>
     </header>
   );

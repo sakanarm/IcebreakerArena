@@ -197,7 +197,14 @@ try {
     const href = await p.getByRole('link', { name: 'เข้าสู่ระบบ', exact: true }).getAttribute('href');
     check(/\/login\?next=%2Fpika$/.test(href ?? ''), 'signed out, /pika asks for a login that comes back to it');
     await p.goto(`${WEB}/exam`, { waitUntil: 'networkidle' });
-    check((await p.locator(`a[href="${MOUNT}/pika"]`).count()) === 1, '/exam points to the knowledge base');
+    check((await p.locator(`main a[href="${MOUNT}/create"]`).count()) === 1, '/exam points to the create page');
+    await p.goto(`${WEB}/create`, { waitUntil: 'networkidle' });
+    await p.locator('[data-testid=create-pika]:not([data-state=loading])').waitFor({ timeout: 20000 });
+    check(
+      (await p.getByTestId('create-pika').getAttribute('data-state')) === 'login' &&
+        /\/login\?next=%2Fpika$/.test((await p.getByTestId('create-pika-go').getAttribute('href')) ?? ''),
+      'signed out, the create page offers Pika behind a login that comes back to /pika',
+    );
   }
 
   if (who) {
@@ -215,8 +222,18 @@ try {
       const state = p.getByRole('heading', { name: /บัญชีนี้ยังไม่มีอีเมล|ยังไม่ได้เชื่อมกับ Pika|เริ่มคลังความรู้ของคุณ|เลือกหน้าที่จะออกข้อสอบ/ }).first();
       await state.waitFor({ timeout: 20000 });
       check(true, `the page says where this account stands: "${await textOf(state)}"`);
+      const stateText = await textOf(state);
       await p.goto(`${WEB}/host`, { waitUntil: 'networkidle' });
-      check((await p.locator(`header a[href="${MOUNT}/pika"]`).count()) === 1, 'the host page links to /pika when signed in');
+      check((await p.locator(`header a[href="${MOUNT}/create"]`).count()) === 1, 'the host page links to the create page');
+      await p.goto(`${WEB}/create`, { waitUntil: 'networkidle' });
+      const card = p.locator('[data-testid=create-pika]:not([data-state=loading])');
+      await card.waitFor({ timeout: 20000 });
+      const cardState = await card.getAttribute('data-state');
+      const blocked = /บัญชีนี้ยังไม่มีอีเมล|ยังไม่ได้เชื่อมกับ Pika/.exec(stateText)?.[0];
+      check(
+        blocked ? cardState === 'off' && (await textOf(p.getByTestId('create-pika-why'))).includes(blocked) : cardState === 'go' && (await p.getByTestId('create-pika-go').getAttribute('href')) === `${MOUNT}/pika`,
+        `the create page's Pika card agrees (${cardState}${blocked ? `: ${blocked}` : ''})`,
+      );
     } else {
       // ---------- the whole road, against the stand-in ----------
       const start = p.getByRole('button', { name: 'สร้างคลังความรู้ของฉัน' });

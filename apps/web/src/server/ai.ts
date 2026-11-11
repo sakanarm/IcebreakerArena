@@ -36,6 +36,12 @@ export interface AiConfig {
   perDay: number;
   /** anyone: whoever holds the exam; signed-in: only people logged in to the site */
   who: 'anyone' | 'signed-in';
+  /** papers one maker may have the AI write a day (ai-quiz.ts); each also counts once toward perDay */
+  quizPerPersonPerDay: number;
+  /** how hard Claude thinks while writing a paper: worth more than a chat reply */
+  quizEffort: 'low' | 'medium' | 'high';
+  /** ask for JSON through structured outputs; off for a gateway that does not pass output_config.format on */
+  structuredOutput: boolean;
 }
 
 export const AI_DEFAULTS = {
@@ -46,6 +52,9 @@ export const AI_DEFAULTS = {
   perPersonPerDay: 30,
   perDay: 2000,
   who: 'anyone',
+  quizPerPersonPerDay: 10,
+  quizEffort: 'medium',
+  structuredOutput: true,
 } as const;
 
 const EFFORTS = ['low', 'medium', 'high'] as const;
@@ -54,7 +63,7 @@ const posInt = (v: unknown, fallback: number, max: number) =>
   typeof v === 'number' && Number.isInteger(v) && v > 0 ? Math.min(v, max) : fallback;
 
 let warned = '';
-function warnOnce(message: string) {
+export function warnOnce(message: string) {
   if (warned === message) return;
   warned = message;
   console.error(`[ai] ${message}`);
@@ -100,6 +109,9 @@ export function aiConfig(): AiConfig | null {
     perPersonPerDay: posInt(c.perPersonPerDay, AI_DEFAULTS.perPersonPerDay, 10000),
     perDay: posInt(c.perDay, AI_DEFAULTS.perDay, 1000000),
     who: c.who === 'signed-in' ? 'signed-in' : 'anyone',
+    quizPerPersonPerDay: posInt(c.quizPerPersonPerDay, AI_DEFAULTS.quizPerPersonPerDay, 1000),
+    quizEffort: EFFORTS.includes(c.quizEffort as AiConfig['effort']) ? (c.quizEffort as AiConfig['effort']) : AI_DEFAULTS.quizEffort,
+    structuredOutput: c.structuredOutput === false ? false : AI_DEFAULTS.structuredOutput,
   };
 }
 
@@ -237,16 +249,20 @@ export interface AiReply {
 /** Removes the key from anything that might reach a log. */
 export const hideKey = (text: string, key: string) => (key ? text.split(key).join('<KEY HIDDEN>') : text);
 
-/** Asks Claude about the question. Refusals come back as HttpErrors a browser can show. */
-export async function askClaude(c: AiConfig, brief: string, turns: AiTurn[]): Promise<AiReply> {
-  const client = new Anthropic({
+/** A client for the admin's provider: the official API, or the approved gateway with its own headers. */
+export const claudeClient = (c: AiConfig, timeout: number) =>
+  new Anthropic({
     apiKey: c.apiKey,
     authToken: null,
     baseURL: c.baseUrl ?? undefined,
     defaultHeaders: c.headers,
-    timeout: 60_000,
+    timeout,
     maxRetries: 1,
   });
+
+/** Asks Claude about the question. Refusals come back as HttpErrors a browser can show. */
+export async function askClaude(c: AiConfig, brief: string, turns: AiTurn[]): Promise<AiReply> {
+  const client = claudeClient(c, 60_000);
   const system = `${RULES}\n\n<question>\n${brief}\n</question>`;
   const messages: Anthropic.MessageParam[] = turns.map((t) => ({ role: t.role, content: t.text }));
   try {

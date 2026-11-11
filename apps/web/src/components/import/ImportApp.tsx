@@ -2,24 +2,30 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { LIMITS, SHEET_TEMPLATE, parseCsv, readSheets, sheetGames, type Game, type SheetIn, type SheetRead } from '@pika-arena/shared';
 import { refreshAccount, useAccount, type AccountUser } from '@/lib/account';
+import { quizStatus, type QuizPaper, type QuizStatus } from '@/lib/ai-quiz';
 import { apiMessage } from '@/lib/api';
 import { cloud } from '@/lib/cloud';
 import { downloadText, toCsv } from '@/lib/csv';
 import { newId, saveMyGame } from '@/lib/games';
 import { SHEET_ACCEPT, readSheetFile } from '@/lib/sheet-file';
-import { AccountChip } from '../AccountChip';
+import { SiteNav } from '../SiteNav';
+import { AI_FORM, AiPick, type AiForm } from './AiPick';
 import { WaitingDots } from '../motion-bits';
 import { Notice } from '../Notice';
-import { FloatingShapes, Logo } from '../shapes';
+import { FloatingShapes } from '../shapes';
 
 /** what was read, and from where: the title starts as the file's name */
 interface Loaded {
   source: string;
   read: SheetRead;
+  /** set when the AI wrote the questions: the maker checks each one before saving */
+  ai?: { quotes: Record<string, string> };
 }
+
+type Tab = 'file' | 'paste' | 'ai';
 
 interface Made {
   id: string;
@@ -84,37 +90,78 @@ export function ImportApp() {
 function Importer({ user }: { user: AccountUser | null }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [made, setMade] = useState<Made[] | null>(null);
+  // kept here, not in the tab, so going back from the preview finds the form as it was
+  const [tab, setTab] = useState<Tab>('file');
+  const [aiForm, setAiForm] = useState<AiForm>(AI_FORM);
+  const [ai, setAi] = useState<QuizStatus>({ enabled: false });
+
+  useEffect(() => {
+    let live = true;
+    void quizStatus().then((s) => {
+      if (!live) return;
+      setAi(s);
+      // the "ให้ AI ออกข้อสอบ" button on the games page opens this tab
+      if (s.enabled && !s.needsLogin && new URLSearchParams(window.location.search).get('ai') === '1') setTab('ai');
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const aiReady = ai.enabled && !ai.needsLogin ? ai : null;
+
+  const written = (paper: QuizPaper, asked: number) => {
+    const notes: string[] = [];
+    if (paper.dropped > 0) notes.push(`ตัดข้อที่ AI เขียนไม่ครบหรือผิดรูปแบบออก ${paper.dropped} ข้อ`);
+    if (paper.count < asked) notes.push(`ได้ ${paper.count} จาก ${asked} ข้อที่ขอ เนื้อหาอาจมีข้อเท็จจริงไม่พอสำหรับข้อที่ไม่ซ้ำกัน`);
+    setLoaded({
+      source: paper.title || aiForm.name,
+      read: { rounds: paper.rounds, count: paper.count, problems: [], notes },
+      ai: { quotes: paper.quotes },
+    });
+  };
 
   return (
     <div className="relative min-h-dvh px-4 pt-6 pb-16 sm:px-5">
       <FloatingShapes opacity={0.06} />
       <div className="relative mx-auto max-w-4xl">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/host" aria-label="กลับไปที่เกมของฉัน">
-            <Logo small />
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            {user && <AccountChip />}
-            <Link href="/host" className="btn btn-ghost px-4 text-base">
-              ← เกมของฉัน
-            </Link>
-          </div>
-        </header>
+        <SiteNav here="create" />
+        <Link href="/create" className="mt-6 inline-flex items-center gap-1 rounded-lg text-sm font-semibold text-white/60 hover:text-white">
+          ← วิธีสร้างอื่น
+        </Link>
 
         <div className="mt-8">
           <h1 className="text-3xl font-extrabold text-balance sm:text-4xl">นำเข้าคลังข้อสอบ</h1>
           <p className="mt-2 max-w-2xl text-white/70">
-            มีข้อสอบอยู่ใน Excel หรือ Google Sheets อยู่แล้ว นำเข้ามาเป็นเกมได้ในครั้งเดียว ใช้ทำข้อสอบสี่ตัวเลือก หรือเปิดห้องเล่นสดก็ได้
+            มีข้อสอบอยู่ใน Excel หรือ Google Sheets อยู่แล้ว นำเข้ามาเป็นเกมได้ในครั้งเดียว
+            {aiReady ? ' หรือให้ AI ออกข้อสอบจากเอกสารของคุณ' : ''} ใช้ทำข้อสอบสี่ตัวเลือก หรือเปิดห้องเล่นสดก็ได้
           </p>
         </div>
 
         <AnimatePresence mode="wait">
           {made ? (
-            <Done key="done" made={made} inCloud={user !== null} onAgain={() => (setMade(null), setLoaded(null))} />
+            <Done key="done" made={made} inCloud={user !== null} byAi={!!loaded?.ai} onAgain={() => (setMade(null), setLoaded(null))} />
           ) : loaded ? (
             <Preview key="preview" loaded={loaded} inCloud={user !== null} onBack={() => setLoaded(null)} onMade={setMade} />
           ) : (
-            <Pick key="pick" onLoaded={setLoaded} />
+            <Pick
+              key="pick"
+              tab={tab === 'ai' && !aiReady ? 'file' : tab}
+              onTab={setTab}
+              onLoaded={setLoaded}
+              ai={
+                aiReady && (
+                  <AiPick
+                    form={aiForm}
+                    onForm={setAiForm}
+                    left={aiReady.left}
+                    perDay={aiReady.perDay}
+                    onWritten={written}
+                    onLeft={(left) => setAi({ ...aiReady, left })}
+                  />
+                )
+              }
+            />
           )}
         </AnimatePresence>
       </div>
@@ -131,8 +178,7 @@ const step = {
 
 // ---------- 1. pick a file or paste ----------
 
-function Pick({ onLoaded }: { onLoaded: (l: Loaded) => void }) {
-  const [tab, setTab] = useState<'file' | 'paste'>('file');
+function Pick({ tab, onTab, onLoaded, ai }: { tab: Tab; onTab: (t: Tab) => void; onLoaded: (l: Loaded) => void; ai: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
@@ -158,30 +204,34 @@ function Pick({ onLoaded }: { onLoaded: (l: Loaded) => void }) {
     onLoaded({ source: '', read });
   };
 
+  const tabs: [Tab, string][] = [
+    ['file', '📄 อัปโหลดไฟล์'],
+    ['paste', '📋 วางจากตาราง'],
+  ];
+  if (ai) tabs.push(['ai', '✨ ให้ AI ออกข้อสอบ']);
+
   return (
-    <motion.section {...step} className="mt-8 grid gap-5">
+    <motion.section {...step} className="mt-8 grid grid-cols-1 gap-5">
       <div className="glass p-4 sm:p-6">
-        <div role="tablist" aria-label="วิธีนำเข้า" className="mb-5 inline-flex rounded-2xl bg-black/25 p-1">
-          {(
-            [
-              ['file', '📄 อัปโหลดไฟล์'],
-              ['paste', '📋 วางจากตาราง'],
-            ] as const
-          ).map(([key, label]) => (
+        <div role="tablist" aria-label="วิธีนำเข้า" className="mb-5 inline-flex max-w-full flex-wrap rounded-2xl bg-black/25 p-1">
+          {tabs.map(([key, label]) => (
             <button
               key={key}
               type="button"
               role="tab"
               aria-selected={tab === key}
-              onClick={() => (setTab(key), setError(null))}
+              onClick={() => (onTab(key), setError(null))}
               className={`rounded-xl px-4 py-2 font-semibold transition ${tab === key ? 'bg-white text-ink shadow' : 'text-white/75 hover:text-white'}`}
+              data-testid={`import-tab-${key}`}
             >
               {label}
             </button>
           ))}
         </div>
 
-        {tab === 'file' ? (
+        {tab === 'ai' && ai ? (
+          ai
+        ) : tab === 'file' ? (
           <div
             onDragOver={(e) => (e.preventDefault(), setOver(true))}
             onDragLeave={() => setOver(false)}
@@ -242,14 +292,14 @@ function Pick({ onLoaded }: { onLoaded: (l: Loaded) => void }) {
           </div>
         )}
 
-        {error && (
+        {error && tab !== 'ai' && (
           <p role="alert" className="mt-4 rounded-xl bg-rose-500/20 px-4 py-3 text-rose-100">
             {error}
           </p>
         )}
       </div>
 
-      <Format />
+      {tab !== 'ai' && <Format />}
     </motion.section>
   );
 }
@@ -312,8 +362,22 @@ function Format() {
 // ---------- 2. check what was read ----------
 
 function Preview({ loaded, inCloud, onBack, onMade }: { loaded: Loaded; inCloud: boolean; onBack: () => void; onMade: (m: Made[]) => void }) {
-  const { read } = loaded;
-  const [title, setTitle] = useState(loaded.source.slice(0, LIMITS.titleMax));
+  const { ai } = loaded;
+  // questions the maker has left out (AI papers only): everything below counts and saves without them
+  const [left, setLeft] = useState<ReadonlySet<string>>(new Set());
+  const read = useMemo<SheetRead>(() => {
+    if (left.size === 0) return loaded.read;
+    const rounds = loaded.read.rounds.map((r) => ({ ...r, questions: r.questions.filter((q) => !left.has(q.id)) })).filter((r) => r.questions.length > 0);
+    return { ...loaded.read, rounds, count: rounds.reduce((n, r) => n + r.questions.length, 0) };
+  }, [loaded.read, left]);
+  const toggle = (id: string) =>
+    setLeft((s) => {
+      const next = new Set(s);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const backLabel = ai ? 'กลับไปแก้เนื้อหา' : 'เลือกไฟล์อื่น';
+  const [title, setTitle] = useState(loaded.source.slice(0, LIMITS.titleMax - 16));
   const [bank, setBank] = useState(false);
   const [draw, setDraw] = useState(10);
   const [saving, setSaving] = useState(false);
@@ -354,11 +418,25 @@ function Preview({ loaded, inCloud, onBack, onMade }: { loaded: Loaded; inCloud:
   };
 
   return (
-    <motion.section {...step} className="mt-8 grid gap-5">
+    <motion.section {...step} className="mt-8 grid grid-cols-1 gap-5">
       <div className="glass p-4 sm:p-6">
+        {ai && (
+          <div className="mb-4 flex gap-3 rounded-2xl bg-gold/15 px-4 py-3 text-amber-50" data-testid="ai-review">
+            <span className="text-2xl" aria-hidden>
+              🤖
+            </span>
+            <p className="min-w-0">
+              <b>AI ออกข้อสอบให้แล้ว ตรวจทุกข้อก่อนบันทึก</b>
+              <span className="block text-sm text-amber-50/80">
+                ดูว่าเฉลยตรงกับเนื้อหาจริง (มีข้อความจากเนื้อหาแนบไว้ทุกข้อ) ข้อไหนไม่ดีให้เอาเครื่องหมายออก หรือบันทึกแล้วแก้ต่อใน Editor
+              </span>
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2" data-testid="import-summary">
-          <Stat tone="good" value={read.count} label="ข้อที่นำเข้าได้" />
+          <Stat tone="good" value={read.count} label={ai ? 'ข้อที่จะบันทึก' : 'ข้อที่นำเข้าได้'} />
           <Stat value={read.rounds.length} label="หัวข้อ" />
+          {ai && left.size > 0 && <Stat value={left.size} label="ข้อที่เอาออก" />}
           {problems.length > 0 && <Stat tone="bad" value={problems.length} label="แถวที่ต้องแก้" />}
         </div>
 
@@ -394,7 +472,7 @@ function Preview({ loaded, inCloud, onBack, onMade }: { loaded: Loaded; inCloud:
         )}
       </div>
 
-      {read.count > 0 && (
+      {(read.count > 0 || ai) && (
         <>
           <div className="glass grid gap-4 p-4 sm:p-6">
             <label className="grid gap-2">
@@ -408,25 +486,29 @@ function Preview({ loaded, inCloud, onBack, onMade }: { loaded: Loaded; inCloud:
                 data-testid="import-title"
               />
             </label>
-            <label className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <input type="checkbox" checked={bank} onChange={(e) => setBank(e.target.checked)} className="size-5 accent-[var(--color-gold)]" />
-              <span>เวลาเปิดห้องเล่นสด สุ่มถามหัวข้อละ</span>
-              <select value={draw} onChange={(e) => setDraw(Number(e.target.value))} disabled={!bank} className="rounded-lg bg-white px-2 py-1 text-ink disabled:opacity-50" aria-label="จำนวนข้อที่สุ่มต่อหัวข้อ">
-                {DRAW_CHOICES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              <span>ข้อ</span>
-            </label>
-            <p className="-mt-2 text-sm text-white/60">
-              {bank
-                ? bigRounds > 0
-                  ? `หัวข้อที่มีมากกว่า ${draw} ข้อ (${bigRounds} หัวข้อ) จะสุ่มมาถามทีละ ${draw} ข้อ เล่นรอบใหม่ได้ชุดใหม่ ส่วนโหมดข้อสอบเลือกจำนวนข้อเองตอนเริ่มทำ`
-                  : `ทุกหัวข้อมีไม่เกิน ${draw} ข้อ จึงถามครบทุกข้อเหมือนเดิม`
-                : 'ไม่เลือก: เล่นสดถามครบทุกข้อตามลำดับ ส่วนโหมดข้อสอบเลือกจำนวนข้อและสุ่มเองตอนเริ่มทำอยู่แล้ว'}
-            </p>
+            {!ai && (
+              <>
+                <label className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <input type="checkbox" checked={bank} onChange={(e) => setBank(e.target.checked)} className="size-5 accent-[var(--color-gold)]" />
+                  <span>เวลาเปิดห้องเล่นสด สุ่มถามหัวข้อละ</span>
+                  <select value={draw} onChange={(e) => setDraw(Number(e.target.value))} disabled={!bank} className="rounded-lg bg-white px-2 py-1 text-ink disabled:opacity-50" aria-label="จำนวนข้อที่สุ่มต่อหัวข้อ">
+                    {DRAW_CHOICES.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  <span>ข้อ</span>
+                </label>
+                <p className="-mt-2 text-sm text-white/60">
+                  {bank
+                    ? bigRounds > 0
+                      ? `หัวข้อที่มีมากกว่า ${draw} ข้อ (${bigRounds} หัวข้อ) จะสุ่มมาถามทีละ ${draw} ข้อ เล่นรอบใหม่ได้ชุดใหม่ ส่วนโหมดข้อสอบเลือกจำนวนข้อเองตอนเริ่มทำ`
+                      : `ทุกหัวข้อมีไม่เกิน ${draw} ข้อ จึงถามครบทุกข้อเหมือนเดิม`
+                    : 'ไม่เลือก: เล่นสดถามครบทุกข้อตามลำดับ ส่วนโหมดข้อสอบเลือกจำนวนข้อและสุ่มเองตอนเริ่มทำอยู่แล้ว'}
+                </p>
+              </>
+            )}
             {parts > 1 && (
               <p className="rounded-xl bg-gold/15 px-4 py-3 text-sm text-amber-100">
                 เกม 1 เกมมีได้ {LIMITS.questionsMax} ข้อ คลังนี้มี {read.count} ข้อ จึงแบ่งเป็น {parts} ชุด ชื่อ “{title.trim() || '…'} (ชุดที่ 1/{parts})” ไปเรื่อย ๆ
@@ -438,11 +520,13 @@ function Preview({ loaded, inCloud, onBack, onMade }: { loaded: Loaded; inCloud:
               </p>
             )}
             <div className="flex flex-wrap gap-3">
-              <button type="button" onClick={() => void save()} disabled={saving} className="btn btn-gold" data-testid="import-save">
+              <button type="button" onClick={() => void save()} disabled={saving || read.count === 0} className="btn btn-gold" data-testid="import-save">
                 {saving ? (
                   <>
                     กำลังบันทึก <WaitingDots />
                   </>
+                ) : ai ? (
+                  read.count === 0 ? 'เลือกอย่างน้อย 1 ข้อ' : `บันทึก ${read.count} ข้อเป็นเกม`
                 ) : problems.length > 0 ? (
                   `นำเข้าเฉพาะ ${read.count} ข้อที่ถูกต้อง`
                 ) : (
@@ -450,19 +534,19 @@ function Preview({ loaded, inCloud, onBack, onMade }: { loaded: Loaded; inCloud:
                 )}
               </button>
               <button type="button" onClick={onBack} disabled={saving} className="btn btn-ghost">
-                เลือกไฟล์อื่น
+                {backLabel}
               </button>
             </div>
           </div>
 
-          <Questions read={read} />
+          {ai ? <Questions read={loaded.read} quotes={ai.quotes} left={left} onToggle={saving ? undefined : toggle} /> : <Questions read={read} />}
         </>
       )}
 
-      {read.count === 0 && (
+      {read.count === 0 && !ai && (
         <div>
           <button type="button" onClick={onBack} className="btn btn-gold">
-            เลือกไฟล์อื่น
+            {backLabel}
           </button>
         </div>
       )}
@@ -481,47 +565,87 @@ function Stat({ value, label, tone }: { value: number; label: string; tone?: 'go
 }
 
 /** every question as it will be saved, answer marked, so a misread column shows before saving */
-function Questions({ read }: { read: SheetRead }) {
-  const [open, setOpen] = useState<number | null>(read.rounds.length === 1 ? 0 : null);
+function Questions({
+  read,
+  quotes,
+  left,
+  onToggle,
+}: {
+  read: SheetRead;
+  /** AI papers: the document's words behind each question, and the ones the maker left out */
+  quotes?: Record<string, string>;
+  left?: ReadonlySet<string>;
+  onToggle?: (id: string) => void;
+}) {
+  const review = quotes !== undefined;
+  // an AI paper is short and every question needs a look, so all of it starts open
+  const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set(review || read.rounds.length === 1 ? read.rounds.map((_, i) => i) : []));
+  const flip = (i: number) =>
+    setOpen((s) => {
+      const next = new Set(s);
+      if (!next.delete(i)) next.add(i);
+      return next;
+    });
   return (
     <div className="glass p-2 sm:p-3" data-testid="import-rounds">
-      <h2 className="px-3 pt-2 pb-1 text-lg font-bold">ตรวจคำถามก่อนนำเข้า</h2>
+      <h2 className="px-3 pt-2 pb-1 text-lg font-bold">{review ? 'ตรวจคำถามที่ AI ออก' : 'ตรวจคำถามก่อนนำเข้า'}</h2>
       {read.rounds.map((r, ri) => (
         <div key={r.id} className="border-t border-white/10 first-of-type:border-0">
           <button
             type="button"
-            onClick={() => setOpen(open === ri ? null : ri)}
-            aria-expanded={open === ri}
+            onClick={() => flip(ri)}
+            aria-expanded={open.has(ri)}
             className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left hover:bg-white/5"
           >
             <span className="min-w-0 font-semibold break-words">{r.title}</span>
             <span className="shrink-0 text-sm text-white/60">
-              {r.questions.length} ข้อ {open === ri ? '▴' : '▾'}
+              {r.questions.length} ข้อ {open.has(ri) ? '▴' : '▾'}
             </span>
           </button>
-          {open === ri && (
+          {open.has(ri) && (
             <ol className="grid gap-2 px-2 pb-3">
-              {r.questions.map((q, qi) => (
-                <li key={q.id} className="card p-4">
-                  <p className="font-semibold break-words">
-                    <span className="mr-1 text-slate-400">{qi + 1}.</span>
-                    {q.prompt}
-                    {q.type === 'truefalse' && <span className="ml-2 rounded bg-slate-100 px-1.5 text-xs font-normal text-slate-500">ถูก/ผิด</span>}
-                  </p>
-                  <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
-                    {q.options.map((o, oi) => {
-                      const right = q.correct.includes(oi);
-                      return (
-                        <li key={oi} className={`flex gap-2 rounded-lg px-2 py-1 break-words ${right ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-600'}`}>
-                          <span className="shrink-0">{right ? '✓' : `${LETTERS[oi]}.`}</span>
-                          <span className="min-w-0">{o}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {q.explanation && <p className="mt-2 text-sm whitespace-pre-line text-slate-500 break-words">💡 {q.explanation}</p>}
-                </li>
-              ))}
+              {r.questions.map((q, qi) => {
+                const out = left?.has(q.id) ?? false;
+                return (
+                  <li key={q.id} className={`card p-4 transition ${out ? 'opacity-45' : ''}`} data-testid="import-question">
+                    <div className="flex items-start gap-3">
+                      {review && (
+                        <input
+                          type="checkbox"
+                          checked={!out}
+                          disabled={!onToggle}
+                          onChange={() => onToggle?.(q.id)}
+                          className="mt-1 size-5 shrink-0 accent-emerald-600"
+                          aria-label={`ใช้ข้อ ${qi + 1} ของ ${r.title}`}
+                          data-testid="import-keep"
+                        />
+                      )}
+                      <p className={`min-w-0 font-semibold break-words ${out ? 'line-through' : ''}`}>
+                        <span className="mr-1 text-slate-400">{qi + 1}.</span>
+                        {q.prompt}
+                        {q.type === 'truefalse' && <span className="ml-2 rounded bg-slate-100 px-1.5 text-xs font-normal text-slate-500">ถูก/ผิด</span>}
+                      </p>
+                    </div>
+                    <ul className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+                      {q.options.map((o, oi) => {
+                        const right = q.correct.includes(oi);
+                        return (
+                          <li key={oi} className={`flex gap-2 rounded-lg px-2 py-1 break-words ${right ? 'bg-emerald-50 font-semibold text-emerald-800' : 'text-slate-600'}`}>
+                            <span className="shrink-0">{right ? '✓' : `${LETTERS[oi]}.`}</span>
+                            <span className="min-w-0">{o}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {q.explanation && <p className="mt-2 text-sm whitespace-pre-line text-slate-500 break-words">💡 {q.explanation}</p>}
+                    {quotes?.[q.id] && (
+                      <blockquote className="mt-2 border-l-4 border-sky-300 bg-sky-50 px-3 py-1.5 text-sm text-slate-600 break-words" data-testid="import-quote">
+                        📄 จากเนื้อหา: “{quotes[q.id]}”
+                      </blockquote>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>
@@ -532,7 +656,7 @@ function Questions({ read }: { read: SheetRead }) {
 
 // ---------- 3. done ----------
 
-function Done({ made, inCloud, onAgain }: { made: Made[]; inCloud: boolean; onAgain: () => void }) {
+function Done({ made, inCloud, byAi, onAgain }: { made: Made[]; inCloud: boolean; byAi: boolean; onAgain: () => void }) {
   const total = made.reduce((n, m) => n + m.count, 0);
   return (
     <motion.section {...step} className="mt-8 grid gap-5" data-testid="import-done">
@@ -540,7 +664,9 @@ function Done({ made, inCloud, onAgain }: { made: Made[]; inCloud: boolean; onAg
         <div className="text-6xl" aria-hidden>
           🎉
         </div>
-        <h2 className="mt-3 text-2xl font-extrabold text-balance">นำเข้าแล้ว {total.toLocaleString('th-TH')} ข้อ</h2>
+        <h2 className="mt-3 text-2xl font-extrabold text-balance">
+          {byAi ? 'บันทึก' : 'นำเข้า'}แล้ว {total.toLocaleString('th-TH')} ข้อ
+        </h2>
         <p className="mt-2 text-white/70">
           {inCloud ? 'เก็บไว้ในบัญชีของคุณแล้ว' : 'เก็บไว้ในเบราว์เซอร์นี้แล้ว'} ทำข้อสอบได้ทันที หรือเปิดใน Editor เพื่อแก้ เพิ่มรูป แล้วเปิดห้องเล่นสด
         </p>
@@ -568,7 +694,7 @@ function Done({ made, inCloud, onAgain }: { made: Made[]; inCloud: boolean; onAg
           ไปที่เกมของฉัน
         </Link>
         <button type="button" onClick={onAgain} className="btn btn-ghost">
-          นำเข้าไฟล์อื่น
+          {byAi ? 'ให้ AI ออกอีกชุด' : 'นำเข้าไฟล์อื่น'}
         </button>
       </div>
     </motion.section>

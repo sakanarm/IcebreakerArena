@@ -35,34 +35,20 @@ export default function ExamIndexPage() {
           ))}
         </ul>
 
-        <section className="exam-card mt-8 p-5">
-          <h2 className="font-semibold">ทำข้อสอบจากเกมของคุณเอง</h2>
+        <section className="exam-card mt-8 p-5 sm:p-6">
+          <h2 className="font-semibold">สร้างข้อสอบของคุณเอง</h2>
           <p className="mt-1 text-sm leading-relaxed text-slate-600">
-            คำถามแบบควิซและจริง/เท็จในเกมของคุณใช้เป็นข้อสอบได้ทันที เปิดได้จากหน้าเลือกเกม และถ้าเข้าสู่ระบบอยู่ เปิดลิงก์ข้อสอบส่งให้คนอื่นทำได้โดยไม่ต้องมีบัญชี
+            ให้ AI ออกข้อสอบจากเอกสาร เลือกหัวข้อจากคลังความรู้ Pika นำเข้าคลังข้อสอบจาก Excel หรือเขียนเองทีละข้อ ทุกวิธีได้ข้อสอบพร้อมเฉลยและคำอธิบาย
+            และถ้าเข้าสู่ระบบอยู่ ส่งลิงก์ข้อสอบให้คนอื่นทำได้โดยไม่ต้องมีบัญชี
           </p>
-          <Link href="/host" className="exam-btn mt-4">
-            ไปที่เกมของฉัน
-          </Link>
-        </section>
-
-        <section className="exam-card mt-4 p-5">
-          <h2 className="font-semibold">มีข้อสอบอยู่ใน Excel แล้ว?</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate-600">
-            นำเข้าคลังข้อสอบจากไฟล์ Excel, CSV หรือคัดลอกจาก Google Sheets ทีละหลายร้อยข้อ พร้อมเฉลยและคำอธิบาย แล้วเปิดเป็นข้อสอบได้ทันที
-          </p>
-          <Link href="/import" className="exam-btn mt-4">
-            นำเข้าคลังข้อสอบ
-          </Link>
-        </section>
-
-        <section className="exam-card mt-4 p-5">
-          <h2 className="font-semibold">ออกข้อสอบจากเอกสารการทำงาน</h2>
-          <p className="mt-1 text-sm leading-relaxed text-slate-600">
-            อัปโหลดคู่มือ สไลด์อบรม หรือ PDF เข้าคลังความรู้ Pika ส่วนตัวของคุณ แล้วเลือกหัวข้อมาตั้งเป็นข้อสอบสี่ตัวเลือก ทุกข้อมีเฉลยจากข้อความต้นฉบับ (ต้องเข้าสู่ระบบ)
-          </p>
-          <Link href="/pika" className="exam-btn mt-4">
-            สร้างข้อสอบจากคลังความรู้
-          </Link>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/create" className="exam-btn exam-btn-primary">
+              เลือกวิธีสร้างข้อสอบ
+            </Link>
+            <Link href="/host" className="exam-btn">
+              ไปที่เกมของฉัน
+            </Link>
+          </div>
         </section>
       </main>
     </div>

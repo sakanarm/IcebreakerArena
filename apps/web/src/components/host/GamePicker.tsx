@@ -13,10 +13,11 @@ import { copyGame, countAsked, countQuestions, deleteMyGame, dropBlankOptions, l
 import { createRoom } from '@/lib/host';
 import { withBase } from '@/lib/paths';
 import { warmHostSound } from '@/lib/use-sound';
-import { AccountChip, switchedText } from '../AccountChip';
+import { switchedText } from '../AccountChip';
+import { SiteNav } from '../SiteNav';
 import { GameCover } from '../cover/GameCover';
 import { WaitingDots } from '../motion-bits';
-import { FloatingShapes, Logo } from '../shapes';
+import { FloatingShapes } from '../shapes';
 import { OpenRooms } from './OpenRooms';
 
 type Toast = { text: string; tone: 'bad' | 'good' };
@@ -57,29 +58,16 @@ export function GamePicker() {
     <div className="relative min-h-dvh px-5 pt-6 pb-16">
       <FloatingShapes opacity={0.07} />
       <div className="relative mx-auto max-w-6xl">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/" aria-label="กลับหน้าแรก">
-            <Logo small />
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <AccountChip />
-            {user && (
-              <Link href="/pika" className="btn btn-ghost">
-                📚 จากคลังความรู้
-              </Link>
-            )}
-            <Link href="/import" className="btn btn-ghost">
-              📊 นำเข้าจาก Excel
-            </Link>
-            <Link href="/editor" className="btn btn-gold">
-              ＋ สร้างเกมใหม่
-            </Link>
-          </div>
-        </header>
+        <SiteNav here="host" />
 
-        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-10">
-          <h1 className="text-4xl font-extrabold md:text-5xl">เลือกเกมที่จะเล่น</h1>
-          <p className="mt-2 text-lg text-white/70">กด “เริ่มห้อง” แล้วเปิดจอนี้ขึ้นโปรเจกเตอร์ ให้ทุกคนสแกน QR หรือใส่ PIN</p>
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-10 flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-4xl font-extrabold md:text-5xl">เลือกเกมที่จะเล่น</h1>
+            <p className="mt-2 text-lg text-white/70">กด “เริ่มห้อง” แล้วเปิดจอนี้ขึ้นโปรเจกเตอร์ ให้ทุกคนสแกน QR หรือใส่ PIN</p>
+          </div>
+          <Link href="/create" className="btn btn-gold shrink-0" data-testid="host-create">
+            ＋ สร้างชุดคำถามใหม่
+          </Link>
         </motion.div>
 
         <OpenRooms say={say} />
@@ -953,13 +941,13 @@ function EmptyMine() {
         ✍️
       </span>
       <p className="text-lg font-semibold">ยังไม่มีเกมของคุณ</p>
-      <p className="max-w-md text-white/65">สร้างเกมแรกได้ในไม่กี่นาที ทำสำเนาเกมตัวอย่างไปแก้ต่อ หรือนำเข้าข้อสอบที่มีอยู่แล้วใน Excel</p>
+      <p className="max-w-md text-white/65">สร้างจากเอกสารด้วย AI จากคลังความรู้ Pika นำเข้าจาก Excel หรือเขียนเอง หรือทำสำเนาเกมตัวอย่างไปแก้ต่อก็ได้</p>
       <div className="mt-2 flex flex-wrap justify-center gap-3">
-        <Link href="/editor" className="btn btn-primary">
-          ＋ สร้างเกมแรก
+        <Link href="/create" className="btn btn-primary">
+          ＋ สร้างชุดคำถามแรก
         </Link>
-        <Link href="/import" className="btn btn-ghost">
-          📊 นำเข้าจาก Excel
+        <Link href="/exam" className="btn btn-ghost">
+          ลองทำข้อสอบตัวอย่าง
         </Link>
       </div>
     </motion.div>

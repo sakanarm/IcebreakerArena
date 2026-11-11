@@ -65,7 +65,17 @@ export function ExamApp({ code }: { code: string }) {
 
   const title = loaded.status === 'ready' ? loaded.paper.title : '';
   useEffect(() => {
-    if (title) document.title = `${title} · ข้อสอบ · MFEC Pika Arena`;
+    if (!title) return;
+    const want = `${title} · ข้อสอบ · MFEC Pika Arena`;
+    const put = () => {
+      if (document.title !== want) document.title = want;
+    };
+    put();
+    // after a click from /exam, Next writes this route's own title ("ข้อสอบ") once the page is in, which can be
+    // after a sample (it needs no loading) has already set the paper's name: put the name back each time
+    const watch = new MutationObserver(put);
+    watch.observe(document.head, { subtree: true, childList: true, characterData: true });
+    return () => watch.disconnect();
   }, [title]);
 
   // stable, so the sitting's own timers are not set up again on every change
