@@ -6,7 +6,9 @@
 //   npm run users -- reset <username>                             new password, logs the account out everywhere
 //   npm run users -- disable <username> | enable <username>
 //   npm run users -- demo <username> [--share]                    adds the demo games; --share also lists one in the catalog
-//   npm run users -- email <username> <work email> | --clear      the email the knowledge base (Pika) names the account's project after
+//   npm run users -- email <username> <work email> | --clear      the work email: company login lets its owner in, and the
+//                                                                 knowledge base (Pika) names the account's project after it
+//   npm run users -- invite <work email> "<display name>" [--admin]  an account with no password, for company login only
 //
 // add and reset take --out=<file> to save the password in a new file only this account can read, instead of
 // printing it. On the server, prefix NODE_ENV=production so it uses the database in var/secrets/database-url.
@@ -14,11 +16,11 @@
 // process may have that folder open (check does not open it).
 import { closeSync, mkdirSync, openSync, rmSync, statSync, writeSync } from 'node:fs';
 import path from 'node:path';
-import { authModeProblem, authModeSource, dataDir, databaseUrl, dbSchema, readSecret } from '../src/server/config';
+import { SSO_FILE, authModeProblem, authModeSource, dataDir, databaseUrl, dbSchema, readSecret, ssoSource } from '../src/server/config';
 import { SCHEMA_VERSION, checkSchemaName, connectPostgres, getDb } from '../src/server/db';
 import { DEMO_GAMES, SHARED_DEMO, addDemoGames } from '../src/server/demo-games';
 import { HttpError } from '../src/server/http';
-import { LOCAL_ISSUER, createLocalUser, generatePassword, normalizeUsername, setLocalEmail, setLocalPassword } from '../src/server/local-users';
+import { LOCAL_ISSUER, createLocalUser, generatePassword, normalizeUsername, setLocalEmail, setLocalPassword, usernameFromEmail } from '../src/server/local-users';
 import { projectIdFor } from '../src/server/pika';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -30,13 +32,13 @@ const out = outArg ? path.resolve(process.env.INIT_CWD ?? process.cwd(), outArg)
 
 function usage(): never {
   console.error(
-    'usage: users check | list | add <username> "<display name>" [--admin] [--out=<file>] | reset <username> [--out=<file>] | disable <username> | enable <username> | demo <username> [--share] | email <username> <email>|--clear',
+    'usage: users check | list | add <username> "<display name>" [--admin] [--out=<file>] | reset <username> [--out=<file>] | disable <username> | enable <username> | demo <username> [--share] | email <username> <email>|--clear | invite <work email> "<display name>" [--admin]',
   );
   process.exit(2);
 }
 
 // a mistyped flag (--admn) must not quietly make a different account
-const FLAGS: Record<string, string[]> = { add: ['--admin', '--out='], reset: ['--out='], demo: ['--share'], email: ['--clear'] };
+const FLAGS: Record<string, string[]> = { add: ['--admin', '--out='], reset: ['--out='], demo: ['--share'], email: ['--clear'], invite: ['--admin'] };
 for (const f of flags) {
   if (!(FLAGS[cmd ?? ''] ?? []).some((ok) => (ok.endsWith('=') ? f.startsWith(ok) && f.length > ok.length : f === ok))) usage();
 }
@@ -89,6 +91,20 @@ async function check(): Promise<boolean> {
   say(`login: ${source.raw.toLowerCase()} (${source.from === 'default' ? 'the default' : `from ${source.from}`})`);
   if (modeProblem) problems.push(modeProblem);
   const accountsOn = !modeProblem && source.raw.toLowerCase() !== 'off';
+
+  // company login: its settings are checked whatever the mode, so they can be ready before it is switched on
+  const sso = ssoSource();
+  if (sso.problem) problems.push(sso.problem);
+  else if (!sso.config) say(`company login: not set up (no ${SSO_FILE})`);
+  else {
+    const shown = accountsOn && ['local', 'oidc'].includes(source.raw.toLowerCase());
+    say(`company login: client ${sso.config.clientId} at ${sso.config.issuer}, from ${sso.config.from}${shown ? '' : ' (not offered while accounts are off)'}`);
+    if (sso.config.from === SSO_FILE && process.platform !== 'win32') {
+      const file = path.join(dataDir(), 'secrets', 'keycloak.json');
+      const mode = statSync(file).mode & 0o777;
+      if (mode & 0o077) problems.push(`${file} is mode ${mode.toString(8)}, open to other accounts: chmod 600 it`);
+    }
+  }
 
   const secretFile = path.join(dataDir(), 'secrets', 'database-url');
   const url = databaseUrl();
@@ -147,6 +163,11 @@ async function check(): Promise<boolean> {
           [LOCAL_ISSUER],
         );
         say(`local accounts: ${acc!.n} (${acc!.admins} admin)`);
+        const [mail] = await db.query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM ${schema}.ib_users WHERE issuer = $1 AND NOT disabled AND email IS NOT NULL`,
+          [LOCAL_ISSUER],
+        );
+        say(`  with a work email (can use company login): ${mail!.n}`);
       }
     }
     // tables of ours anywhere else (public) would mean something once ran without the schema
@@ -174,13 +195,13 @@ async function main() {
     if (!(await check())) process.exitCode = 1;
     return;
   }
-  if (!['list', 'add', 'reset', 'disable', 'enable', 'demo', 'email'].includes(cmd ?? '')) usage();
+  if (!['list', 'add', 'reset', 'disable', 'enable', 'demo', 'email', 'invite'].includes(cmd ?? '')) usage();
   const db = await getDb();
   try {
     switch (cmd) {
       case 'list': {
-        const rows = await db.query<{ subject: string; display_name: string; is_curator: boolean; disabled: boolean; last_login: Date | null; has_password: boolean }>(
-          `SELECT u.subject, u.display_name, u.is_curator, u.disabled, p.user_id IS NOT NULL AS has_password,
+        const rows = await db.query<{ subject: string; display_name: string; is_curator: boolean; disabled: boolean; last_login: Date | null; has_password: boolean; has_email: boolean }>(
+          `SELECT u.subject, u.display_name, u.is_curator, u.disabled, p.user_id IS NOT NULL AS has_password, u.email IS NOT NULL AS has_email,
                   (SELECT max(a.at) FROM ib_audit_log a WHERE a.user_id = u.id AND a.action = 'login') AS last_login
              FROM ib_users u LEFT JOIN ib_passwords p ON p.user_id = u.id
             WHERE u.issuer = $1 ORDER BY u.subject`,
@@ -188,7 +209,7 @@ async function main() {
         );
         if (!rows.length) console.log('no local accounts yet');
         for (const r of rows) {
-          const tags = [r.is_curator && 'admin', r.disabled && 'disabled', !r.has_password && 'no password'].filter(Boolean).join(', ');
+          const tags = [r.is_curator && 'admin', r.disabled && 'disabled', !r.has_password && 'no password', r.has_email && 'email'].filter(Boolean).join(', ');
           console.log(`${r.subject.padEnd(20)} ${r.display_name}${tags ? `  [${tags}]` : ''}  ${r.last_login ? `last login ${new Date(r.last_login).toISOString().slice(0, 16)}` : 'never logged in'}`);
         }
         return;
@@ -243,6 +264,22 @@ async function main() {
         if (res.shared) console.log(res.shared === 'listed' ? `shared ${shared} in the catalog` : `${shared} was already in the catalog`);
         return;
       }
+      case 'invite': {
+        const [email, name] = args;
+        if (!email || !name || !email.includes('@')) usage();
+        const username = usernameFromEmail(email);
+        if (!username) throw new Error('could not make a username from that email: use add <username> "<name>", then email <username> <work email>');
+        await db.tx(async (sql) => {
+          await createLocalUser(sql, { username, name, password: null, curator: flags.has('--admin') });
+          await setLocalEmail(sql, username, email);
+        });
+        console.log(
+          `made ${flags.has('--admin') ? 'admin ' : ''}account "${username}" (${name}) with no password: its owner logs in with the company account of that email.
+` +
+            `To also give it a password: npm run users -- reset ${username}`,
+        );
+        return;
+      }
       case 'email': {
         const [username, email] = args;
         const clear = flags.has('--clear');
@@ -266,7 +303,7 @@ main().catch((e: unknown) => {
   const text: Record<string, string> = {
     bad_username: 'a username is 3–32 of a-z, 0-9, dot, dash or underscore, starting with a letter or digit',
     bad_name: 'the display name must be 2–40 characters',
-    username_taken: 'that username is taken',
+    username_taken: 'that username is taken (to give an existing account company login, use: email <username> <work email>)',
     bad_email: 'that is not an email address the knowledge base can name a project after (letters, digits, _ or - before the @)',
     email_taken: 'another account already has that email, or one that names the same knowledge-base project',
   };

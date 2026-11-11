@@ -6,10 +6,10 @@ import { HttpError } from './http';
 import { projectIdFor } from './pika';
 
 /**
- * Local accounts (AUTH_MODE=local): a username and password kept in our own database, until company
- * login (Entra) is ready. An admin makes the accounts with `npm run users`; nobody signs up alone.
- * They are ordinary ib_users rows with issuer 'local' and the username as subject, so moving to
- * company login later only adds a way in.
+ * Local accounts (AUTH_MODE=local): a username and password kept in our own database. An admin makes
+ * the accounts with `npm run users`; nobody signs up alone. They are ordinary ib_users rows with issuer
+ * 'local' and the username as subject. Company login (Keycloak, keycloak.ts) is another way into the
+ * same row, found by its email, and `users invite` makes a row that has no password at all.
  */
 export const LOCAL_ISSUER = 'local';
 
@@ -81,22 +81,25 @@ function checkPassword(password: string) {
   if (password.length > PASSWORD_MAX) throw new HttpError(400, 'too_long');
 }
 
-/** Makes a local account, or refuses when the username is taken. */
+/**
+ * Makes a local account, or refuses when the username is taken. With password null the account has
+ * no password: its person logs in with the company account whose email it is given (users invite).
+ */
 export async function createLocalUser(
   sql: Sql,
-  opts: { username: string; name: string; password: string; curator?: boolean },
+  opts: { username: string; name: string; password: string | null; curator?: boolean },
 ): Promise<SessionUser> {
   const username = normalizeUsername(opts.username);
   if (!username) throw new HttpError(400, 'bad_username');
   const name = opts.name.normalize('NFC').replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim();
   if (name.length < 2 || name.length > 40) throw new HttpError(400, 'bad_name');
-  checkPassword(opts.password);
+  if (opts.password !== null) checkPassword(opts.password);
   const taken = await sql.query('SELECT 1 FROM ib_users WHERE issuer = $1 AND subject = $2', [LOCAL_ISSUER, username]);
   if (taken.length) throw new HttpError(409, 'username_taken');
   const user = await upsertUser(sql, { issuer: LOCAL_ISSUER, subject: username, name });
   if (opts.curator) await sql.query('UPDATE ib_users SET is_curator = true WHERE id = $1', [user.id]);
-  await sql.query('INSERT INTO ib_passwords (user_id, hash) VALUES ($1, $2)', [user.id, await hashPassword(opts.password)]);
-  await audit(sql, null, 'local_user_created', user.id, { username, curator: !!opts.curator });
+  if (opts.password !== null) await sql.query('INSERT INTO ib_passwords (user_id, hash) VALUES ($1, $2)', [user.id, await hashPassword(opts.password)]);
+  await audit(sql, null, 'local_user_created', user.id, { username, curator: !!opts.curator, password: opts.password !== null });
   return { ...user, isCurator: !!opts.curator };
 }
 
@@ -146,6 +149,12 @@ export async function setLocalEmail(sql: Sql, username: string, rawEmail: string
   // the email itself stays out of the log: who changed and that it changed is enough
   await audit(sql, null, 'local_email_set', id, { cleared: email === null });
   return true;
+}
+
+/** The username `users invite` gives a work email: the part before the @, made to fit the username rules. */
+export function usernameFromEmail(email: string): string | null {
+  const local = email.trim().toLowerCase().split('@')[0] ?? '';
+  return normalizeUsername(local.replace(/[^a-z0-9._-]+/g, '-').replace(/^[._-]+/, '').slice(0, 32));
 }
 
 // failed tries per username, in this process (the web app runs as one): 5 within 15 minutes, then wait

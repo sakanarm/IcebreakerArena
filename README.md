@@ -51,6 +51,7 @@ npm run dev
 | `npm run e2e:sheet-import -- [--base=…] [--login=<ไฟล์>]` | นำเข้าคลังข้อสอบ: แม่แบบ, ไฟล์ .xlsx จริง (มีหัวเรื่อง เซลล์ผสาน ชีตซ่อน), วาง 230 แถวที่แบ่งเป็น 3 ชุด, ไฟล์ที่ใช้ไม่ได้ แล้วลบเกมที่สร้างทิ้ง |
 | `npm run e2e:ask-ai -- [--login=<ไฟล์>]` | ปุ่มถาม AI หลังเฉลย กับ AI ปลอมบนเครื่อง (ไม่เรียก AI จริง) รันได้กับ localhost เท่านั้น เพราะต้องเขียน `var/secrets/ai.json` ชั่วคราว |
 | `npm run e2e:pika -- [--base=…] [--login=<ไฟล์>] [--fake-pika=<port>]` | หน้า `/pika` ข้อสอบจากคลังความรู้: อัปโหลด/วางข้อความ ติดตามจน Pika อ่านเสร็จ เลือกหน้า รีวิว แล้วบันทึกเป็นข้อสอบ กับ Pika ปลอมบนเครื่อง (`--fake-pika`) หรือแบบอ่านอย่างเดียวที่ไม่ส่งอะไรเข้า Pika (ใช้กับ production) ดู [e2e/README](e2e/README.md) |
+| `npm run e2e:sso -- --fake-kc=<port> [--oidc]` หรือ `-- --base=… --expect-off` | ล็อกอินด้วยบัญชีบริษัทกับ Keycloak ปลอมบนเครื่อง: PKCE, state, nonce, ลายเซ็น token, อีเมลที่ไม่มีบัญชี, บัญชีที่ปิด, กดยกเลิก, เปลี่ยนบัญชี Microsoft และ secret ไม่ถึงเบราว์เซอร์ หรือแบบอ่านอย่างเดียวว่า server ที่ยังไม่ตั้งค่าไม่มีปุ่มและทุก route เป็น 404 ดู [e2e/README](e2e/README.md) |
 | `npm run users -- <คำสั่ง>` | จัดการบัญชีผู้สร้างเกม (ดู[บัญชีผู้สร้างเกม](#บัญชีผู้สร้างเกม)) |
 
 ทุก push และ PR เข้า `main` GitHub Actions จะรัน typecheck, unit test และ build บน Node 20 กับ 22 แล้วเล่นเกมจริงด้วยบอท 200 คน ส่วนตัวตรวจหน้าจอด้วยเบราว์เซอร์รันทุกคืนตี 2 (ดู[รายละเอียด](e2e/README.md#บน-ci))
@@ -168,7 +169,8 @@ pm2 restart ecosystem.config.js
 | โหมด | ทำอะไร |
 | --- | --- |
 | `off` (ค่าเริ่มต้น) | ไม่มีบัญชี เกมอยู่ในเบราว์เซอร์แต่ละเครื่อง ไม่ต้องมีฐานข้อมูล |
-| `local` | ล็อกอินด้วย username และ password ที่ admin สร้างให้ ใช้ไปก่อนจนกว่าจะต่อ SSO |
+| `local` | ล็อกอินด้วย username และ password ที่ admin สร้างให้ และถ้าตั้ง Keycloak ไว้ มีปุ่ม "เข้าสู่ระบบด้วยบัญชีบริษัท" อยู่ด้านบนด้วย |
+| `oidc` | ล็อกอินด้วยบัญชีบริษัทเท่านั้น (Keycloak ที่ส่งต่อไป Microsoft) ไม่มีช่อง password ต้องตั้ง Keycloak ก่อน ไม่อย่างนั้นเว็บถอยไปโหมด `off` |
 
 ตั้งโหมดด้วยคำเดียวในไฟล์ `var/auth-mode` (env `AUTH_MODE` ชนะไฟล์ถ้าตั้งไว้) แล้ว `pm2 restart icebreaker-web` restart แค่เว็บไม่กระทบเกมที่เล่นอยู่ ตอนเปิดบัญชีแล้วแต่ยังไม่ล็อกอิน หน้าเลือกเกมยังมีเกมตัวอย่างให้เล่นได้ทันที และเกมที่เคยเก็บไว้ในเบราว์เซอร์ย้ายเข้าบัญชีได้ด้วยปุ่ม "ย้ายเข้าบัญชี"
 
@@ -191,6 +193,27 @@ npm run users -- demo <username> --share                # ใส่เกมเ�
 ```
 
 `add` กับ `reset` พิมพ์ password ให้ครั้งเดียว ถ้าใส่ `--out=<ไฟล์>` จะเก็บลงไฟล์ใหม่ (mode 600) แทน ไม่ค้างอยู่ในหน้าจอหรือ log ปิดบัญชีกลับเป็นแบบเดิมด้วย `echo off > var/auth-mode` แล้ว `pm2 restart icebreaker-web` ข้อมูลในฐานข้อมูลยังอยู่ครบ
+
+### ล็อกอินด้วยบัญชีบริษัท (Keycloak)
+
+เว็บคุยกับ Keycloak ของบริษัทเท่านั้น (realm `mfec`) Keycloak ส่งต่อไปหน้า Microsoft ให้เอง (`kc_idp_hint=entra`) ไม่ได้ต่อ Entra ID ตรง ๆ ใช้ authorization code + PKCE (S256) แบบ confidential client ตรวจลายเซ็น ID token, issuer, audience, nonce และวันหมดอายุเองทุกครั้ง
+
+1. ขอ client จากคนดูแล Keycloak: realm `mfec`, client ID `pika-arena`, confidential, Standard flow ON, Direct Access Grants OFF, Implicit OFF, PKCE S256, redirect URI `https://dmhub.mfec.dev/PikaArena/api/auth/callback/keycloak` (และ `http://localhost:3000/api/auth/callback/keycloak` สำหรับเครื่อง dev), post logout redirect URI `https://dmhub.mfec.dev/PikaArena/*` (และ `http://localhost:3000/*`), ID token ต้องมี `email` หรือ `preferred_username` ที่เป็นอีเมล
+2. วาง secret บน server ที่ `var/secrets/keycloak.json` (mode 600):
+   ```json
+   {"issuer":"https://dmhub.mfec.dev:8443/realms/mfec","clientId":"pika-arena","clientSecret":"<secret>","appUrl":"https://dmhub.mfec.dev"}
+   ```
+   `appUrl` ต้องมีบน production เพราะหลัง nginx เว็บไม่รู้ชื่อโดเมนจริง (บนเครื่อง dev ใช้ env `KEYCLOAK_ISSUER` `KEYCLOAK_CLIENT_ID` `KEYCLOAK_CLIENT_SECRET` แทนก็ได้ ไฟล์ชนะ env) secret ไม่ถึงเบราว์เซอร์และไม่ลง log
+3. `npm run users -- check` ต้องขึ้นว่าบัญชีบริษัทพร้อม แล้ว `pm2 restart icebreaker-web` ปุ่มจะขึ้นในหน้าล็อกอิน
+
+ใครเข้าได้: ล็อกอินได้เฉพาะคนที่มีบัญชีในระบบซึ่งอีเมลตรงกับอีเมลบริษัทที่ Keycloak ส่งมา (ไม่สนตัวพิมพ์เล็กใหญ่) คนอื่นจะเห็นข้อความให้ขอผู้ดูแลระบบ กับลิงก์ไปหน้าเข้าร่วมเกม เพิ่มคนด้วย
+
+```bash
+npm run users -- invite <อีเมลบริษัท> "<ชื่อที่แสดง>" [--admin]   # บัญชีไม่มี password เข้าได้ด้วยบัญชีบริษัทเท่านั้น
+npm run users -- email <username> <อีเมลบริษัท>                    # บัญชีเดิมที่มี password ก็เข้าด้วยบัญชีบริษัทได้ด้วย เกมเดิมอยู่ครบ
+```
+
+เชื่อใจอีเมลที่ Keycloak ส่งมา (ไม่ได้บังคับ `email_verified`) เพราะ realm นี้รับคนจาก Microsoft ของบริษัทเท่านั้น ถ้าวันหนึ่ง realm เปิดให้สมัครเองหรือแก้อีเมลเองได้ ต้องกลับมาทบทวน เมื่อทุกคนที่สร้างเกมมีอีเมลผูกแล้ว เปลี่ยนเป็นบัญชีบริษัทอย่างเดียวได้ด้วย `echo oidc > var/auth-mode` แล้ว `pm2 restart icebreaker-web`
 
 ### ข้อสอบจากคลังความรู้ Pika (`/pika`)
 
@@ -288,7 +311,7 @@ npm run crowd -- --url=https://dmhub.mfec.dev/PikaArena --players=200
 
 ## ข้อจำกัดตอนนี้
 
-- ยังไม่มี SSO (Entra ID) คนสร้างเกมใช้บัญชี local ที่ admin สร้างให้ไปก่อน ผู้เล่นเข้าด้วยชื่อเล่นโดยไม่ต้องล็อกอิน ส่วนสิทธิ์ควบคุมห้องผูกกับเบราว์เซอร์ที่กดเริ่มห้อง
+- ล็อกอินด้วยบัญชีบริษัท (Keycloak) ทำเสร็จแล้ว แต่จะเปิดบน production เมื่อได้ client จากคนดูแล Keycloak ระหว่างนี้คนสร้างเกมใช้บัญชี local ที่ admin สร้างให้ ผู้เล่นเข้าด้วยชื่อเล่นโดยไม่ต้องล็อกอิน ส่วนสิทธิ์ควบคุมห้องผูกกับเบราว์เซอร์ที่กดเริ่มห้อง
 - ห้องและผลคะแนนไม่ได้บันทึกลงฐานข้อมูล ให้ดาวน์โหลด CSV จากหน้ารายงานก่อนปิดห้อง
 - รับได้สูงสุด 1,000 คนต่อห้อง (`MAX_PLAYERS_PER_ROOM`)
 - PIN หรือลิงก์จอใหญ่ที่ผิดนับต่อ IP: ผิดติดกันได้ 60 ครั้ง หลังจากนั้นลองได้วินาทีละครั้ง (กันการสุ่ม PIN) การเข้าห้องด้วย PIN ที่ถูกไม่นับ ถ้าคนทั้งงานออกเน็ตด้วย IP เดียวกันและพิมพ์ผิดกันเยอะ บางคนอาจเห็น "ลองถี่เกินไป" ให้รอสักครู่แล้วลองใหม่

@@ -2,20 +2,50 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { localLogin, logout, mockLogin, refreshAccount, useAccount } from '@/lib/account';
+import { useEffect, useState } from 'react';
+import { localLogin, logout, mockLogin, refreshAccount, ssoStartPath, switchSsoAccount, useAccount } from '@/lib/account';
 import { apiMessage } from '@/lib/api';
+import { withBase } from '@/lib/paths';
 import { WaitingDots } from './motion-bits';
 import { Notice } from './Notice';
 
+/** Why a company login came back here (the ?error= the server sets). Anything else in the address is ignored. */
+const SSO_MESSAGES: Record<string, string> = {
+  no_account: 'บัญชีบริษัทนี้ยังไม่ได้รับสิทธิ์สร้างเกม ขอให้ผู้ดูแลระบบเพิ่มอีเมลของคุณก่อน แล้วค่อยเข้าสู่ระบบอีกครั้ง',
+  account_disabled: 'บัญชีนี้ถูกปิดใช้งาน ติดต่อผู้ดูแลระบบ',
+  sso_cancelled: 'ยกเลิกการเข้าสู่ระบบแล้ว กดปุ่มอีกครั้งเมื่อพร้อม',
+  sso_expired: 'การเข้าสู่ระบบหมดเวลา หรือเริ่มไว้จากอีกแท็บ กดเข้าสู่ระบบใหม่อีกครั้ง',
+  sso_failed: 'เข้าสู่ระบบด้วยบัญชีบริษัทไม่สำเร็จ ลองใหม่อีกครั้ง ถ้ายังไม่ได้ ติดต่อผู้ดูแลระบบ',
+};
+
+/** Four squares, the usual mark on a "sign in with your Microsoft work account" button. */
+function WorkAccountMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="size-5 shrink-0">
+      <rect x="1" y="1" width="8.5" height="8.5" fill="#f25022" />
+      <rect x="10.5" y="1" width="8.5" height="8.5" fill="#7fba00" />
+      <rect x="1" y="10.5" width="8.5" height="8.5" fill="#00a4ef" />
+      <rect x="10.5" y="10.5" width="8.5" height="8.5" fill="#ffb900" />
+    </svg>
+  );
+}
+
 /** Login for game makers. Players never log in: they join with a PIN and a nickname. */
-export function LoginScreen({ next }: { next: string }) {
+export function LoginScreen({ next, error: returned = null }: { next: string; error?: string | null }) {
   const router = useRouter();
   const account = useAccount();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // on the way to Microsoft; reset when the browser's Back brings this page back from its cache
+  const [leaving, setLeaving] = useState(false);
+  useEffect(() => {
+    const back = (e: PageTransitionEvent) => e.persisted && setLeaving(false);
+    window.addEventListener('pageshow', back);
+    return () => window.removeEventListener('pageshow', back);
+  }, []);
+  const ssoProblem = returned ? SSO_MESSAGES[returned] ?? null : null;
 
   if (account.status === 'loading') {
     return (
@@ -90,11 +120,66 @@ export function LoginScreen({ next }: { next: string }) {
     );
   }
 
+  const otherAccount = async () => {
+    setError(null);
+    try {
+      const url = await switchSsoAccount();
+      window.location.assign(url ?? withBase('/login'));
+    } catch (e) {
+      setError(apiMessage(e));
+    }
+  };
+
+  // Company login: a plain link, since the server answers with a redirect to Keycloak
+  const companyLogin = account.sso && (
+    <div className="flex flex-col gap-3">
+      {ssoProblem && (
+        <div role="alert" className="rounded-xl bg-bad/15 px-4 py-3 text-left text-sm font-semibold text-bad">
+          {ssoProblem}
+          {returned === 'no_account' && (
+            <span className="mt-1 block font-normal text-white/80">
+              ถ้าจะเข้าร่วมเล่นเกม ไม่ต้องเข้าสู่ระบบ{' '}
+              <Link href="/play" className="font-semibold underline">
+                ไปหน้าเข้าร่วมเกม
+              </Link>
+            </span>
+          )}
+        </div>
+      )}
+      <a
+        href={withBase(ssoStartPath(next))}
+        onClick={() => setLeaving(true)}
+        aria-disabled={leaving}
+        className={`btn btn-primary flex items-center justify-center gap-3 ${leaving ? 'pointer-events-none opacity-70' : ''}`}
+      >
+        <WorkAccountMark />
+        {leaving ? 'กำลังไปหน้า Microsoft…' : 'เข้าสู่ระบบด้วยบัญชีบริษัท'}
+      </a>
+      {(returned === 'no_account' || returned === 'account_disabled') && (
+        <button type="button" onClick={() => void otherAccount()} className="text-sm font-semibold text-white/70 underline hover:text-white">
+          ใช้บัญชี Microsoft อื่น
+        </button>
+      )}
+    </div>
+  );
+
   if (account.mode === 'oidc') {
-    // company login (Microsoft Entra ID) is the next step; until IT registers the app there is nothing to send people to
+    if (!companyLogin) {
+      return (
+        <Notice emoji="🔧" title="ระบบเข้าสู่ระบบยังไม่พร้อม">
+          การเข้าสู่ระบบด้วยบัญชีบริษัทยังตั้งค่าไม่เสร็จ ติดต่อผู้ดูแลระบบ
+        </Notice>
+      );
+    }
     return (
-      <Notice emoji="🔧" title="ระบบเข้าสู่ระบบยังไม่พร้อม">
-        การเข้าสู่ระบบด้วยบัญชีบริษัทยังตั้งค่าไม่เสร็จ ติดต่อผู้ดูแลระบบ
+      <Notice emoji="🔑" title="เข้าสู่ระบบ">
+        <p className="mb-5">สำหรับคนสร้างและจัดเกม ใช้บัญชี Microsoft ของบริษัท ส่วนคนเล่นเข้าร่วมด้วย PIN ได้เลยโดยไม่ต้องเข้าสู่ระบบ</p>
+        {companyLogin}
+        {error && (
+          <p role="alert" className="mt-3 text-sm font-semibold text-bad">
+            {error}
+          </p>
+        )}
       </Notice>
     );
   }
@@ -117,7 +202,19 @@ export function LoginScreen({ next }: { next: string }) {
   if (account.mode === 'local') {
     return (
       <Notice emoji="🔑" title="เข้าสู่ระบบ">
-        <p>ใช้ชื่อผู้ใช้และรหัสผ่านที่ผู้ดูแลระบบให้ไว้</p>
+        {companyLogin ? (
+          <>
+            <p className="mb-5">สำหรับคนสร้างและจัดเกม ใช้บัญชี Microsoft ของบริษัท ส่วนคนเล่นเข้าร่วมด้วย PIN ได้เลยโดยไม่ต้องเข้าสู่ระบบ</p>
+            {companyLogin}
+            <p className="mt-6 flex items-center gap-3 text-sm text-white/60" aria-hidden="true">
+              <span className="h-px flex-1 bg-white/20" />
+              หรือใช้ชื่อผู้ใช้ที่ผู้ดูแลระบบให้ไว้
+              <span className="h-px flex-1 bg-white/20" />
+            </p>
+          </>
+        ) : (
+          <p>ใช้ชื่อผู้ใช้และรหัสผ่านที่ผู้ดูแลระบบให้ไว้</p>
+        )}
         <form onSubmit={submit} className="mt-5 flex flex-col gap-3 text-left">
           <label htmlFor="login-user" className="text-sm font-semibold text-white/80">
             ชื่อผู้ใช้
@@ -131,7 +228,7 @@ export function LoginScreen({ next }: { next: string }) {
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            autoFocus
+            autoFocus={!companyLogin}
             className="field font-display text-lg"
           />
           <label htmlFor="login-password" className="mt-1 text-sm font-semibold text-white/80">

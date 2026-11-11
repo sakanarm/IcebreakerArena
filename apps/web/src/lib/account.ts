@@ -18,6 +18,8 @@ export type Account =
   | {
       status: 'ready';
       mode: AuthMode;
+      /** the login page offers company login (Keycloak, then Microsoft) */
+      sso: boolean;
       /** who this page acts for: the user it opened as, or logged in as here */
       user: AccountUser | null;
       /**
@@ -41,7 +43,7 @@ function set(next: Account) {
 
 /** A login or logout in this tab: the page now acts for `user`, and other tabs check theirs. */
 function become(mode: AuthMode, user: AccountUser | null) {
-  set({ status: 'ready', mode, user, switched: null });
+  set({ status: 'ready', mode, sso: current.status === 'ready' && current.sso, user, switched: null });
   try {
     channel()?.postMessage('changed');
   } catch {
@@ -51,12 +53,13 @@ function become(mode: AuthMode, user: AccountUser | null) {
 
 /** Asks the server who is logged in; every useAccount() on the page updates. */
 export function refreshAccount(): Promise<void> {
-  inflight ??= api<{ mode: AuthMode; user: AccountUser | null }>('/auth/me')
+  inflight ??= api<{ mode: AuthMode; sso?: boolean; user: AccountUser | null }>('/auth/me')
     .then((r) => {
       const mine = current.status === 'ready' ? current.user : null;
+      const sso = r.sso === true;
       // a page that had nobody takes whoever logged in; a page with a user stays with them
-      if (!mine || r.user?.id === mine.id) set({ status: 'ready', mode: r.mode, user: r.user, switched: null });
-      else set({ status: 'ready', mode: r.mode, user: mine, switched: { to: r.user } });
+      if (!mine || r.user?.id === mine.id) set({ status: 'ready', mode: r.mode, sso, user: r.user, switched: null });
+      else set({ status: 'ready', mode: r.mode, sso, user: mine, switched: { to: r.user } });
     })
     .catch(() => {
       // a page already showing someone's games keeps them through a network blip
@@ -118,6 +121,19 @@ export async function mockLogin(name: string) {
 export async function localLogin(username: string, password: string) {
   const r = await api<{ user: AccountUser }>('/auth/login', { method: 'POST', body: { username, password } });
   become('local', r.user);
+}
+
+/** Where the company login button goes: the server sends the person on to Keycloak. */
+export const ssoStartPath = (next: string) => `/api/auth/keycloak?${new URLSearchParams({ next })}`;
+
+/**
+ * "Use another Microsoft account": ends the session here and at Keycloak, which then comes back to
+ * the login page. Without this, the next company login would sign the same account straight back in.
+ */
+export async function switchSsoAccount(): Promise<string | null> {
+  const r = await api<{ url: string | null }>('/auth/keycloak/logout', { method: 'POST' });
+  become(current.status === 'ready' ? current.mode : 'off', null);
+  return r.url;
 }
 
 export async function logout() {
