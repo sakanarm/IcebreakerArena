@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { examSize, type ExamItem } from '@pika-arena/shared';
 import {
   attemptOf,
@@ -64,18 +64,24 @@ export function ExamApp({ code }: { code: string }) {
   }, [view]);
 
   const title = loaded.status === 'ready' ? loaded.paper.title : '';
-  useEffect(() => {
+  // a layout effect, not a plain one: leaving the paper, Next writes the next page's title in the same commit that
+  // unmounts this one, and a plain effect's cleanup runs only after the observer has already put the name back
+  useLayoutEffect(() => {
     if (!title) return;
     const want = `${title} · ข้อสอบ · MFEC Pika Arena`;
+    let here = true;
     const put = () => {
-      if (document.title !== want) document.title = want;
+      if (here && document.title !== want) document.title = want;
     };
     put();
     // after a click from /exam, Next writes this route's own title ("ข้อสอบ") once the page is in, which can be
     // after a sample (it needs no loading) has already set the paper's name: put the name back each time
     const watch = new MutationObserver(put);
     watch.observe(document.head, { subtree: true, childList: true, characterData: true });
-    return () => watch.disconnect();
+    return () => {
+      here = false;
+      watch.disconnect();
+    };
   }, [title]);
 
   // stable, so the sitting's own timers are not set up again on every change
