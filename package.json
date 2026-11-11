@@ -21,6 +21,7 @@
     "e2e:exam": "node e2e/exam.mjs",
     "e2e:ask-ai": "node e2e/ask-ai.mjs",
     "e2e:sheet-import": "node e2e/sheet-import.mjs",
+    "e2e:pika": "node e2e/pika-exam.mjs",
     "bots": "npm run bots -w @pika-arena/server --",
     "crowd": "npm run crowd -w @pika-arena/server --",
     "playthrough": "npm run playthrough -w @pika-arena/server --",

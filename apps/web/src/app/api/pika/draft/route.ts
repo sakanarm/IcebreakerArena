@@ -40,7 +40,11 @@ export async function POST(req: Request) {
     const plans = sent.map(planOf).filter((p): p is FactPlan => p !== null);
     if (plans.length === 0) throw new HttpError(400, 'no_facts');
 
-    const { game, failed } = buildGame(plans, { title: str(body.title, LIMITS.titleMax), description: str(body.description, LIMITS.descriptionMax) });
+    const { game, failed } = buildGame(plans, {
+      title: str(body.title, LIMITS.titleMax),
+      description: str(body.description, LIMITS.descriptionMax),
+      ...(body.style === 'exam' ? { style: 'exam' as const } : {}),
+    });
     const draft = normalizeDraft(game);
     if (!draft || draft.rounds.every((r) => r.questions.length === 0)) throw new HttpError(409, 'no_facts');
 

@@ -3,6 +3,7 @@ import { audit } from './audit';
 import { upsertUser, type SessionUser } from './auth';
 import type { Sql } from './db';
 import { HttpError } from './http';
+import { projectIdFor } from './pika';
 
 /**
  * Local accounts (AUTH_MODE=local): a username and password kept in our own database, until company
@@ -112,6 +113,38 @@ export async function setLocalPassword(sql: Sql, username: string, password: str
   );
   await sql.query('DELETE FROM ib_sessions WHERE user_id = $1', [id]);
   await audit(sql, null, 'local_password_set', id);
+  return true;
+}
+
+const EMAIL_SHAPE = /^[^\s@<>"]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
+
+/**
+ * Sets (or clears, with null) the work email of a local account. The knowledge base names a
+ * person's project after it, so two accounts may never share one: that would be one project, and
+ * each could read what the other taught it. False when there is no such account.
+ */
+export async function setLocalEmail(sql: Sql, username: string, rawEmail: string | null): Promise<boolean> {
+  const email = rawEmail === null ? null : rawEmail.trim().toLowerCase();
+  if (email !== null && (!EMAIL_SHAPE.test(email) || email.length > 254)) throw new HttpError(400, 'bad_email');
+  const rows = await sql.query<{ id: string }>('SELECT id FROM ib_users WHERE issuer = $1 AND subject = $2', [LOCAL_ISSUER, normalizeUsername(username)]);
+  const id = rows[0]?.id;
+  if (!id) return false;
+  if (email !== null) {
+    // the project is named after the part before the @, so a@one.co and a@two.co would share one too
+    const mine = projectIdFor(email);
+    const others = await sql.query<{ email: string }>('SELECT email FROM ib_users WHERE email IS NOT NULL AND id <> $1', [id]);
+    const sameProject = (e: string) => {
+      try {
+        return projectIdFor(e) === mine;
+      } catch {
+        return false;
+      }
+    };
+    if (others.some((o) => o.email.toLowerCase() === email || sameProject(o.email))) throw new HttpError(409, 'email_taken');
+  }
+  await sql.query('UPDATE ib_users SET email = $2 WHERE id = $1', [id, email]);
+  // the email itself stays out of the log: who changed and that it changed is enough
+  await audit(sql, null, 'local_email_set', id, { cleared: email === null });
   return true;
 }
 

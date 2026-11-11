@@ -56,8 +56,13 @@ export async function POST(req: Request) {
     if (paths.length === 0) throw new HttpError(400, 'no_pages');
     if (paths.length > MAX_PAGES) throw new HttpError(400, 'too_many_pages');
 
+    // an exam takes many questions from a page; a party game a few from each, so every page gets a turn
+    const style = body.style === 'exam' ? 'exam' : 'game';
     const { pages, missing } = await readAll(project, paths);
-    const { keep, dropped } = planFacts(pages.flatMap((p) => p.facts));
+    const { keep, dropped } = planFacts(
+      pages.flatMap((p) => p.facts),
+      { style },
+    );
     if (keep.length === 0) throw new HttpError(409, 'no_facts', { missing, dropped: dropped.length });
 
     return json({

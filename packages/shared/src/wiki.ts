@@ -27,17 +27,26 @@ export interface WikiPage {
   related: string[];
 }
 
-type Section = 'summary' | 'details' | 'related' | 'other';
+type Section = 'summary' | 'details' | 'related' | 'skip' | 'other';
 
 const HEADING = /^\s{0,3}#{1,6}\s+(.*?)\s*#*\s*$/;
 const BULLET = /^(\s*)(?:[-*+]|\d{1,2}[.)])\s+(.*)$/;
 const CITE = /\[\[([^\]\n]+)\]\]/g;
+/**
+ * "ดูรายละเอียดที่ [[topics/x]]": a pointer to another page inside a sentence. Taken out whole, so the
+ * fact does not end on a dangling "ดูที่", and the page it points at is not mistaken for the source.
+ */
+const SEE_ALSO = /\s*\(?\s*(?:(?:ดู|อ่าน)(?:รายละเอียด|ข้อมูล)?(?:เพิ่มเติม)?(?:ได้)?(?:ที่)?|see(?: also)?)\s*:?\s*\[\[[^\]\n]+\]\]\s*\)?/gi;
+/** whatever is left of such a pointer when its link was written some other way */
+const DANGLING = /\s*(?:(?:ดู|อ่าน)(?:รายละเอียด|ข้อมูล)?(?:เพิ่มเติม)?(?:ได้)?ที่|see(?: also)?)\s*:?\s*$/i;
 
 function sectionOf(heading: string): Section {
   const h = heading.toLowerCase();
   if (h.includes('summary') || h.includes('สรุป') || h.includes('ภาพรวม')) return 'summary';
   if (h.includes('detail') || h.includes('รายละเอียด') || h.includes('ข้อเท็จจริง')) return 'details';
   if (h.includes('related') || h.includes('เกี่ยวข้อง') || h.includes('อ้างอิง')) return 'related';
+  // notes about the page, the pages a source updated, open questions: about the wiki, not the subject
+  if (/note|หมายเหตุ|updated|source|แหล่งที่มา|open question|คำถามที่ยัง|ยังไม่ทราบ|changelog/.test(h)) return 'skip';
   return 'other';
 }
 
@@ -65,18 +74,23 @@ export function parseWikiPage(markdown: string): WikiPage {
   let section: Section = 'other';
   const summary: string[] = [];
   const facts: WikiFact[] = [];
+  /** bullets under headings of the page's own choosing: its facts only when it has no Details */
+  const loose: WikiFact[] = [];
+  let hasDetails = false;
   const related: string[] = [];
   /** the bullet still being read, so a wrapped line joins the line above instead of starting a fact */
   let open: { section: Section; indent: number; raw: string } | null = null;
 
   const close = () => {
     if (!open) return;
-    const { raw } = open;
-    const cites = [...raw.matchAll(CITE)].map((m) => m[1].trim()).filter(Boolean);
-    const text = plain(raw.replace(CITE, ' '));
-    if (open.section === 'related') related.push(...(cites.length ? cites : text ? [text] : []));
-    else if (text) facts.push({ text, ...(cites[0] ? { cite: cites[0] } : {}) });
+    const at = open.section;
+    const raw = at === 'related' ? open.raw : open.raw.replace(SEE_ALSO, ' ');
     open = null;
+    if (at === 'skip') return;
+    const cites = [...raw.matchAll(CITE)].map((m) => m[1].trim()).filter(Boolean);
+    const text = plain(plain(raw.replace(CITE, ' ')).replace(DANGLING, ''));
+    if (at === 'related') related.push(...(cites.length ? cites : text ? [text] : []));
+    else if (text) (at === 'details' ? facts : loose).push({ text, ...(cites[0] ? { cite: cites[0] } : {}) });
   };
 
   for (const line of lines) {
@@ -84,6 +98,7 @@ export function parseWikiPage(markdown: string): WikiPage {
     if (heading) {
       close();
       section = sectionOf(heading[1]);
+      if (section === 'details') hasDetails = true;
       continue;
     }
     const bullet = BULLET.exec(line);
@@ -105,7 +120,7 @@ export function parseWikiPage(markdown: string): WikiPage {
   }
   close();
 
-  return { summary: plain(summary.join(' ')), facts, related };
+  return { summary: plain(summary.join(' ')), facts: hasDetails ? facts : loose, related };
 }
 
 /** Why a fact cannot be used, in the words the review screen shows. */
@@ -116,7 +131,7 @@ export const SKIP_REASON: Record<FactSkip, string> = {
   contact: 'มีข้อมูลติดต่อ (อีเมลหรือเบอร์โทร)',
   duplicate: 'ซ้ำกับข้อที่เลือกไว้แล้ว',
   long: 'ยาวเกินกว่าที่คำถามหนึ่งข้อรับได้',
-  'per-page': 'เกินโควตาของหน้านี้ (หน้าละ 3 ข้อ) เพื่อให้คำถามกระจายทั่วทุกหน้า',
+  'per-page': 'เกินโควตาของหน้านี้ เพื่อให้คำถามกระจายทั่วทุกหน้า',
 };
 
 /** A fact shorter than this is a label or a heading, not something anyone can be asked about. */

@@ -60,6 +60,15 @@ export interface PikaDocument {
   pages: string[];
 }
 
+/** A document being learned. Pika reads it in the background; this is how far it has got. */
+export interface PikaJob {
+  id: string;
+  state: 'running' | 'done' | 'failed';
+  /** the pages the document became, once it is done */
+  pages: string[];
+  documentId: string | null;
+}
+
 export interface PikaHit {
   path: string;
   title: string;
@@ -131,7 +140,18 @@ export function writeProject(p: PikaProject): void {
 
 type Query = Record<string, string | number | undefined>;
 
-async function call(key: string, method: 'GET' | 'POST' | 'DELETE', route: string, { query, body }: { query?: Query; body?: unknown } = {}): Promise<unknown> {
+interface CallOptions {
+  query?: Query;
+  /** sent as json */
+  body?: unknown;
+  /** sent as multipart instead; fetch writes the boundary itself */
+  form?: FormData;
+  /** Pika's ingest refuses a request without one, so a retried upload is not learned twice */
+  idempotencyKey?: string;
+  timeoutMs?: number;
+}
+
+async function call(key: string, method: 'GET' | 'POST' | 'DELETE', route: string, { query, body, form, idempotencyKey, timeoutMs }: CallOptions = {}): Promise<unknown> {
   const url = new URL(`${pikaBase()}${route}`);
   for (const [k, v] of Object.entries(query ?? {})) if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
 
@@ -142,10 +162,11 @@ async function call(key: string, method: 'GET' | 'POST' | 'DELETE', route: strin
       headers: {
         authorization: `Bearer ${key}`,
         accept: 'application/json',
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...(body === undefined || form ? {} : { 'content-type': 'application/json' }),
+        ...(idempotencyKey ? { 'idempotency-key': idempotencyKey } : {}),
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      ...(form ? { body: form } : body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: AbortSignal.timeout(timeoutMs ?? TIMEOUT_MS),
       cache: 'no-store',
     });
   } catch (e) {
@@ -160,6 +181,10 @@ async function call(key: string, method: 'GET' | 'POST' | 'DELETE', route: strin
     if (res.status === 401 || res.status === 403) throw new HttpError(502, 'pika_denied');
     if (res.status === 404) throw new HttpError(404, 'pika_not_found');
     if (res.status === 429) throw new HttpError(429, 'pika_busy');
+    if (res.status === 413) throw new HttpError(413, 'file_too_big');
+    if (res.status === 415) throw new HttpError(415, 'file_type');
+    // a file Pika read and could not use: empty, scanned without text, a format it does not know
+    if (res.status === 400 || res.status === 422) throw new HttpError(422, 'pika_rejected');
     throw new HttpError(502, 'pika_failed');
   }
   if (!text) return null;
@@ -289,4 +314,90 @@ export async function readPage(p: PikaProject, pagePath: string): Promise<PikaPa
   const content = pick(answer, 'content', 'markdown', 'text');
   if (!content) return null;
   return { path: pick(answer, 'file_path', 'filePath', 'path') || pagePath, title: pick(answer, 'title') || pagePath, content };
+}
+
+// ---------- adding to the knowledge base ----------
+
+/** Files Pika can read; anything else is refused here, before a byte is sent. */
+export const INGEST_TYPES = ['.pdf', '.docx', '.pptx', '.xlsx', '.txt', '.md', '.csv'] as const;
+/** Pika takes 25 MB; a little under it here, so the refusal is ours and says so in Thai. */
+export const INGEST_MAX_BYTES = 20 * 1024 * 1024;
+/** A pasted text this long is a document, not a note: past it, upload the file. */
+export const INGEST_TEXT_MAX = 200_000;
+
+/** An upload of 20 MB through a slow link takes a while; reading pages never does. */
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+const STATES: Record<string, PikaJob['state']> = {
+  queued: 'running',
+  pending: 'running',
+  processing: 'running',
+  running: 'running',
+  started: 'running',
+  done: 'done',
+  completed: 'done',
+  complete: 'done',
+  succeeded: 'done',
+  success: 'done',
+  failed: 'failed',
+  error: 'failed',
+  cancelled: 'failed',
+  canceled: 'failed',
+};
+
+function jobOf(answer: unknown, fallbackId = ''): PikaJob {
+  const o = obj(answer);
+  const result = obj(o.result);
+  const raw = pick(o, 'status', 'state').toLowerCase();
+  const pages = (Array.isArray(result.pages) ? result.pages : Array.isArray(o.pages) ? o.pages : [])
+    .map((x) => (typeof x === 'string' ? x : pick(obj(x), 'file_path', 'path')))
+    .filter(Boolean);
+  return {
+    id: pick(o, 'job_id', 'jobId', 'id') || fallbackId,
+    // a state this version of Pika has a new word for is still running; the page keeps asking
+    state: STATES[raw] ?? 'running',
+    pages,
+    documentId: pick(result, 'document_id', 'documentId') || pick(o, 'document_id') || null,
+  };
+}
+
+/** A file from the person's computer, handed to Pika to learn. */
+export async function ingestFile(p: PikaProject, file: Blob, name: string, { title, idempotencyKey }: { title?: string; idempotencyKey: string }): Promise<PikaJob> {
+  const form = new FormData();
+  form.set('file', file, name);
+  if (title?.trim()) form.set('title', title.trim());
+  form.set('source_ref', `pika-arena/upload/${name}`.slice(0, 200));
+  const answer = await call(p.key, 'POST', `/projects/${encodeURIComponent(p.projectId)}/files`, { form, idempotencyKey, timeoutMs: UPLOAD_TIMEOUT_MS });
+  const job = jobOf(answer);
+  if (!job.id) {
+    console.error('[pika] upload answered without a job id');
+    throw new HttpError(502, 'pika_failed');
+  }
+  return job;
+}
+
+/** Text someone pasted, learned the same way a file is. */
+export async function ingestText(p: PikaProject, { title, content, idempotencyKey }: { title: string; content: string; idempotencyKey: string }): Promise<PikaJob> {
+  const answer = await call(p.key, 'POST', `/projects/${encodeURIComponent(p.projectId)}/documents`, {
+    body: { title, content, source_ref: 'pika-arena/paste' },
+    idempotencyKey,
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+  });
+  const job = jobOf(answer);
+  if (!job.id) {
+    console.error('[pika] paste answered without a job id');
+    throw new HttpError(502, 'pika_failed');
+  }
+  return job;
+}
+
+/**
+ * How far a document has got. Asked with the person's own project key, and an answer that names
+ * another project is treated as no answer: a job id is not a secret, a project's pages are.
+ */
+export async function getJob(p: PikaProject, jobId: string): Promise<PikaJob> {
+  const answer = await call(p.key, 'GET', `/jobs/${encodeURIComponent(jobId)}`);
+  const owner = pick(obj(answer), 'project_id', 'projectId');
+  if (owner && owner !== p.projectId) throw new HttpError(404, 'pika_not_found');
+  return jobOf(answer, jobId);
 }

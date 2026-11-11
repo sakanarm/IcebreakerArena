@@ -613,6 +613,11 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
               <Link href="/import" className="btn btn-ghost col-span-2 px-3 text-sm">
                 📊 นำเข้าคลังข้อสอบจาก Excel / CSV
               </Link>
+              {inCloud && (
+                <Link href="/pika" className="btn btn-ghost col-span-2 px-3 text-sm">
+                  📚 สร้างข้อสอบจากคลังความรู้ Pika
+                </Link>
+              )}
             </div>
             <p className="mt-3 text-xs leading-relaxed text-white/45">
               {inCloud && keptHere

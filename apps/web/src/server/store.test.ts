@@ -27,7 +27,7 @@ import {
   saveGame,
 } from './games';
 import { HttpError, guardMutation, readJson } from './http';
-import { checkLocalLogin, createLocalUser, generatePassword, hashPassword, normalizeUsername, resetLoginThrottle, setLocalPassword, verifyPassword } from './local-users';
+import { checkLocalLogin, createLocalUser, generatePassword, hashPassword, normalizeUsername, resetLoginThrottle, setLocalEmail, setLocalPassword, verifyPassword } from './local-users';
 import { IDLE_MS, createSession, findSession, parseCookies, sessionToken, type SessionUser } from './session';
 
 let db: Db;
@@ -762,6 +762,30 @@ test('local login: right password in any username case, one answer for wrong nam
   // a mock or company login with the same name is someone else
   const other = await upsertUser(db, { issuer: 'mock', subject: 'tester1', name: 'tester1' });
   assert.notEqual(other.id, made.id);
+  resetLoginThrottle();
+});
+
+test('a local account gets a work email from the admin, and no two accounts share a knowledge-base project', async () => {
+  resetLoginThrottle();
+  const a = await db.tx((sql) => createLocalUser(sql, { username: 'mail-a', name: 'คนแรก', password: 'a-good-password' }));
+  await db.tx((sql) => createLocalUser(sql, { username: 'mail-b', name: 'คนที่สอง', password: 'a-good-password' }));
+
+  assert.equal(await db.tx((sql) => setLocalEmail(sql, 'MAIL-A', '  First.Person@Example.co.th ')), true);
+  // login reads it back, lowercased, and nothing else about the account moved
+  assert.deepEqual(await checkLocalLogin(db, 'mail-a', 'a-good-password'), { ...a, email: 'first.person@example.co.th' });
+
+  for (const taken of ['first.person@example.co.th', 'FIRST.PERSON@other.example', 'first_person@example.co.th']) {
+    await assert.rejects(db.tx((sql) => setLocalEmail(sql, 'mail-b', taken)), (e: HttpError) => e.code === 'email_taken', taken);
+  }
+  for (const bad of ['no-at-sign', 'ชื่อไทย@example.co.th', 'a@b', 'two words@example.co.th', '@example.co.th']) {
+    await assert.rejects(db.tx((sql) => setLocalEmail(sql, 'mail-b', bad)), (e: HttpError) => e.code === 'bad_email', bad);
+  }
+  assert.equal(await db.tx((sql) => setLocalEmail(sql, 'nobody-here', 'x@example.co.th')), false);
+
+  // cleared, the email is free for someone else
+  assert.equal(await db.tx((sql) => setLocalEmail(sql, 'mail-a', null)), true);
+  assert.equal((await checkLocalLogin(db, 'mail-a', 'a-good-password')).email, null);
+  assert.equal(await db.tx((sql) => setLocalEmail(sql, 'mail-b', 'first.person@example.co.th')), true);
   resetLoginThrottle();
 });
 

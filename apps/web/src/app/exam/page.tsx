@@ -54,6 +54,16 @@ export default function ExamIndexPage() {
             นำเข้าคลังข้อสอบ
           </Link>
         </section>
+
+        <section className="exam-card mt-4 p-5">
+          <h2 className="font-semibold">ออกข้อสอบจากเอกสารการทำงาน</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            อัปโหลดคู่มือ สไลด์อบรม หรือ PDF เข้าคลังความรู้ Pika ส่วนตัวของคุณ แล้วเลือกหัวข้อมาตั้งเป็นข้อสอบสี่ตัวเลือก ทุกข้อมีเฉลยจากข้อความต้นฉบับ (ต้องเข้าสู่ระบบ)
+          </p>
+          <Link href="/pika" className="exam-btn mt-4">
+            สร้างข้อสอบจากคลังความรู้
+          </Link>
+        </section>
       </main>
     </div>
   );

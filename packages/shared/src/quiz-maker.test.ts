@@ -6,6 +6,7 @@ import {
   buildGame,
   buildQuestion,
   buildQuestions,
+  EXAM_PER_PAGE,
   MAX_PER_PAGE,
   numberSpans,
   pickType,
@@ -350,4 +351,130 @@ test('a game never comes out bigger than a room can open', () => {
   assert.equal(result.ok, true, result.ok ? '' : result.errors.join(' / '));
   assert.ok(game.rounds.length <= LIMITS.roundsMax);
   assert.ok(allQuestions(game).length <= LIMITS.questionsMax);
+});
+
+// ---------- the exam style ----------
+
+/** what the knowledge base gave for one test document (2026-11-11): the same facts on three pages */
+const REAL: SourceFact[] = (
+  [
+    ['sources/policy.md', 'เอกสารทดสอบ นโยบายการใช้ Pika Arena', 'Pika Arena คือเว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมภายในบริษัท'],
+    ['sources/policy.md', 'เอกสารทดสอบ นโยบายการใช้ Pika Arena', 'ห้องหนึ่งห้องรับผู้เล่นได้สูงสุด 200 คน'],
+    ['sources/policy.md', 'เอกสารทดสอบ นโยบายการใช้ Pika Arena', 'ผู้เล่นเข้าร่วมด้วย PIN 6 หลัก โดยไม่ต้องเข้าสู่ระบบ'],
+    ['sources/policy.md', 'เอกสารทดสอบ นโยบายการใช้ Pika Arena', 'เกมหนึ่งเกมมีคำถามได้ไม่เกิน 100 ข้อ และไม่เกิน 20 ด่าน'],
+    ['sources/policy.md', 'เอกสารทดสอบ นโยบายการใช้ Pika Arena', 'เกมที่สร้างจากคลังความรู้ Pika แชร์เข้าคลังกลางไม่ได้'],
+    ['sources/policy.md', 'เอกสารทดสอบ นโยบายการใช้ Pika Arena', 'ระบบเก็บรายงานผลการเล่นไว้ 90 วัน แล้วลบทิ้งอัตโนมัติ'],
+    ['systems/pika-arena.md', 'Pika Arena', 'เป็นเว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมภายในบริษัท'],
+    ['systems/pika-arena.md', 'Pika Arena', 'ห้องหนึ่งห้องรับผู้เล่นได้สูงสุด 200 คน'],
+    ['systems/pika-arena.md', 'Pika Arena', 'มีโหมดข้อสอบที่ใช้ฝึกก่อนสอบจริง'],
+    ['systems/pika-arena.md', 'Pika Arena', 'ระบบเก็บรายงานผลการเล่นไว้ 90 วัน'],
+    ['topics/retention.md', 'การเก็บรายงานผลการเล่น Pika Arena 90 วัน', 'ระบบเก็บรายงานผลการเล่นไว้ 90 วัน แล้วลบทิ้งอัตโนมัติ'],
+  ] as const
+).map(([page, pageTitle, text]) => fact(text, page, { pageTitle, cite: 'sources/policy.md' }));
+
+test('a fact the page leaves without a subject gets the page name, and a number never rides in on one', () => {
+  const { keep } = planFacts(REAL, { style: 'exam' });
+  assert.ok(keep.some((k) => k.text === 'Pika Arena มีโหมดข้อสอบที่ใช้ฝึกก่อนสอบจริง'), keep.map((k) => k.text).join('\n'));
+  assert.ok(!keep.some((k) => k.text.startsWith('เป็น') || k.text.startsWith('มี')));
+  const titled = fact('เป็นเว็บที่ใช้งานง่ายสำหรับทุกคนในบริษัท', 'topics/a.md', { pageTitle: 'รายงาน 90 วัน' });
+  assert.equal(planFacts([titled]).keep[0].text, titled.text);
+});
+
+test('the same fact said on three pages, or with a clause added, is asked once', () => {
+  const { keep, dropped } = planFacts(REAL, { style: 'exam' });
+  assert.equal(keep.length, 7, keep.map((k) => k.text).join('\n'));
+  assert.equal(keep.filter((k) => k.text.includes('90 วัน')).length, 1);
+  assert.equal(keep.filter((k) => k.text.includes('เว็บเกมตอบคำถาม')).length, 1);
+  assert.ok(dropped.every((d) => d.why === 'duplicate'));
+});
+
+test('an exam keeps far more of a page than a party game does', () => {
+  const many = Array.from({ length: 20 }, (_, i) => fact(`ข้อเท็จจริงลำดับที่ ${i + 1} ของหน้านี้ที่ยาวพอจะถาม`, 'topics/long.md'));
+  assert.equal(planFacts(many).keep.length, MAX_PER_PAGE);
+  assert.equal(planFacts(many, { style: 'exam' }).keep.length, EXAM_PER_PAGE);
+  assert.equal(planFacts(many, { perPage: 7 }).keep.length, 7);
+});
+
+test('an exam is four choices or true/false, never a slider or a typed answer', () => {
+  for (const facts of [REAL, FACTS]) {
+    const { keep } = planFacts(facts, { style: 'exam' });
+    assert.ok(keep.every((k) => k.type === 'quiz' || k.type === 'truefalse'));
+    const { game, failed } = buildGame(keep, { title: '', style: 'exam' });
+    assert.equal(failed.length, 0);
+    const result = validateGame(game);
+    assert.equal(result.ok, true, result.ok ? '' : result.errors.join(' / '));
+    for (const q of allQuestions(game)) {
+      assert.ok(q.type === 'quiz' || q.type === 'truefalse', q.type);
+      if (q.type === 'quiz') {
+        assert.equal(q.options.length, 4, q.prompt);
+        assert.equal(new Set(q.options).size, 4, q.prompt);
+        assert.equal(q.correct.length, 1);
+      }
+      assert.ok(q.explanation && q.source, q.prompt);
+    }
+    assert.equal(game.cover?.emoji, '📝');
+    assert.equal(game.title, 'ข้อสอบจากคลังความรู้');
+  }
+});
+
+test('a number is asked among its neighbours on its own scale', () => {
+  const ask = (text: string) => {
+    const [q] = buildQuestions([{ ...fact(text), type: 'quiz' }], { style: 'exam' }).questions;
+    assert.equal(q.type, 'quiz', text);
+    return { options: q.options, answer: q.options[q.correct[0]], prompt: q.prompt };
+  };
+  const room = ask('ห้องหนึ่งห้องรับผู้เล่นได้สูงสุด 200 คน');
+  assert.equal(room.answer, '200');
+  assert.ok(room.prompt.endsWith(`สูงสุด ${BLANK} คน`), room.prompt);
+  assert.ok(room.options.every((o) => Number(o) > 0 && Number(o) % 50 === 0), room.options.join());
+  assert.deepEqual(room.options.map(Number), room.options.map(Number).sort((a, b) => a - b));
+  assert.ok(ask('ทีมเริ่มใช้งานระบบนี้จริงในปี 2026 เป็นต้นมา').options.every((y) => Math.abs(Number(y) - 2026) <= 3));
+  assert.ok(ask('ผู้ใช้ส่วนใหญ่พอใจกับระบบนี้ถึง 98% จากแบบสอบถาม').options.every((o) => Number(o) <= 100));
+  assert.ok(ask('ทีมดูแลระบบนี้มีสมาชิกทั้งหมด 1 คนในตอนเริ่มต้น').options.every((o) => Number(o) >= 1));
+  assert.ok(ask('ระบบรองรับผู้เล่นรวมกันได้ถึง 1,000 คนต่อวัน').options.some((o) => o.includes(',')));
+  assert.ok(ask('ค่าความหน่วงเฉลี่ยของระบบอยู่ที่ 0.5 วินาทีต่อคำขอ').options.every((o) => /^\d+\.\d$/.test(o)));
+});
+
+test('where the right number sits among the four changes from fact to fact', () => {
+  const texts = Array.from({ length: 24 }, (_, i) => `ระบบนี้มีผู้ใช้งานประจำทั้งหมด ${(i + 3) * 40} คนในทุกแผนก`);
+  const { questions } = buildQuestions(texts.map((t) => ({ ...fact(t), type: 'quiz' as const })), { style: 'exam' });
+  assert.ok(new Set(questions.map((q) => q.correct[0])).size >= 3, questions.map((q) => q.correct[0]).join());
+});
+
+test('"X คือ Y" is asked as "X คืออะไร" against the other things the pages define', () => {
+  const defs = [
+    'Pika Arena คือเว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรม',
+    'โหมดข้อสอบคือหน้าฝึกทำข้อสอบแบบสี่ตัวเลือกพร้อมเฉลย',
+    'คลังกลางคือที่รวมเกมที่ทุกคนในบริษัทนำไปใช้ต่อได้',
+    'รายงานผลคือสรุปคะแนนของผู้เล่นทุกคนหลังจบเกม',
+  ].map((t) => fact(t));
+  const { keep } = planFacts(defs, { style: 'exam' });
+  const { questions } = buildQuestions(keep, { style: 'exam' });
+  const q = questions[0];
+  assert.equal(q.prompt, 'Pika Arena คืออะไร');
+  assert.equal(q.options[q.correct[0]], 'เว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรม');
+  assert.equal(q.options.length, 4);
+});
+
+test('an exam true/false is sometimes the fact made false, and then says what is true', () => {
+  const texts = [
+    'เกมที่สร้างจากคลังความรู้ Pika แชร์เข้าคลังกลางไม่ได้',
+    'ผู้เล่นเข้าร่วมเกมได้โดยไม่ต้องสมัครสมาชิกก่อน',
+    'ผู้ดูแลระบบไม่สามารถลบรายงานของผู้อื่นได้เลย',
+    'คนที่ไม่ได้ล็อกอินยังเปิดลิงก์ข้อสอบได้ตามปกติ',
+  ];
+  const all = texts.flatMap((t) =>
+    Array.from({ length: 6 }, (_, seed) => buildQuestion({ ...fact(t), type: 'truefalse' }, 'q', [], seed, { style: 'exam' })!),
+  );
+  const lies = all.filter((q) => q.correct[0] === 1);
+  assert.ok(lies.length > 0 && lies.length < all.length, `${lies.length}/${all.length}`);
+  for (const q of lies) {
+    assert.ok(!q.prompt.includes('ไม่'), q.prompt);
+    assert.match(q.explanation!, /^ที่ถูกคือ /);
+  }
+  // a sentence with two negatives is never turned around: which one would be the lie?
+  const twice = 'ระบบไม่เก็บข้อมูลที่ไม่จำเป็นต่อการเล่นเกมเลย';
+  for (let seed = 0; seed < 6; seed++) {
+    assert.deepEqual(buildQuestion({ ...fact(twice), type: 'truefalse' }, 'q', [], seed, { style: 'exam' })!.correct, [0]);
+  }
 });

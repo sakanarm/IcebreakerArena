@@ -18,6 +18,10 @@ import { MAX_PAGES, validateGame, type Game } from '@pika-arena/shared';
 import { GET as documentsGET } from '@/app/api/pika/documents/route';
 import { POST as draftPOST } from '@/app/api/pika/draft/route';
 import { POST as factsPOST } from '@/app/api/pika/facts/route';
+import { POST as filesPOST } from '@/app/api/pika/files/route';
+import { GET as jobGET } from '@/app/api/pika/jobs/[id]/route';
+import { POST as textPOST } from '@/app/api/pika/text/route';
+import { INGEST_PER_HOUR, resetIngestLimits, withIngestSlot } from './pika-ingest';
 import { GET as projectGET, POST as projectPOST } from '@/app/api/pika/project/route';
 import { POST as searchPOST } from '@/app/api/pika/search/route';
 import { upsertUser } from './auth';
@@ -26,8 +30,11 @@ import { getDb, type Db } from './db';
 import { listGames } from './games';
 import { HttpError } from './http';
 import {
+  INGEST_MAX_BYTES,
+  INGEST_TEXT_MAX,
   ensureProject,
   existingProject,
+  getJob,
   listDocuments,
   pikaConfigured,
   projectIdFor,
@@ -126,6 +133,7 @@ interface Call {
   query: URLSearchParams;
   auth: string;
   body: Record<string, unknown>;
+  headers: Record<string, string | string[] | undefined>;
 }
 type Answer = { status?: number; json?: unknown; text?: string; type?: string };
 
@@ -143,6 +151,14 @@ function pika(c: Call): Answer {
   if (c.method === 'POST' && c.route === `/projects/${id}/api-keys`) return { status: 201, json: { client_id: 'client-2', api_key: ISSUED_KEY } };
   if (c.method === 'GET' && c.route === `/projects/${id}/documents`) return { json: DOCUMENTS };
   if (c.method === 'POST' && c.route === `/projects/${id}/search`) return { json: { hits: HITS } };
+  if (c.method === 'POST' && c.route === `/projects/${id}/files`) return { status: 202, json: { job_id: 'job-file', status: 'queued' } };
+  if (c.method === 'POST' && c.route === `/projects/${id}/documents`) return { status: 202, json: { job_id: 'job-text', status: 'queued' } };
+  if (c.method === 'GET' && c.route === '/jobs/job-file') {
+    return { json: { job_id: 'job-file', project_id: PROJECT, status: 'done', result: { pages: ['topics/arena.md', 'systems/stack.md'], document_id: 'doc-9' } } };
+  }
+  if (c.method === 'GET' && c.route === '/jobs/job-text') return { json: { job_id: 'job-text', status: 'processing' } };
+  if (c.method === 'GET' && c.route === '/jobs/job-broken') return { json: { job_id: 'job-broken', status: 'failed', error: 'could not read' } };
+  if (c.method === 'GET' && c.route === '/jobs/job-theirs') return { json: { job_id: 'job-theirs', project_id: 'icebreaking_someone_else', status: 'done', result: { pages: ['secret.md'] } } };
   if (c.method === 'GET' && c.route === `/projects/${id}/pages`) {
     const page = PAGES[c.query.get('path') ?? ''];
     return page ? { json: { file_path: c.query.get('path'), title: page.title, content: page.content } } : { status: 404, json: { detail: 'page not found' } };
@@ -207,6 +223,7 @@ before(async () => {
         query: url.searchParams,
         auth: request.headers.authorization ?? '',
         body,
+        headers: request.headers,
       };
       calls.push(call);
       const out = answer(call);
@@ -680,6 +697,224 @@ describe('the review screen', () => {
       (await read(await documentsGET(new Request('http://localhost/api/pika/documents', { headers: { cookie: theirs } })))).body.error,
       'no_project',
     );
+    assert.equal(calls.length, 0);
+  });
+});
+
+// ---------- adding documents ----------
+
+describe('adding to the knowledge base', () => {
+  beforeEach(() => resetIngestLimits());
+
+  const upload = (file: Blob | null, name: string, fields: Record<string, string> = {}, headers: Record<string, string> = {}) => {
+    const form = new FormData();
+    if (file) form.set('file', file, name);
+    for (const [k, v] of Object.entries({ key: 'pick-0001', ...fields })) form.set(k, v);
+    return req('/api/pika/files', { method: 'POST', headers: { 'x-ib-req': '1', ...headers }, body: form });
+  };
+  const pdf = (bytes = 2048) => new Blob([new Uint8Array(bytes).fill(37)], { type: 'application/pdf' });
+
+  test('a file goes to the person’s own project with their key, and comes back as a job', async () => {
+    const { status, text, body } = await read(await filesPOST(upload(pdf(), 'คู่มือ/นโยบาย.pdf', { title: 'นโยบายบริษัท' })));
+    assert.equal(status, 202, text);
+    assert.deepEqual(body.job, { id: 'job-file', state: 'running', pages: [], documentId: null });
+
+    const sent = lastCall('POST', '/files');
+    assert.equal(sent?.route, `/projects/${PROJECT}/files`);
+    assert.equal(sent?.auth, `Bearer ${PROJECT_KEY}`);
+    // the key is per person and per pick, so a send that is retried is learned once
+    assert.equal(sent?.headers['idempotency-key'], `ib-${user.id}-pick-0001`);
+    assert.match(String(sent?.headers['content-type']), /^multipart\/form-data; boundary=/);
+    const raw = String(sent?.body.raw ?? '');
+    // only the name of the file leaves, never the folder it sat in
+    assert.ok(raw.includes('นโยบาย.pdf'), raw.slice(0, 400));
+    assert.ok(!raw.includes('คู่มือ/'), 'the folder went too');
+    assert.ok(raw.includes('นโยบายบริษัท'));
+    assert.ok(!text.includes('pika_live'));
+  });
+
+  test('a file Pika cannot read is refused here, before anything is sent', async () => {
+    for (const [file, name, want] of [
+      [pdf(), 'โปรแกรม.exe', 'file_type'],
+      [pdf(), 'ไม่มีนามสกุล', 'file_type'],
+      [new Blob([]), 'ว่าง.pdf', 'empty_file'],
+      [null, 'x.pdf', 'no_file'],
+    ] as const) {
+      const { body } = await read(await filesPOST(upload(file, name)));
+      assert.equal(body.error, want, name);
+    }
+    assert.equal((await read(await filesPOST(upload(pdf(), 'x.pdf', { key: 'สั้น' })))).body.error, 'bad_request');
+    assert.equal(calls.length, 0);
+  });
+
+  test('a file bigger than the limit is refused from its declared length, unread', async () => {
+    const { status, body } = await read(await filesPOST(upload(pdf(), 'x.pdf', {}, { 'content-length': String(INGEST_MAX_BYTES + 1024 * 1024) })));
+    assert.equal(status, 413);
+    assert.equal(body.error, 'file_too_big');
+    assert.equal(calls.length, 0);
+  });
+
+  test('a body that never says how big it is gets cut off at the limit', async () => {
+    const chunk = new Uint8Array(1024 * 1024).fill(65);
+    let sentChunks = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        // more than the limit, and then some: the route must stop reading on its own
+        if (sentChunks++ > 40) c.close();
+        else c.enqueue(chunk);
+      },
+    });
+    const res = await filesPOST(
+      req('/api/pika/files', { method: 'POST', headers: { 'x-ib-req': '1', 'content-type': 'multipart/form-data; boundary=x' }, body, duplex: 'half' } as RequestInit),
+    );
+    assert.equal(res.status, 413);
+    assert.ok(sentChunks < 30, `read ${sentChunks} MB`);
+    assert.equal(calls.length, 0);
+  });
+
+  test('only a form from our own page is taken', async () => {
+    const form = new FormData();
+    form.set('file', pdf(), 'x.pdf');
+    assert.equal((await filesPOST(req('/api/pika/files', { method: 'POST', body: form }))).status, 403);
+    const asJson = await read(await filesPOST(send('/api/pika/files', { file: 'x' })));
+    assert.equal(asJson.status, 415);
+    assert.equal(calls.length, 0);
+  });
+
+  test('what Pika refuses is named, in a way the page can explain', async () => {
+    for (const [status, want] of [
+      [413, '413 file_too_big'],
+      [415, '415 file_type'],
+      [422, '422 pika_rejected'],
+      [400, '422 pika_rejected'],
+      [429, '429 pika_busy'],
+      [500, '502 pika_failed'],
+    ] as const) {
+      answer = (c) => (c.route.endsWith('/files') ? { status, json: { detail: 'no' } } : pika(c));
+      const res = await read(await filesPOST(upload(pdf(), 'x.pdf')));
+      assert.equal(`${res.status} ${res.body.error}`, want, `Pika said ${status}`);
+    }
+  });
+
+  test('an hour holds a fair number of documents, and a refused one does not count', async () => {
+    answer = (c) => (c.route.endsWith('/files') ? { status: 422, json: { detail: 'unreadable' } } : pika(c));
+    for (let i = 0; i < INGEST_PER_HOUR + 3; i++) assert.equal((await read(await filesPOST(upload(pdf(), 'x.pdf')))).body.error, 'pika_rejected');
+
+    answer = pika;
+    for (let i = 0; i < INGEST_PER_HOUR; i++) assert.equal((await filesPOST(upload(pdf(), 'x.pdf'))).status, 202);
+    const { status, body } = await read(await filesPOST(upload(pdf(), 'x.pdf')));
+    assert.equal(status, 429);
+    assert.equal(body.error, 'ingest_quota');
+    assert.ok(body.retryAfter > 0 && body.retryAfter <= 3600);
+  });
+
+  test('two at once, not twenty', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    let started = 0;
+    const slow = () =>
+      withIngestSlot(user.id, async () => {
+        started++;
+        await gate;
+      });
+    const first = [slow(), slow()];
+    assert.equal(await refusal(() => withIngestSlot(user.id, async () => {})), '429 ingest_busy');
+    release();
+    await Promise.all(first);
+    assert.equal(started, 2);
+    // the slots are given back
+    await withIngestSlot(user.id, async () => {});
+  });
+
+  test('pasted text is learned the same way, with its title', async () => {
+    const content = `นโยบายการลาของบริษัท\n\n${'พนักงานมีสิทธิ์ลาพักร้อนได้ปีละ 10 วันทำการ และต้องแจ้งล่วงหน้าอย่างน้อย 3 วัน '.repeat(5)}`;
+    const { status, body } = await read(await textPOST(send('/api/pika/text', { title: '  นโยบายการลา  ', content, key: 'paste-0001' })));
+    assert.equal(status, 202);
+    assert.equal(body.job.id, 'job-text');
+    assert.equal(body.hasContact, false);
+    const sent = lastCall('POST', '/documents');
+    assert.equal(sent?.route, `/projects/${PROJECT}/documents`);
+    assert.equal(sent?.auth, `Bearer ${PROJECT_KEY}`);
+    assert.equal(sent?.body.title, 'นโยบายการลา');
+    assert.equal(sent?.body.content, content.trim());
+    assert.equal(sent?.headers['idempotency-key'], `ib-${user.id}-paste-0001`);
+  });
+
+  test('a paste has to be a document: titled, long enough, not endless', async () => {
+    const long = 'ก'.repeat(300);
+    assert.equal((await read(await textPOST(send('/api/pika/text', { title: '', content: long, key: 'paste-0002' })))).body.error, 'no_title');
+    assert.equal((await read(await textPOST(send('/api/pika/text', { title: 'สั้น', content: 'สั้นเกินไป', key: 'paste-0002' })))).body.error, 'text_too_short');
+    assert.equal(
+      (await read(await textPOST(send('/api/pika/text', { title: 'ยาว', content: 'ก'.repeat(INGEST_TEXT_MAX + 1), key: 'paste-0002' })))).body.error,
+      'text_too_long',
+    );
+    assert.equal(calls.length, 0);
+  });
+
+  test('a paste with an email in it is still learned, and the page is told', async () => {
+    const content = `${'ขั้นตอนการเบิกค่าใช้จ่ายต้องแนบใบเสร็จตัวจริงทุกครั้ง '.repeat(6)}\nสอบถามได้ที่ hr@example.com`;
+    const { body } = await read(await textPOST(send('/api/pika/text', { title: 'การเบิก', content, key: 'paste-0003' })));
+    assert.equal(body.hasContact, true);
+  });
+
+  test('a job is followed until it is done, then names its pages', async () => {
+    const at = (id: string) => jobGET(req(`/api/pika/jobs/${id}`), { params: Promise.resolve({ id }) });
+    assert.deepEqual((await read(await at('job-text'))).body.job, { id: 'job-text', state: 'running', pages: [], documentId: null });
+    assert.deepEqual((await read(await at('job-file'))).body.job, {
+      id: 'job-file',
+      state: 'done',
+      pages: ['topics/arena.md', 'systems/stack.md'],
+      documentId: 'doc-9',
+    });
+    assert.equal((await read(await at('job-broken'))).body.job.state, 'failed');
+    assert.equal(lastCall('GET', '/jobs/job-broken')?.auth, `Bearer ${PROJECT_KEY}`);
+  });
+
+  test('a job of another project shows nothing of it', async () => {
+    const at = (id: string) => jobGET(req(`/api/pika/jobs/${encodeURIComponent(id)}`), { params: Promise.resolve({ id }) });
+    const { status, text } = await read(await at('job-theirs'));
+    assert.equal(status, 404);
+    assert.ok(!text.includes('secret.md'));
+    assert.equal((await at('../projects/x')).status, 400);
+  });
+
+  test('a new word for a state is still running, not done', async () => {
+    answer = (c) => (c.route === '/jobs/job-new' ? { json: { job_id: 'job-new', status: 'thinking-hard' } } : pika(c));
+    assert.equal((await getJob(readProject(PROJECT)!, 'job-new')).state, 'running');
+  });
+
+  test('the review screen can ask for an exam: many facts from one page, four choices each', async () => {
+    const { body } = await read(await factsPOST(send('/api/pika/facts', { paths: ['topics/arena.md', 'systems/stack.md'], style: 'exam' })));
+    // no per-page quota in an exam's way
+    assert.ok(!body.dropped.some((d: any) => d.why === 'per-page'), JSON.stringify(body.dropped));
+    assert.ok(body.facts.every((f: any) => f.type === 'quiz' || f.type === 'truefalse'), JSON.stringify(body.facts));
+
+    const made = await read(await draftPOST(send('/api/pika/draft', { style: 'exam', facts: body.facts.map(({ id, ...rest }: any) => rest) })));
+    assert.equal(made.status, 201, made.text);
+    const game = made.body.game.game as Game;
+    assert.equal(game.title, 'ข้อสอบจากคลังความรู้');
+    const questions = game.rounds.flatMap((r) => r.questions);
+    assert.ok(questions.every((q) => q.type === 'quiz' || q.type === 'truefalse'));
+    assert.ok(questions.some((q) => q.type === 'quiz'));
+    assert.ok(validateGame(game).ok);
+    assert.equal(made.body.game.tainted, true);
+  });
+
+  test('nothing can be added without a project of one’s own', async () => {
+    const other = await upsertUser(db, { issuer: 'mock', subject: 'no-project-2', name: 'ยังไม่มีโปรเจกต์', email: 'yuki@mfec.co.th' });
+    const theirs = `ib_sid=${await createSession(db, other.id)}`;
+    const form = new FormData();
+    form.set('file', pdf(), 'x.pdf');
+    form.set('key', 'pick-0009');
+    const asThem = (url: string, body: BodyInit, type?: string) =>
+      new Request(`http://localhost${url}`, { method: 'POST', headers: { cookie: theirs, 'x-ib-req': '1', ...(type ? { 'content-type': type } : {}) }, body });
+    assert.equal((await read(await filesPOST(asThem('/api/pika/files', form)))).body.error, 'no_project');
+    assert.equal(
+      (await read(await textPOST(asThem('/api/pika/text', JSON.stringify({ title: 't', content: 'ก'.repeat(300), key: 'paste-0009' }), 'application/json')))).body.error,
+      'no_project',
+    );
+    const job = await jobGET(new Request('http://localhost/api/pika/jobs/job-file', { headers: { cookie: theirs } }), { params: Promise.resolve({ id: 'job-file' }) });
+    assert.equal((await read(job)).body.error, 'no_project');
     assert.equal(calls.length, 0);
   });
 });

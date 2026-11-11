@@ -63,6 +63,11 @@ export function GamePicker() {
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <AccountChip />
+            {user && (
+              <Link href="/pika" className="btn btn-ghost">
+                📚 จากคลังความรู้
+              </Link>
+            )}
             <Link href="/import" className="btn btn-ghost">
               📊 นำเข้าจาก Excel
             </Link>

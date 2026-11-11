@@ -76,3 +76,44 @@ test('two facts are the same when only punctuation and spacing differ', () => {
   assert.equal(factKey('ห้องรองรับ 1,000 คน'), factKey('ห้องรองรับ 1,000 คน.'));
   assert.notEqual(factKey('ห้องรองรับ 1,000 คน'), factKey('ห้องรองรับ 2,000 คน'));
 });
+
+/** the shape a real knowledge-base page came back in (2026-11-11): pointers inside sentences, notes below */
+const SYSTEM_PAGE = `# Pika Arena
+
+## Summary
+เว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมภายในบริษัท
+
+## Details
+- เป็นเว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมภายในบริษัท — [[sources/2026-11-11-policy]]
+- มีโหมดข้อสอบ ดูรายละเอียดที่ [[topics/pika-arena-exam-mode]] — [[sources/2026-11-11-policy]]
+- ระบบเก็บรายงานผลการเล่นไว้ 90 วัน ดูที่ [[topics/game-report-retention-90-days]] — [[sources/2026-11-11-policy]]
+- ข้อมูลเพิ่มเติม (see also [[topics/other]])
+
+## Pages updated from this source
+- [[systems/pika-arena]] — ข้อจำกัดของระบบและการเข้าร่วม
+
+## Notes
+- ยังไม่มีข้อมูลเรื่องราคา การติดตั้ง หรือผู้รับผิดชอบระบบ
+`;
+
+test('a pointer to another page comes out whole, and the source is still the citation', () => {
+  const facts = parseWikiPage(SYSTEM_PAGE).facts;
+  assert.deepEqual(
+    facts.map((f) => f.text),
+    ['เป็นเว็บเกมตอบคำถามสำหรับกิจกรรมละลายพฤติกรรมภายในบริษัท', 'มีโหมดข้อสอบ', 'ระบบเก็บรายงานผลการเล่นไว้ 90 วัน', 'ข้อมูลเพิ่มเติม'],
+  );
+  assert.ok(facts.slice(0, 3).every((f) => f.cite === 'sources/2026-11-11-policy'), JSON.stringify(facts));
+  assert.equal(facts[3].cite, undefined);
+});
+
+test('notes about the page and the pages a source updated are not facts', () => {
+  const text = parseWikiPage(SYSTEM_PAGE).facts.map((f) => f.text).join(' | ');
+  assert.ok(!text.includes('ราคา'), text);
+  assert.ok(!text.includes('ข้อจำกัดของระบบ'), text);
+});
+
+test('a page with Details keeps only them; one without keeps the bullets it has', () => {
+  const md = '## Summary\nภาพรวม\n\n## ขั้นตอน\n- ขั้นแรกของงานที่ยาวพอจะถามได้\n';
+  assert.deepEqual(parseWikiPage(md).facts.map((f) => f.text), ['ขั้นแรกของงานที่ยาวพอจะถามได้']);
+  assert.deepEqual(parseWikiPage(`${md}\n## Details\n- ข้อเท็จจริงที่หน้านี้ระบุไว้ชัดเจน\n`).facts.map((f) => f.text), ['ข้อเท็จจริงที่หน้านี้ระบุไว้ชัดเจน']);
+});

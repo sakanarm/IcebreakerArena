@@ -43,6 +43,25 @@ export async function api<T>(path: string, { method = 'GET', body }: { method?: 
   return data as T;
 }
 
+/**
+ * Sends a form with a file in it. Same headers as `api` except the content type, which the browser
+ * writes itself so the multipart boundary is right.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const headers: Record<string, string> = { 'x-ib-req': '1' };
+  if (pageUser) headers['x-ib-user'] = pageUser;
+  let res: Response;
+  try {
+    res = await fetch(withBase(`/api${path}`), { method: 'POST', headers, body: form, credentials: 'same-origin', cache: 'no-store' });
+  } catch {
+    throw new ApiError(0, 'offline');
+  }
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  // a proxy that refuses a big body answers in HTML, without our error field
+  if (!res.ok) throw new ApiError(res.status, typeof data.error === 'string' ? data.error : res.status === 413 ? 'file_too_big' : 'server_error', data);
+  return data as T;
+}
+
 export const errorCode = (e: unknown) => (e instanceof ApiError ? e.code : 'offline');
 
 const MESSAGES: Record<string, string> = {
@@ -77,6 +96,21 @@ const MESSAGES: Record<string, string> = {
   no_project: 'ยังไม่มีโปรเจกต์ใน Pika สำหรับบัญชีนี้ กดสร้างก่อนหนึ่งครั้ง',
   no_facts: 'หน้าที่เลือกยังไม่มีข้อความที่ตั้งเป็นคำถามได้ ลองเลือกหน้าอื่นเพิ่ม',
   too_many_pages: 'เลือกได้ครั้งละไม่เกิน 10 หน้า',
+  no_pages: 'เลือกหน้าจากคลังความรู้ก่อนอย่างน้อยหนึ่งหน้า',
+  bad_query: 'พิมพ์คำค้นอย่างน้อย 2 ตัวอักษร',
+  file_too_big: 'ไฟล์ใหญ่เกิน 20 MB แบ่งไฟล์ให้เล็กลง หรือคัดลอกเฉพาะเนื้อหามาวางแทน',
+  file_type: 'อัปโหลดได้เฉพาะไฟล์ .pdf .docx .pptx .xlsx .txt .md หรือ .csv',
+  empty_file: 'ไฟล์นี้ว่างเปล่า ลองเลือกไฟล์อื่น',
+  no_file: 'ยังไม่ได้เลือกไฟล์',
+  bad_form: 'ส่งไฟล์ไม่สำเร็จ ลองเลือกไฟล์ใหม่อีกครั้ง',
+  form_required: 'ส่งไฟล์ไม่สำเร็จ ลองเลือกไฟล์ใหม่อีกครั้ง',
+  bad_request: 'คำขอไม่ถูกต้อง รีเฟรชหน้านี้แล้วลองใหม่',
+  pika_rejected: 'คลังความรู้ Pika อ่านไฟล์นี้ไม่ได้ ลองบันทึกเป็น PDF หรือคัดลอกเนื้อหามาวางแทน',
+  ingest_quota: 'เพิ่มเอกสารครบ 20 ชิ้นในชั่วโมงนี้แล้ว รอสักพักแล้วค่อยเพิ่มต่อ',
+  ingest_busy: 'กำลังส่งเอกสารอยู่ 2 ชิ้นแล้ว รอให้ชิ้นก่อนส่งเสร็จก่อน',
+  no_title: 'ตั้งชื่อเอกสารก่อน',
+  text_too_short: 'ข้อความสั้นเกินไป วางเนื้อหาอย่างน้อย 200 ตัวอักษร',
+  text_too_long: 'ข้อความยาวเกิน 200,000 ตัวอักษร แบ่งเป็นหลายครั้ง หรือบันทึกเป็นไฟล์แล้วอัปโหลดแทน',
 };
 
 /** A sentence for the person, in Thai. */
