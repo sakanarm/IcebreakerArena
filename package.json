@@ -20,6 +20,7 @@
     "e2e:bank": "node e2e/bank.mjs",
     "e2e:exam": "node e2e/exam.mjs",
     "e2e:ask-ai": "node e2e/ask-ai.mjs",
+    "e2e:sheet-import": "node e2e/sheet-import.mjs",
     "bots": "npm run bots -w @pika-arena/server --",
     "crowd": "npm run crowd -w @pika-arena/server --",
     "playthrough": "npm run playthrough -w @pika-arena/server --",

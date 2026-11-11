@@ -44,6 +44,16 @@ export default function ExamIndexPage() {
             ไปที่เกมของฉัน
           </Link>
         </section>
+
+        <section className="exam-card mt-4 p-5">
+          <h2 className="font-semibold">มีข้อสอบอยู่ใน Excel แล้ว?</h2>
+          <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            นำเข้าคลังข้อสอบจากไฟล์ Excel, CSV หรือคัดลอกจาก Google Sheets ทีละหลายร้อยข้อ พร้อมเฉลยและคำอธิบาย แล้วเปิดเป็นข้อสอบได้ทันที
+          </p>
+          <Link href="/import" className="exam-btn mt-4">
+            นำเข้าคลังข้อสอบ
+          </Link>
+        </section>
       </main>
     </div>
   );

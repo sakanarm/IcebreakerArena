@@ -610,6 +610,9 @@ function Editor({ id, user, switched }: { id: string | null; user: AccountUser |
                   ⬇️ ส่งออก JSON
                 </button>
               )}
+              <Link href="/import" className="btn btn-ghost col-span-2 px-3 text-sm">
+                📊 นำเข้าคลังข้อสอบจาก Excel / CSV
+              </Link>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-white/45">
               {inCloud && keptHere

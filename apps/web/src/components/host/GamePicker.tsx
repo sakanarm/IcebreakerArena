@@ -63,6 +63,9 @@ export function GamePicker() {
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <AccountChip />
+            <Link href="/import" className="btn btn-ghost">
+              📊 นำเข้าจาก Excel
+            </Link>
             <Link href="/editor" className="btn btn-gold">
               ＋ สร้างเกมใหม่
             </Link>
@@ -945,10 +948,15 @@ function EmptyMine() {
         ✍️
       </span>
       <p className="text-lg font-semibold">ยังไม่มีเกมของคุณ</p>
-      <p className="max-w-md text-white/65">สร้างเกมแรกได้ในไม่กี่นาที หรือทำสำเนาเกมตัวอย่างไปแก้ต่อ</p>
-      <Link href="/editor" className="btn btn-primary mt-2">
-        ＋ สร้างเกมแรก
-      </Link>
+      <p className="max-w-md text-white/65">สร้างเกมแรกได้ในไม่กี่นาที ทำสำเนาเกมตัวอย่างไปแก้ต่อ หรือนำเข้าข้อสอบที่มีอยู่แล้วใน Excel</p>
+      <div className="mt-2 flex flex-wrap justify-center gap-3">
+        <Link href="/editor" className="btn btn-primary">
+          ＋ สร้างเกมแรก
+        </Link>
+        <Link href="/import" className="btn btn-ghost">
+          📊 นำเข้าจาก Excel
+        </Link>
+      </div>
     </motion.div>
   );
 }
