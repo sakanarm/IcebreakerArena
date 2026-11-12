@@ -15,15 +15,17 @@ const PLACES: { key: Exclude<NavPlace, null>; href: string; label: string; testi
 /**
  * The top bar of the maker's dark pages (games, create, import, knowledge base): the logo, the three
  * places a maker moves between, and who is logged in. On a phone the places drop to a full-width row
- * under the logo, so nothing wraps into a column of buttons.
+ * under the logo, so nothing wraps into a column of buttons. `extra` goes beside the account (the exam pages'
+ * light/dark switch).
  */
-export function SiteNav({ here, loginLink = true }: { here: NavPlace; loginLink?: boolean }) {
+export function SiteNav({ here, loginLink = true, extra }: { here: NavPlace; loginLink?: boolean; extra?: React.ReactNode }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
       <Link href="/" aria-label="กลับหน้าแรก" className="rounded-2xl">
         <Logo small />
       </Link>
       <div className="flex items-center gap-2 sm:order-last">
+        {extra}
         <AccountChip loginLink={loginLink} />
       </div>
       <nav aria-label="เมนูหลัก" className="flex w-full gap-1 rounded-2xl border border-white/10 bg-white/[0.06] p-1 sm:ml-auto sm:w-auto">

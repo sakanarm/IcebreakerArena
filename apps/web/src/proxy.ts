@@ -17,6 +17,8 @@ export function proxy(request: NextRequest) {
   });
   const headers = new Headers(request.headers);
   headers.set('Content-Security-Policy', policy);
+  // for the app's own inline script in app/layout.tsx
+  headers.set('x-nonce', nonce);
   const response = NextResponse.next({ request: { headers } });
   response.headers.set('Content-Security-Policy', policy);
   return response;

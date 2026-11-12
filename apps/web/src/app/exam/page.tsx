@@ -10,10 +10,10 @@ export const viewport: Viewport = { themeColor: '#0b0b2b' };
 export default function ExamIndexPage() {
   const papers = SAMPLE_GAMES.map((g) => ({ id: g.id, paper: buildExam(toRoomGame(g)) })).filter((p) => examSize(p.paper) > 0);
   return (
-    <div className="exam-page">
+    <div className="exam-page exam-themed">
       <ExamHeader />
       <main className="mx-auto max-w-3xl px-4 pt-8 pb-16">
-        <p className="text-sm font-semibold tracking-wide text-brand-2">ฝึกทำข้อสอบด้วยตัวเอง</p>
+        <p className="text-sm font-semibold tracking-wide text-ex-cue">ฝึกทำข้อสอบด้วยตัวเอง</p>
         <h1 className="mt-1 font-display text-3xl font-semibold sm:text-4xl">โหมดข้อสอบ</h1>
         <p className="mt-2 leading-relaxed text-ex-muted">
           ทำคำถามแบบเลือกตอบจากเกมได้ด้วยตัวเอง ไม่ต้องรอห้อง ไม่ต้องเข้าสู่ระบบ สุ่มข้อจากคลังได้ทุกครั้ง ฝึกทีละข้อพร้อมเฉลยและคำอธิบาย หรือจำลองสอบแบบจับเวลา

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { connection } from 'next/server';
 // Fonts ship with the app (no Google Fonts request), so it also works offline at an event.
 import '@fontsource/kanit/400.css';
@@ -7,6 +8,8 @@ import '@fontsource/kanit/800.css';
 import '@fontsource/ibm-plex-sans-thai/400.css';
 import '@fontsource/ibm-plex-sans-thai/600.css';
 import './globals.css';
+import { InlineScript } from '@/components/InlineScript';
+import { examThemeScript } from '@/lib/exam-theme';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
@@ -24,8 +27,13 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // every page renders per request: proxy.ts gives each one a fresh nonce, and a page built ahead of time has none
   await connection();
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
-    <html lang="th">
+    // the script below may put data-exam-theme on <html> before React hydrates it
+    <html lang="th" suppressHydrationWarning>
+      <head>
+        <InlineScript html={examThemeScript} nonce={nonce} />
+      </head>
       <body className="arena-bg min-h-dvh">
         <Providers>{children}</Providers>
       </body>

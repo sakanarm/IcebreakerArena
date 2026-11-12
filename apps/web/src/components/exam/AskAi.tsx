@@ -127,7 +127,7 @@ function Thread({
             {turns.map((t, i) => (
               <li key={i} className={t.role === 'user' ? 'flex justify-end' : ''}>
                 {t.role === 'user' ? (
-                  <p className="max-w-[85%] rounded-xl rounded-br-sm bg-brand/30 px-3 py-2 leading-relaxed wrap-anywhere whitespace-pre-line text-ex-fg">
+                  <p className="max-w-[85%] rounded-xl rounded-br-sm bg-brand/30 px-3 py-2 exam-light:bg-ex-accent/[0.12] leading-relaxed wrap-anywhere whitespace-pre-line text-ex-fg">
                     <span className="sr-only">คุณถาม: </span>
                     {t.text}
                   </p>
@@ -143,7 +143,7 @@ function Thread({
         )}
         {busy && (
           <p className="flex items-center gap-2 text-sm text-ex-soft" role="status">
-            <span className="inline-block size-2 animate-pulse rounded-full bg-brand-2" aria-hidden /> AI กำลังคิด…
+            <span className="inline-block size-2 animate-pulse rounded-full bg-ex-cue" aria-hidden /> AI กำลังคิด…
           </p>
         )}
         {error && (

@@ -65,10 +65,10 @@ export function ExamStart({
   const last = attempt && attempt.finishedAt !== null ? scoreExam(attempt.items, attempt.answers) : null;
 
   return (
-    <div className="exam-page">
+    <div className="exam-page exam-themed">
       <ExamHeader />
       <main className="mx-auto max-w-3xl px-4 pt-8 pb-16">
-        <p className="text-sm font-semibold tracking-wide text-brand-2">ข้อสอบ</p>
+        <p className="text-sm font-semibold tracking-wide text-ex-cue">ข้อสอบ</p>
         <h1 className="mt-1 font-display text-3xl leading-snug font-semibold sm:text-4xl text-balance wrap-anywhere">{paper.title || 'ข้อสอบไม่มีชื่อ'}</h1>
         {paper.description && <p className="mt-2 leading-relaxed wrap-anywhere text-ex-muted">{paper.description}</p>}
         <p className="mt-3 text-sm text-ex-soft">
@@ -170,7 +170,7 @@ export function ExamStart({
                   onChange={(e) => typed(e.target.value)}
                   onBlur={() => setDraft(null)}
                   onFocus={(e) => e.target.select()}
-                  className="h-11 w-16 border-y border-ex-line-strong bg-night/60 text-center text-lg font-semibold text-ex-fg outline-none focus:border-ex-accent focus:ring-1 focus:ring-ex-accent disabled:opacity-40"
+                  className="h-11 w-16 border-y border-ex-line-strong bg-ex-input text-center text-lg font-semibold text-ex-fg outline-none focus:border-ex-accent focus:ring-1 focus:ring-ex-accent disabled:opacity-40"
                 />
                 <button
                   type="button"

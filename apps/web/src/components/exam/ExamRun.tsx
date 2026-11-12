@@ -5,6 +5,7 @@ import { isRightChoice } from '@pika-arena/shared';
 import { MODE_LABEL, answeredCount, clock, doneCount, letter, type Attempt } from '@/lib/exam';
 import type { AiPaper } from '@/lib/exam-ai';
 import { AskAi } from './AskAi';
+import { ExamThemeToggle } from './ExamThemeToggle';
 import { ChoiceBody, ConfirmDialog, Explanation, QuestionImage, choiceBox, rightLetters, shownLook, topicName, type ChoiceLook } from './parts';
 
 /** a pause longer than this is not time spent on the paper (the lid was shut, the tab was left) */
@@ -147,8 +148,8 @@ export function ExamRun({
   const right = shown && isRightChoice(q, answer);
 
   return (
-    <div className="exam-page">
-      <header className="sticky top-0 z-20 border-b border-ex-line bg-night/85 backdrop-blur-md">
+    <div className="exam-page exam-themed">
+      <header className="sticky top-0 z-20 border-b border-ex-line bg-night/85 backdrop-blur-md exam-light:bg-white/85">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4">
           <button type="button" onClick={() => onLeave(tally())} className="exam-btn exam-btn-quiet -ml-2 min-h-10 shrink-0 px-2 text-sm" aria-label="ออกจากข้อสอบ กลับมาทำต่อได้">
             ← ออก
@@ -157,12 +158,13 @@ export function ExamRun({
             {attempt.title || 'ข้อสอบ'} <span className="font-normal text-ex-soft">· {MODE_LABEL[mode]}</span>
           </p>
           {attempt.deadline !== null && <Countdown deadline={attempt.deadline} onTimeUp={finish} />}
+          <ExamThemeToggle tone="paper" />
           <button type="button" onClick={handIn} className="exam-btn exam-btn-primary min-h-10 shrink-0 px-3 text-sm">
             {mode === 'mock' ? 'ส่งข้อสอบ' : 'สรุปผล'}
           </button>
         </div>
         <div
-          className="h-1 bg-white/[0.06]"
+          className="h-1 bg-ex-wash/[0.06]"
           role="progressbar"
           aria-label={mode === 'mock' ? 'ข้อที่ตอบแล้ว' : 'ข้อที่ทำแล้ว'}
           aria-valuemin={0}
@@ -187,7 +189,7 @@ export function ExamRun({
                 type="button"
                 onClick={() => put('flags', !flags[at])}
                 aria-pressed={flags[at]}
-                className={`exam-btn min-h-9 px-2.5 text-sm ${flags[at] ? 'border-gold/70 bg-gold/10 text-gold hover:not-disabled:border-gold hover:not-disabled:bg-gold/15' : 'text-ex-muted'}`}
+                className={`exam-btn min-h-9 px-2.5 text-sm ${flags[at] ? 'border-ex-warn/70 bg-ex-warn/10 text-ex-warn hover:not-disabled:border-ex-warn hover:not-disabled:bg-ex-warn/15' : 'text-ex-muted'}`}
               >
                 <span aria-hidden>{flags[at] ? '⚑' : '⚐'}</span> {flags[at] ? 'ติดธงไว้' : 'ติดธงกลับมาดู'}
               </button>
@@ -292,7 +294,7 @@ export function ExamRun({
                     onClick={() => go(i)}
                     aria-current={i === at ? 'step' : undefined}
                     aria-label={`ข้อ ${i + 1}: ${CELL[state].label}${flags[i] ? ' ติดธงไว้' : ''}`}
-                    className={`relative grid h-11 w-full place-items-center rounded-lg border text-sm font-semibold ${CELL[state].box} ${i === at ? 'ring-2 ring-brand-2 ring-offset-2 ring-offset-ex-card' : ''}`}
+                    className={`relative grid h-11 w-full place-items-center rounded-lg border text-sm font-semibold ${CELL[state].box} ${i === at ? 'ring-2 ring-ex-cue ring-offset-2 ring-offset-ex-card' : ''}`}
                   >
                     {i + 1}
                     {flags[i] && <span className="absolute -top-1 -right-1 size-3 rounded-full border-2 border-ex-card bg-gold" aria-hidden />}
@@ -347,8 +349,8 @@ const CELL: Record<CellState, { box: string; label: string; legend: string }> = 
   open: { box: 'border-ex-line-strong bg-ex-raised text-ex-muted hover:border-ex-accent hover:text-ex-fg', label: 'ยังไม่ได้ทำ', legend: 'ยังไม่ได้ทำ' },
   picked: { box: 'border-ex-accent bg-brand/15 text-ex-accent', label: 'เลือกไว้ ยังไม่ได้ตรวจ', legend: 'เลือกไว้' },
   answered: { box: 'border-brand bg-brand text-white', label: 'ตอบแล้ว', legend: 'ตอบแล้ว' },
-  right: { box: 'border-ex-good bg-ex-good text-night', label: 'ตอบถูก', legend: 'ถูก' },
-  wrong: { box: 'border-ex-bad bg-ex-bad text-night', label: 'ตอบผิด', legend: 'ผิด' },
+  right: { box: 'border-ex-good bg-ex-good text-ex-on-mark', label: 'ตอบถูก', legend: 'ถูก' },
+  wrong: { box: 'border-ex-bad bg-ex-bad text-ex-on-mark', label: 'ตอบผิด', legend: 'ผิด' },
   skipped: { box: 'border-ex-soft/60 bg-ex-soft/40 text-ex-fg', label: 'ดูเฉลยโดยไม่ได้ตอบ', legend: 'ไม่ได้ตอบ' },
 };
 
@@ -378,7 +380,7 @@ function Countdown({ deadline, onTimeUp }: { deadline: number; onTimeUp: () => v
     <p
       role="timer"
       aria-label={`เหลือเวลา ${clock(left)}`}
-      className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${low ? 'bg-ex-bad/15 text-ex-bad' : 'bg-white/[0.06] text-ex-fg'}`}
+      className={`shrink-0 rounded-md px-2 py-1 text-sm font-semibold tabular-nums ${low ? 'bg-ex-bad/15 text-ex-bad' : 'bg-ex-wash/[0.06] text-ex-fg'}`}
     >
       <span aria-hidden>⏱ </span>
       {clock(left)}

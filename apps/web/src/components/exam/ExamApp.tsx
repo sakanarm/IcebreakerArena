@@ -204,7 +204,7 @@ export function ExamApp({ code }: { code: string }) {
 
 function Plain({ children }: { children: React.ReactNode }) {
   return (
-    <div className="exam-page">
+    <div className="exam-page exam-themed">
       <ExamHeader />
       <main className="mx-auto max-w-3xl px-4 pt-10 pb-16">
         <div className="exam-card p-6 sm:p-8">{children}</div>

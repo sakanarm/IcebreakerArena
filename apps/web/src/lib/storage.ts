@@ -50,6 +50,8 @@ export const keys = {
   hostSound: 'ib.sound.host',
   stageSound: 'ib.sound.stage',
   phoneSound: 'ib.sound.phone',
+  /** 'light' when this browser reads its exams on the light page (see lib/exam-theme.ts); not under ib.exam.<code>, where sittings live */
+  examTheme: 'ib.look.exam',
 };
 
 export interface PlayerSession {

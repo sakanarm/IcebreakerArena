@@ -16,7 +16,7 @@ type Outcome = 'right' | 'wrong' | 'skipped';
 const OUTCOME: Record<Outcome, { label: string; tag: string }> = {
   right: { label: 'ตอบถูก', tag: 'bg-ex-good/15 text-ex-good' },
   wrong: { label: 'ตอบผิด', tag: 'bg-ex-bad/15 text-ex-bad' },
-  skipped: { label: 'ไม่ได้ตอบ', tag: 'bg-white/10 text-ex-muted' },
+  skipped: { label: 'ไม่ได้ตอบ', tag: 'bg-ex-wash/10 text-ex-muted' },
 };
 
 /**
@@ -56,10 +56,10 @@ export function ExamResult({
   const tone = score.percent >= 80 ? 'good' : score.percent < REVISE_BELOW ? 'low' : 'brand';
 
   return (
-    <div className="exam-page">
+    <div className="exam-page exam-themed">
       <ExamHeader />
       <main className="mx-auto max-w-3xl px-4 pt-8 pb-16">
-        <p className="text-sm font-semibold tracking-wide text-brand-2">ผลการทำข้อสอบ · {MODE_LABEL[attempt.mode]}</p>
+        <p className="text-sm font-semibold tracking-wide text-ex-cue">ผลการทำข้อสอบ · {MODE_LABEL[attempt.mode]}</p>
         <h1 className="mt-1 font-display text-2xl leading-snug font-semibold text-balance wrap-anywhere sm:text-3xl">{attempt.title || 'ข้อสอบ'}</h1>
 
         <section className="exam-card mt-6 p-5 sm:p-7" aria-label="คะแนน">
@@ -70,7 +70,7 @@ export function ExamResult({
               </span>
               <span className="text-2xl font-semibold text-ex-soft tabular-nums"> / {score.total} ข้อ</span>
             </p>
-            <p className={`font-display text-3xl font-semibold tabular-nums ${tone === 'good' ? 'text-ex-good' : tone === 'low' ? 'text-gold' : 'text-ex-accent'}`} data-exam-percent>
+            <p className={`font-display text-3xl font-semibold tabular-nums ${tone === 'good' ? 'text-ex-good' : tone === 'low' ? 'text-ex-warn' : 'text-ex-accent'}`} data-exam-percent>
               {score.percent}%
             </p>
           </div>
@@ -119,7 +119,7 @@ export function ExamResult({
                   <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                     <p className="min-w-0 wrap-anywhere">
                       {topicName(t.title, i)}
-                      {t.percent < REVISE_BELOW && <span className="ml-2 rounded-md bg-gold/15 px-1.5 py-0.5 text-xs font-semibold text-gold">ควรทวน</span>}
+                      {t.percent < REVISE_BELOW && <span className="ml-2 rounded-md bg-ex-warn/15 px-1.5 py-0.5 text-xs font-semibold text-ex-warn">ควรทวน</span>}
                     </p>
                     <p className="text-sm text-ex-muted tabular-nums">
                       {t.correct} / {t.total} ข้อ ({t.percent}%)
@@ -163,7 +163,7 @@ export function ExamResult({
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <span className="font-semibold">ข้อ {i + 1}</span>
                     <span className={`rounded-md px-1.5 py-0.5 text-xs font-semibold ${OUTCOME[outcome].tag}`}>{OUTCOME[outcome].label}</span>
-                    {flags[i] && <span className="rounded-md bg-gold/15 px-1.5 py-0.5 text-xs font-semibold text-gold">⚑ ติดธง</span>}
+                    {flags[i] && <span className="rounded-md bg-ex-warn/15 px-1.5 py-0.5 text-xs font-semibold text-ex-warn">⚑ ติดธง</span>}
                     {it.topicTitle.trim() && <span className="min-w-0 wrap-anywhere text-ex-soft">{it.topicTitle.trim()}</span>}
                   </div>
                   <h3 className="mt-2 text-lg leading-relaxed font-semibold wrap-anywhere whitespace-pre-line">{it.question.prompt}</h3>

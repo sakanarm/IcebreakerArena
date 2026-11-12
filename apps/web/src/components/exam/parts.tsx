@@ -4,12 +4,19 @@ import { useEffect, useRef, useState } from 'react';
 import type { ExamQuestion } from '@pika-arena/shared';
 import { letter } from '@/lib/exam';
 import { SiteNav } from '../SiteNav';
+import { ExamThemeToggle } from './ExamThemeToggle';
 
-/** The bar over every exam page but the paper itself: the app's own menu, with ข้อสอบ as the place you are. */
+/**
+ * The bar over every exam page but the paper itself: the app's own menu, with ข้อสอบ as the place you are, and the
+ * light/dark switch. On the light page it becomes a near-black band across the top with white text (the logo's
+ * own color comes from around it), so the menu keeps its colors.
+ */
 export function ExamHeader() {
   return (
-    <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-5">
-      <SiteNav here="exam" />
+    <div className="exam-light:bg-[#141419] exam-light:pb-4 exam-light:text-white">
+      <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-5 exam-light:pt-4">
+        <SiteNav here="exam" extra={<ExamThemeToggle />} />
+      </div>
     </div>
   );
 }
@@ -38,9 +45,12 @@ export type ChoiceLook = 'idle' | 'chosen' | 'right' | 'wrong' | 'rest';
 
 const LOOK: Record<ChoiceLook, { box: string; badge: string }> = {
   idle: { box: 'border-ex-line-strong bg-ex-raised', badge: 'border-ex-line-strong bg-ex-card text-ex-muted' },
-  chosen: { box: 'border-ex-accent bg-brand/20 ring-1 ring-ex-accent', badge: 'border-brand bg-brand text-white' },
-  right: { box: 'border-ex-good/80 bg-ex-good/10 ring-1 ring-ex-good/80', badge: 'border-ex-good bg-ex-good text-night' },
-  wrong: { box: 'border-ex-bad/80 bg-ex-bad/10 ring-1 ring-ex-bad/80', badge: 'border-ex-bad bg-ex-bad text-night' },
+  chosen: {
+    box: 'border-ex-accent bg-brand/20 ring-1 ring-ex-accent exam-light:bg-ex-accent/[0.07]',
+    badge: 'border-brand bg-brand text-white exam-light:border-ex-accent exam-light:bg-ex-accent',
+  },
+  right: { box: 'border-ex-good/80 bg-ex-good/10 ring-1 ring-ex-good/80', badge: 'border-ex-good bg-ex-good text-ex-on-mark' },
+  wrong: { box: 'border-ex-bad/80 bg-ex-bad/10 ring-1 ring-ex-bad/80', badge: 'border-ex-bad bg-ex-bad text-ex-on-mark' },
   rest: { box: 'border-ex-line bg-transparent text-ex-soft', badge: 'border-ex-line bg-transparent text-ex-soft' },
 };
 
@@ -150,7 +160,7 @@ export function ConfirmDialog({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm exam-light:bg-[#16161d]/35" onClick={(e) => e.target === e.currentTarget && onCancel()}>
       <div ref={box} role="dialog" aria-modal="true" aria-labelledby="exam-confirm-title" className="exam-card w-full max-w-md p-6 shadow-2xl">
         <h2 id="exam-confirm-title" className="text-xl font-semibold">
           {title}
@@ -173,7 +183,7 @@ export function ConfirmDialog({
 export function Bar({ percent, tone = 'brand' }: { percent: number; tone?: 'brand' | 'good' | 'low' }) {
   const fill = tone === 'good' ? 'bg-ex-good' : tone === 'low' ? 'bg-gold' : 'bg-linear-to-r from-brand to-brand-2';
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-white/10" aria-hidden>
+    <div className="h-2 overflow-hidden rounded-full bg-ex-wash/10" aria-hidden>
       <div className={`h-full rounded-full ${fill}`} style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} />
     </div>
   );

@@ -5,6 +5,8 @@
 @custom-variant low (@media (min-width: 40rem) and (max-height: 900px));
 /* a phone on its side: the big screen's scenes get compact to fit the little height */
 @custom-variant short (@media (max-height: 500px));
+/* the exam pages with the light look switched on (lib/exam-theme.ts puts data-exam-theme on <html>) */
+@custom-variant exam-light (&:where(:root[data-exam-theme='light'] .exam-themed, :root[data-exam-theme='light'] .exam-themed *));
 
 @theme {
   --font-sans: 'IBM Plex Sans Thai', 'Kanit', ui-sans-serif, system-ui, sans-serif;
@@ -39,6 +41,17 @@
   --color-ex-accent: #93a3ff;
   --color-ex-good: #3fdc9a;
   --color-ex-bad: #ff8593;
+  /* the small line over a page's title, and the ring on the question you are at */
+  --color-ex-cue: #00d1ff;
+  /* flags and "worth going over" as text and tints; a flag's dot stays gold */
+  --color-ex-warn: #ffc83d;
+  /* faint tints (tracks, hovers): white over the night, ink over the light page */
+  --color-ex-wash: #ffffff;
+  --color-ex-input: rgb(11 11 43 / 0.6);
+  /* text on a solid good or bad mark */
+  --color-ex-on-mark: #0b0b2b;
+  --color-ex-primary: #3d5afe;
+  --color-ex-primary-hover: #5873ff;
 
   --animate-float: float 16s ease-in-out infinite;
   --animate-wiggle: wiggle 2.6s ease-in-out infinite;
@@ -296,13 +309,12 @@
   }
 
   .exam-btn-primary {
-    @apply border-brand bg-brand text-white;
+    @apply border-ex-primary bg-ex-primary text-white;
     box-shadow: 0 6px 18px -8px rgb(61 90 254 / 0.8);
   }
 
   .exam-btn-primary:hover:not(:disabled) {
-    border-color: #5873ff;
-    background-color: #5873ff;
+    @apply border-ex-primary-hover bg-ex-primary-hover;
   }
 
   .exam-btn-quiet {
@@ -310,18 +322,66 @@
   }
 
   .exam-btn-quiet:hover:not(:disabled) {
-    @apply border-transparent bg-white/[0.06];
+    @apply border-transparent bg-ex-wash/[0.06];
   }
 
-  /* a box to type into, on the dark cards */
+  /* a box to type into, on the cards */
   .exam-field {
-    @apply rounded-xl border border-ex-line-strong bg-night/60 text-ex-fg outline-none placeholder:text-ex-soft;
+    @apply rounded-xl border border-ex-line-strong bg-ex-input text-ex-fg outline-none placeholder:text-ex-soft;
     transition: border-color 120ms ease, box-shadow 120ms ease;
   }
 
   .exam-field:focus {
     @apply border-ex-accent;
     box-shadow: 0 0 0 1px var(--color-ex-accent);
+  }
+
+  /* The exam pages' light look, for those who read better on a light page (the sun button in their top bar).
+     A soft grey page, white cards with wide corners, near-black text and pill buttons, under the same token
+     names, so every part follows. Every text color stays at 4.5:1 or more on white and on the page grey. */
+  :root[data-exam-theme='light'] .exam-themed {
+    color-scheme: light;
+    --color-ex-card: #ffffff;
+    --color-ex-raised: #f6f6f9;
+    --color-ex-hover: #ececf1;
+    --color-ex-line: #e4e4ea;
+    --color-ex-line-strong: #d0d0da;
+    --color-ex-fg: #16161d;
+    --color-ex-muted: #4c4c59;
+    --color-ex-soft: #666673;
+    --color-ex-accent: #3346e0;
+    --color-ex-good: #067046;
+    --color-ex-bad: #b9233a;
+    --color-ex-cue: #0a6a94;
+    --color-ex-warn: #8a4b00;
+    --color-ex-wash: #1c1c28;
+    --color-ex-input: #ffffff;
+    --color-ex-on-mark: #ffffff;
+    --color-ex-primary: #16161d;
+    --color-ex-primary-hover: #34343f;
+    background: #f4f4f6;
+  }
+
+  /* the page under the exam (what shows past its ends) and the scrollbar go light with it */
+  :root[data-exam-theme='light']:has(.exam-themed) {
+    color-scheme: light;
+  }
+
+  :root[data-exam-theme='light']:has(.exam-themed) body {
+    background: #f4f4f6;
+  }
+
+  :root[data-exam-theme='light'] .exam-themed .exam-card {
+    border-radius: 1.5rem;
+    box-shadow: 0 1px 2px rgb(22 22 29 / 0.04), 0 12px 32px -20px rgb(22 22 29 / 0.22);
+  }
+
+  :root[data-exam-theme='light'] .exam-themed .exam-btn {
+    border-radius: 999px;
+  }
+
+  :root[data-exam-theme='light'] .exam-themed .exam-btn-primary {
+    box-shadow: 0 8px 18px -12px rgb(22 22 29 / 0.7);
   }
 
   .wipe-shut-down,
