@@ -11,7 +11,7 @@ import { Notice } from './Notice';
 
 /** Why a company login came back here (the ?error= the server sets). Anything else in the address is ignored. */
 const SSO_MESSAGES: Record<string, string> = {
-  no_account: 'บัญชีบริษัทนี้ยังไม่ได้รับสิทธิ์สร้างเกม ขอให้ผู้ดูแลระบบเพิ่มอีเมลของคุณก่อน แล้วค่อยเข้าสู่ระบบอีกครั้ง',
+  no_account: 'บัญชีบริษัทนี้ยังเข้าใช้ไม่ได้ อีเมลของบัญชีนี้ซ้ำกับบัญชีอื่นในระบบ ติดต่อผู้ดูแลระบบให้ตรวจก่อน แล้วค่อยเข้าสู่ระบบอีกครั้ง',
   account_disabled: 'บัญชีนี้ถูกปิดใช้งาน ติดต่อผู้ดูแลระบบ',
   sso_cancelled: 'ยกเลิกการเข้าสู่ระบบแล้ว กดปุ่มอีกครั้งเมื่อพร้อม',
   sso_expired: 'การเข้าสู่ระบบหมดเวลา หรือเริ่มไว้จากอีกแท็บ กดเข้าสู่ระบบใหม่อีกครั้ง',
@@ -30,8 +30,12 @@ function WorkAccountMark() {
   );
 }
 
-/** Login for game makers. Players never log in: they join with a PIN and a nickname. */
-export function LoginScreen({ next, error: returned = null }: { next: string; error?: string | null }) {
+/**
+ * Login for game makers. Players never log in: they join with a PIN and a nickname. While company login is on,
+ * it is the only way shown; the username form (for accounts an admin made with a password, and for tests) is
+ * still there at /login?with=password.
+ */
+export function LoginScreen({ next, error: returned = null, withPassword = false }: { next: string; error?: string | null; withPassword?: boolean }) {
   const router = useRouter();
   const account = useAccount();
   const [name, setName] = useState('');
@@ -163,7 +167,7 @@ export function LoginScreen({ next, error: returned = null }: { next: string; er
     </div>
   );
 
-  if (account.mode === 'oidc') {
+  if (account.mode === 'oidc' || (account.mode === 'local' && companyLogin && !withPassword)) {
     if (!companyLogin) {
       return (
         <Notice emoji="🔧" title="ระบบเข้าสู่ระบบยังไม่พร้อม">

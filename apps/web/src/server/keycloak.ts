@@ -5,6 +5,7 @@ export type Jwk = { kty?: string; use?: string; alg?: string; crv?: string; kid?
 import { basePath, secureCookies, type SsoConfig } from './config';
 import type { Sql } from './db';
 import { HttpError } from './http';
+import { joinWithEmail } from './local-users';
 import { USER_COLUMNS, toSessionUser, type UserRow } from './roles';
 import { parseCookies, type SessionUser } from './session';
 
@@ -325,12 +326,14 @@ export function emailFrom(claims: Pick<IdClaims, 'email' | 'preferred_username'>
 }
 
 /**
- * The account with this work email (in any case), the one an admin gave the person with
- * `npm run users -- invite` or `email`. Nobody else gets in: 403 no_account. Disabled accounts get
- * 403 account_disabled; and since every request re-reads the account, disabling one ends its
- * sessions at once, which Keycloak alone could not.
+ * The account with this work email (in any case): one an admin linked with `npm run users -- invite`
+ * or `email`, or one an earlier company login made. Someone with none gets one made now (`newcomer`:
+ * an ordinary maker account, see joinWithEmail), since only the company's own people get through
+ * Keycloak; without `newcomer` they get 403 no_account. Disabled accounts get 403 account_disabled;
+ * and since every request re-reads the account, disabling one ends its sessions at once, which
+ * Keycloak alone could not.
  */
-export async function findSsoUser(sql: Sql, email: string): Promise<SessionUser> {
+export async function findSsoUser(sql: Sql, email: string, newcomer?: { name: string | null }): Promise<SessionUser> {
   const rows = await sql.query<UserRow>(
     `SELECT ${USER_COLUMNS} FROM ib_users WHERE lower(email) = $1 LIMIT 2`,
     [email.toLowerCase()],
@@ -341,7 +344,17 @@ export async function findSsoUser(sql: Sql, email: string): Promise<SessionUser>
     throw new HttpError(403, 'no_account');
   }
   const u = rows[0];
-  if (!u) throw new HttpError(403, 'no_account');
+  if (!u) {
+    if (!newcomer) throw new HttpError(403, 'no_account');
+    try {
+      return await joinWithEmail(sql, email, newcomer.name);
+    } catch (e) {
+      // the email (or its knowledge-base project) belongs to another account: an admin has to sort it out
+      if (!(e instanceof HttpError) || e.status >= 500) throw e;
+      console.error(`[sso] could not make an account for a new company login: ${e.code}`);
+      throw new HttpError(403, 'no_account');
+    }
+  }
   if (u.disabled) throw new HttpError(403, 'account_disabled');
   return toSessionUser(u);
 }

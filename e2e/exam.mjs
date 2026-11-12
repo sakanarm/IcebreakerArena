@@ -386,7 +386,7 @@ if (who) {
     ],
   };
 
-  await mp.goto(`${WEB}/login?next=/editor`, { waitUntil: 'networkidle' });
+  await mp.goto(`${WEB}/login?with=password&next=/editor`, { waitUntil: 'networkidle' });
   await mp.locator('#login-user').fill(who.username);
   await mp.locator('#login-password').fill(who.password);
   await mp.locator('button[type=submit]').click();

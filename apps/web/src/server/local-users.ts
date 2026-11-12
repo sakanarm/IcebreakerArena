@@ -168,6 +168,38 @@ export async function setUserEmail(sql: Sql, id: string, rawEmail: string | null
   await audit(sql, actorId, 'local_email_set', id, { cleared: email === null });
 }
 
+/**
+ * The account a company login makes for a person on their first visit: a maker (an ordinary user) with
+ * no password, named after the email (sakan_pu, or sakan_pu-2 when someone has that name), shown under
+ * the name Microsoft gave, and holding the email so the next login finds it. Throws HttpError 409
+ * email_taken when another account already has the email or one naming the same knowledge-base project.
+ */
+export async function joinWithEmail(sql: Sql, email: string, rawName: string | null): Promise<SessionUser> {
+  const base = usernameFromEmail(email) ?? 'user';
+  let username: string | null = null;
+  for (let n = 1; n <= 50 && !username; n++) {
+    const tail = n === 1 ? '' : `-${n}`;
+    const candidate = normalizeUsername(base.slice(0, 32 - tail.length).replace(/[._-]+$/, '') + tail);
+    if (!candidate) continue;
+    const taken = await sql.query('SELECT 1 FROM ib_users WHERE issuer = $1 AND subject = $2', [LOCAL_ISSUER, candidate]);
+    if (!taken.length) username = candidate;
+  }
+  if (!username) throw new HttpError(409, 'username_taken');
+  const user = await createLocalUser(sql, { username, name: joinName(rawName, email), password: null, role: 'maker' });
+  await setUserEmail(sql, user.id, email);
+  await audit(sql, user.id, 'sso_joined', user.id, { username });
+  return { ...user, email: email.trim().toLowerCase() };
+}
+
+/** the name Microsoft gave, cut to fit; or, without one, the part of the email before the @ */
+function joinName(raw: string | null, email: string): string {
+  const clean = (s: string) => [...s.normalize('NFC').replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim()].slice(0, 40).join('').trim();
+  const given = clean(raw ?? '');
+  if ([...given].length >= 2) return given;
+  const local = clean(email.split('@')[0] ?? '');
+  return [...local].length >= 2 ? local : 'ผู้ใช้ใหม่';
+}
+
 /** The username `users invite` gives a work email: the part before the @, made to fit the username rules. */
 export function usernameFromEmail(email: string): string | null {
   const local = email.trim().toLowerCase().split('@')[0] ?? '';

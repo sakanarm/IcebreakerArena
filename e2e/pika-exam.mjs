@@ -208,7 +208,7 @@ try {
   }
 
   if (who) {
-    await p.goto(`${WEB}/login?next=/pika`, { waitUntil: 'networkidle' });
+    await p.goto(`${WEB}/login?with=password&next=/pika`, { waitUntil: 'networkidle' });
     await p.locator('#login-user').fill(who.username);
     await p.locator('#login-password').fill(who.password);
     await p.locator('button[type=submit]').click();

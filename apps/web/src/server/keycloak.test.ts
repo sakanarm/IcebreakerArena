@@ -248,3 +248,50 @@ test('company login finds the account by its work email, in any case, and nobody
   const pw = await db.query("SELECT 1 FROM ib_passwords p JOIN ib_users u ON u.id = p.user_id WHERE u.subject = 'somchai'");
   assert.equal(pw.length, 0);
 });
+
+test('a first company login makes an ordinary account, and the next login finds it', async () => {
+  const join = async (email: string, name: string | null) => {
+    try {
+      return await db.tx((sql) => findSsoUser(sql, email, { name }));
+    } catch (e) {
+      assert.ok(e instanceof HttpError);
+      return `${e.status} ${e.code}`;
+    }
+  };
+  const users = async () => (await db.query<{ n: number }>('SELECT count(*)::int AS n FROM ib_users'))[0]!.n;
+
+  const first = await join('Malee.S@Example.co.th', '  มาลี   ใจดี ');
+  assert.ok(typeof first !== 'string');
+  assert.equal(first.name, 'มาลี ใจดี');
+  assert.equal(first.email, 'malee.s@example.co.th');
+  assert.equal(first.role, 'maker');
+  assert.equal(first.isCurator, false);
+  const [row] = await db.query<{ subject: string; issuer: string }>('SELECT subject, issuer FROM ib_users WHERE id = $1', [first.id]);
+  assert.deepEqual(row, { subject: 'malee.s', issuer: 'local' });
+  // no password: only the company login opens it
+  assert.equal((await db.query('SELECT 1 FROM ib_passwords WHERE user_id = $1', [first.id])).length, 0);
+
+  const before = await users();
+  const again = await join('malee.s@example.co.th', 'Another Name');
+  assert.ok(typeof again !== 'string');
+  assert.equal(again.id, first.id);
+  assert.equal(again.name, 'มาลี ใจดี', 'a later login does not rename the account');
+  assert.equal(await users(), before);
+
+  // the username is taken by someone else: the next free one
+  await db.tx((sql) => createLocalUser(sql, { username: 'kitti', name: 'กิตติ เดิม', password: null }));
+  const second = await join('kitti@example.co.th', null);
+  assert.ok(typeof second !== 'string');
+  assert.equal((await db.query<{ subject: string }>('SELECT subject FROM ib_users WHERE id = $1', [second.id]))[0]!.subject, 'kitti-2');
+  assert.equal(second.name, 'kitti', 'with no name from Microsoft, the part before the @');
+
+  // another account's email names the same knowledge-base project: refused, and nothing is left behind
+  const count = await users();
+  assert.equal(await join('malee_s@other.example', 'มาลี ปลอม'), '403 no_account');
+  assert.equal(await users(), count);
+
+  // an account made this way can be switched off like any other
+  await db.query('UPDATE ib_users SET disabled = true WHERE id = $1', [first.id]);
+  assert.equal(await join('malee.s@example.co.th', null), '403 account_disabled');
+  assert.equal(await users(), count);
+});

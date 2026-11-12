@@ -229,7 +229,7 @@ const status = (page) => page.evaluate(async (u) => (await fetch(u, { cache: 'no
 const leftNow = async (page) => (await status(page)).left;
 const login = async (ctx, nextPath) => {
   const page = await ctx.newPage();
-  await page.goto(`${WEB}/login?next=${encodeURIComponent(nextPath)}`, { waitUntil: 'networkidle' });
+  await page.goto(`${WEB}/login?with=password&next=${encodeURIComponent(nextPath)}`, { waitUntil: 'networkidle' });
   await page.locator('#login-user').fill(who.username);
   await page.locator('#login-password').fill(who.password);
   await page.locator('button[type=submit]').click();

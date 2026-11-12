@@ -97,7 +97,7 @@ async function loginAs(who, viewport = { width: 1280, height: 900 }, next = '/ad
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: 1, ignoreHTTPSErrors: true });
   const page = await ctx.newPage();
   watch(page, who.username);
-  await page.goto(`${WEB}/login?next=${encodeURIComponent(next)}`, { waitUntil: 'networkidle' });
+  await page.goto(`${WEB}/login?with=password&next=${encodeURIComponent(next)}`, { waitUntil: 'networkidle' });
   await page.locator('#login-user').fill(who.username);
   await page.locator('#login-password').fill(who.password);
   await page.keyboard.press('Enter');

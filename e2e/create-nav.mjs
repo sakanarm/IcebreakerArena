@@ -159,7 +159,7 @@ if (who) {
       [`${MOUNT}/api${path}`, init],
     );
 
-  await page.goto(`${WEB}/login?next=/create`, { waitUntil: 'networkidle' });
+  await page.goto(`${WEB}/login?with=password&next=/create`, { waitUntil: 'networkidle' });
   await page.locator('#login-user').fill(who.username);
   await page.locator('#login-password').fill(who.password);
   await page.locator('button[type=submit]').click();

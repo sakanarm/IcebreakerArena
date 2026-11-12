@@ -34,7 +34,8 @@ async function refused(reason: string) {
 /**
  * Company login, step 2: Keycloak sends the person back here with a one-time code. We check it is
  * the login this browser started, trade the code for an ID token, check the token, and let in the
- * account that has the email in it. Everything else goes back to the login page with a reason.
+ * account that has the email in it, making an ordinary one on a first login. Everything else goes back
+ * to the login page with a reason.
  */
 export async function GET(req: Request) {
   return handle(async () => {
@@ -60,6 +61,7 @@ export async function GET(req: Request) {
 
     let idToken: string;
     let email: string | null;
+    let name: string | null;
     try {
       const d = await discover(cfg);
       idToken = await exchangeCode(cfg, d, code, redirectUri(req, cfg), flow.verifier);
@@ -70,6 +72,7 @@ export async function GET(req: Request) {
         keyFor: (kid, alg) => keycloakKey(d, kid, alg),
       });
       email = emailFrom(claims);
+      name = typeof claims.name === 'string' ? claims.name : null;
     } catch (e) {
       if (!(e instanceof SsoError)) throw e;
       console.error('[sso] callback:', e.message);
@@ -81,7 +84,7 @@ export async function GET(req: Request) {
     }
 
     try {
-      const { setCookie } = await startSession(req, SSO_ISSUER, (sql) => findSsoUser(sql, email));
+      const { setCookie } = await startSession(req, SSO_ISSUER, (sql) => findSsoUser(sql, email, { name }));
       return redirectTo(next, [setCookie, clear, hintCookie(idToken)]);
     } catch (e) {
       if (!(e instanceof HttpError) || e.status !== 403) throw e;

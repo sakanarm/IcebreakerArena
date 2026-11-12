@@ -3,8 +3,9 @@
 // With --fake-kc, the whole road against a stand-in for Keycloak that this script runs itself: the button sends
 // the person to Keycloak with this client, PKCE (S256), a state, a nonce and kc_idp_hint; the code is traded with
 // the client secret (Basic) and the PKCE verifier, once only; an email in any case lands in the account that has
-// it, on the page the login started from; preferred_username stands in when there is no email; a stranger, a
-// disabled account, a cancel, a bad signature, a wrong nonce, a replayed callback, a forged state and a planted
+// it, on the page the login started from; preferred_username stands in when there is no email; someone with no
+// account gets an ordinary one made on the first login and the same one after; an email that clashes with another
+// account's, a disabled account, a cancel, a bad signature, a wrong nonce, a replayed callback, a forged state and a planted
 // second cookie all come back to the login page with a reason and no session; "use another Microsoft account"
 // logs out at Keycloak with the ID token; the client secret never reaches the browser; no console errors; and
 // phones never scroll sideways.
@@ -70,7 +71,7 @@ const kc = {
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 function idToken({ email, nonce }, { key = signing.privateKey, nonceOverride } = {}) {
   const now = Math.floor(Date.now() / 1000);
-  const claims = { iss: ISSUER, aud: CLIENT, azp: CLIENT, sub: `sub-${email}`, exp: now + 300, iat: now, nonce: nonceOverride ?? nonce, name: 'e2e' };
+  const claims = { iss: ISSUER, aud: CLIENT, azp: CLIENT, sub: `sub-${email}`, exp: now + 300, iat: now, nonce: nonceOverride ?? nonce, name: 'คนใหม่ ทดสอบ' };
   // "pu:" in front: no email claim, only preferred_username, as some Microsoft accounts come through
   if (email.startsWith('pu:')) claims.preferred_username = email.slice(3);
   else claims.email = email;
@@ -225,7 +226,10 @@ try {
     const m = await me();
     check(m.sso === true && m.mode === (OIDC ? 'oidc' : 'local'), `company login is offered (mode ${m.mode})`);
     check(await p.getByRole('link', { name: 'เข้าสู่ระบบด้วยบัญชีบริษัท' }).isVisible(), 'the login page shows the company button');
-    check((await p.locator('#login-password').count()) === (OIDC ? 0 : 1), OIDC ? 'oidc: no password form' : 'local: the password form is still there');
+    check((await p.locator('#login-password').count()) === 0, 'only the company button: no password form');
+    await p.goto(`${WEB}/login?with=password&next=/exam`, { waitUntil: 'networkidle' });
+    check((await p.locator('#login-password').count()) === (OIDC ? 0 : 1), OIDC ? 'oidc: no password form even with ?with=password' : 'local: ?with=password still opens the password form');
+    await p.goto(`${WEB}/login?next=/exam`, { waitUntil: 'networkidle' });
     if (OIDC) {
       const r = await api('/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'x', password: 'y' }) });
       check(r.status === 404, 'oidc: the password login API is gone (404)');
@@ -267,12 +271,23 @@ try {
     check((await me()).user === null, 'switch account: our session ended');
     check((await api('/auth/keycloak/logout', { method: 'POST', headers: { 'x-ib-req': '' } })).status === 403, 'switch account needs our own page (403 without the header)');
 
+    // someone the app has never seen: an ordinary account is made on the first login, and found on the next
+    const newcomer = `new.${Date.now().toString(36)}@example.co.th`;
+    await login(newcomer, { next: '/host' });
+    const made = (await me()).user;
+    check(loginError() === null && made?.name === 'คนใหม่ ทดสอบ' && made?.role === 'maker', `a first login makes an ordinary account (${made?.name ?? loginError()}, ${made?.role})`);
+    check(new URL(p.url()).pathname.endsWith('/host'), 'and lands on the page it started from');
+    await logout();
+    await login(newcomer.toUpperCase(), { next: '/host' });
+    check((await me()).user?.id === made?.id, 'the next login finds the same account');
+    await logout();
+
     // turned away, each with its reason and no session
-    await login('stranger@example.co.th');
-    check(loginError() === 'no_account', `a stranger: no_account (${loginError()})`);
-    check(await p.getByText('บัญชีบริษัทนี้ยังไม่ได้รับสิทธิ์สร้างเกม').isVisible(), 'a stranger is told to ask the admin');
+    await login('somchai_j@other.example.com');
+    check(loginError() === 'no_account', `an email that clashes with another account's: no_account (${loginError()})`);
+    check(await p.getByText('บัญชีบริษัทนี้ยังเข้าใช้ไม่ได้').isVisible(), 'and is told to ask the admin');
     check((await p.getByRole('link', { name: 'ไปหน้าเข้าร่วมเกม' }).count()) === 1, 'and players are pointed to the join page');
-    check((await me()).user === null, 'a stranger gets no session');
+    check((await me()).user === null, 'a clash gets no session');
     await shoot(p, 'no-account');
     await p.getByRole('button', { name: 'ใช้บัญชี Microsoft อื่น' }).click();
     await p.waitForURL(`${WEB}/login`, { timeout: 20000 });

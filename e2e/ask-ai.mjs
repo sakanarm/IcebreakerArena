@@ -351,7 +351,7 @@ try {
     const TITLE = `ถาม AI ทดสอบ ${Date.now().toString(36).slice(-5)}`;
     const q = (prompt, why) => ({ type: 'quiz', prompt, options: ['ข้อที่ถูก', 'ผิด ก', 'ผิด ข', 'ผิด ค'], correct: [0], timeLimitS: 20, explanation: why });
     const FILE = { title: TITLE, description: 'เกมทดสอบถาม AI', rounds: [{ title: 'หัวข้อทดสอบ', questions: [q('คำถามของเกมตัวเองข้อหนึ่ง', 'เพราะข้อแรกถูก'), q('คำถามของเกมตัวเองข้อสอง', 'เพราะข้อแรกถูกเหมือนกัน')] }] };
-    await mp.goto(`${WEB}/login?next=/editor`, { waitUntil: 'networkidle' });
+    await mp.goto(`${WEB}/login?with=password&next=/editor`, { waitUntil: 'networkidle' });
     await mp.locator('#login-user').fill(who.username);
     await mp.locator('#login-password').fill(who.password);
     await mp.locator('button[type=submit]').click();

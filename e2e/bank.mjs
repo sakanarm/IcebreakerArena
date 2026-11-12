@@ -93,7 +93,7 @@ const openRound = async (title) => {
 
 // ---------- the editor, at a desk
 if (who) {
-  await page.goto(`${WEB}/login?next=/editor`, { waitUntil: 'networkidle' });
+  await page.goto(`${WEB}/login?with=password&next=/editor`, { waitUntil: 'networkidle' });
   await page.locator('#login-user').fill(who.username);
   await page.locator('#login-password').fill(who.password);
   await page.locator('button[type=submit]').click();
