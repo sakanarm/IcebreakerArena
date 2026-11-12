@@ -44,7 +44,9 @@ export function CreateApp() {
   const login = (next: string) => `/login?next=${encodeURIComponent(next)}`;
   const signIn = (next: string): Way['state'] => ({ kind: 'login', href: login(next) });
 
-  const aiState: Way['state'] = !ready || !ai
+  const aiState: Way['state'] = user && !user.can.aiQuiz
+    ? { kind: 'off', badge: 'ปิดสิทธิ์อยู่', title: 'ผู้ดูแลระบบปิดสิทธิ์นี้สำหรับบัญชีของคุณ', text: 'บัญชีนี้ใช้ AI ออกข้อสอบไม่ได้ วิธีอื่นในหน้านี้ยังใช้ได้ตามปกติ ติดต่อผู้ดูแลระบบถ้าต้องการใช้' }
+    : !ready || !ai
     ? { kind: 'loading' }
     : !ai.enabled
       ? { kind: 'off', title: 'ผู้ดูแลระบบยังไม่ได้เปิดใช้', text: 'วิธีนี้จะเปิดเมื่อผู้ดูแลระบบเชื่อมเว็บนี้กับบริการ AI ของบริษัท ระหว่างนี้ใช้คลังความรู้ Pika หรือนำเข้าจาก Excel ได้' }
@@ -62,6 +64,8 @@ export function CreateApp() {
       ? { kind: 'off', title: 'ต้องมีระบบบัญชี', text: 'คลังความรู้ Pika เป็นของแต่ละคน เครื่องนี้ยังไม่ได้เปิดระบบบัญชี จึงยังใช้ไม่ได้' }
       : !user
         ? signIn('/pika')
+        : !user.can.pika
+          ? { kind: 'off', badge: 'ปิดสิทธิ์อยู่', title: 'ผู้ดูแลระบบปิดสิทธิ์นี้สำหรับบัญชีของคุณ', text: 'บัญชีนี้ใช้คลังความรู้ Pika ไม่ได้ วิธีอื่นในหน้านี้ยังใช้ได้ตามปกติ ติดต่อผู้ดูแลระบบถ้าต้องการใช้' }
         : pika === 'loading'
           ? { kind: 'loading' }
           : pika === 'error'

@@ -158,6 +158,21 @@ export function PikaApp() {
       </Notice>
     );
   }
+  if (!account.user.can.pika) {
+    return (
+      <Notice
+        emoji="🔒"
+        title="ผู้ดูแลระบบปิดสิทธิ์คลังความรู้สำหรับบัญชีนี้"
+        actions={
+          <Link href="/create" className="btn btn-ghost">
+            ดูวิธีสร้างแบบอื่น
+          </Link>
+        }
+      >
+        บัญชีนี้ใช้คลังความรู้ Pika ไม่ได้ วิธีสร้างข้อสอบแบบอื่นยังใช้ได้ตามปกติ ติดต่อผู้ดูแลระบบถ้าต้องการใช้
+      </Notice>
+    );
+  }
   return <Maker key={account.user.id} user={account.user} />;
 }
 

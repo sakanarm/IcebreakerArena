@@ -1,4 +1,4 @@
-import { requireUser } from '@/server/auth';
+import { requirePerm, requireUser } from '@/server/auth';
 import { listCatalog, shareGame } from '@/server/catalog';
 import { getDb } from '@/server/db';
 import { HttpError, guardMutation, handle, json, readJson } from '@/server/http';
@@ -17,6 +17,7 @@ export async function POST(req: Request) {
   return handle(async () => {
     guardMutation(req);
     const user = await requireUser(req);
+    requirePerm(user, 'share');
     const body = await readJson(req, 4096);
     if (!isId(body.gameId)) throw new HttpError(404, 'not_found');
     const res = await shareGame(await getDb(), user, body.gameId);

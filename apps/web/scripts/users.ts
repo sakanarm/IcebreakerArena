@@ -5,6 +5,7 @@
 //   npm run users -- add <username> "<display name>" [--admin]   prints a new password, once
 //   npm run users -- reset <username>                             new password, logs the account out everywhere
 //   npm run users -- disable <username> | enable <username>
+//   npm run users -- role <username> maker|curator|admin            admin: the admin page; curator: takes down catalog entries
 //   npm run users -- demo <username> [--share]                    adds the demo games; --share also lists one in the catalog
 //   npm run users -- email <username> <work email> | --clear      the work email: company login lets its owner in, and the
 //                                                                 knowledge base (Pika) names the account's project after it
@@ -16,11 +17,13 @@
 // process may have that folder open (check does not open it).
 import { closeSync, mkdirSync, openSync, rmSync, statSync, writeSync } from 'node:fs';
 import path from 'node:path';
+import { audit } from '../src/server/audit';
 import { SSO_FILE, authModeProblem, authModeSource, dataDir, databaseUrl, dbSchema, readSecret, ssoSource } from '../src/server/config';
 import { SCHEMA_VERSION, checkSchemaName, connectPostgres, getDb } from '../src/server/db';
 import { DEMO_GAMES, SHARED_DEMO, addDemoGames } from '../src/server/demo-games';
 import { HttpError } from '../src/server/http';
-import { LOCAL_ISSUER, createLocalUser, generatePassword, normalizeUsername, setLocalEmail, setLocalPassword, usernameFromEmail } from '../src/server/local-users';
+import { LOCAL_ISSUER, createLocalUser, generatePassword, normalizeUsername, setLocalEmail, setLocalPassword, setRoleColumns, usernameFromEmail } from '../src/server/local-users';
+import { ROLES, USER_COLUMNS, isRole, toSessionUser, type UserRow } from '../src/server/roles';
 import { projectIdFor } from '../src/server/pika';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -32,7 +35,7 @@ const out = outArg ? path.resolve(process.env.INIT_CWD ?? process.cwd(), outArg)
 
 function usage(): never {
   console.error(
-    'usage: users check | list | add <username> "<display name>" [--admin] [--out=<file>] | reset <username> [--out=<file>] | disable <username> | enable <username> | demo <username> [--share] | email <username> <email>|--clear | invite <work email> "<display name>" [--admin]',
+    'usage: users check | list | add <username> "<display name>" [--admin] [--out=<file>] | reset <username> [--out=<file>] | disable <username> | enable <username> | role <username> maker|curator|admin | demo <username> [--share] | email <username> <email>|--clear | invite <work email> "<display name>" [--admin]',
   );
   process.exit(2);
 }
@@ -158,11 +161,19 @@ async function check(): Promise<boolean> {
       say(`tables: ${tables.length}, v${version}${version < SCHEMA_VERSION ? `, upgraded to v${SCHEMA_VERSION} the first time this app uses the database` : ''}`);
       if (version > SCHEMA_VERSION) problems.push(`the tables are v${version}, newer than this app (v${SCHEMA_VERSION}): deploy the newer app`);
       if (version >= 1) {
-        const [acc] = await db.query<{ n: number; admins: number }>(
-          `SELECT count(*)::int AS n, (count(*) FILTER (WHERE is_curator))::int AS admins FROM ${schema}.ib_users WHERE issuer = $1 AND NOT disabled`,
+        // roles came with the newest tables; before the app upgrades them, is_curator meant admin
+        const hasRoles = version >= SCHEMA_VERSION;
+        const [acc] = await db.query<{ n: number; admins: number; curators: number }>(
+          `SELECT count(*)::int AS n, (count(*) FILTER (WHERE ${hasRoles ? "role = 'admin'" : 'is_curator'}))::int AS admins,
+                  (count(*) FILTER (WHERE ${hasRoles ? "role = 'curator'" : 'false'}))::int AS curators
+             FROM ${schema}.ib_users WHERE issuer = $1 AND NOT disabled`,
           [LOCAL_ISSUER],
         );
-        say(`local accounts: ${acc!.n} (${acc!.admins} admin)`);
+        say(`local accounts: ${acc!.n} (${acc!.admins} admin${acc!.curators ? `, ${acc!.curators} curator` : ''})`);
+        if (hasRoles) {
+          const [any] = await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM ${schema}.ib_users WHERE role = 'admin' AND NOT disabled`);
+          if (any!.n === 0) say('  no admin yet: npm run users -- role <username> admin, then that person opens /admin');
+        }
         const [mail] = await db.query<{ n: number }>(
           `SELECT count(*)::int AS n FROM ${schema}.ib_users WHERE issuer = $1 AND NOT disabled AND email IS NOT NULL`,
           [LOCAL_ISSUER],
@@ -195,13 +206,13 @@ async function main() {
     if (!(await check())) process.exitCode = 1;
     return;
   }
-  if (!['list', 'add', 'reset', 'disable', 'enable', 'demo', 'email', 'invite'].includes(cmd ?? '')) usage();
+  if (!['list', 'add', 'reset', 'disable', 'enable', 'role', 'demo', 'email', 'invite'].includes(cmd ?? '')) usage();
   const db = await getDb();
   try {
     switch (cmd) {
       case 'list': {
-        const rows = await db.query<{ subject: string; display_name: string; is_curator: boolean; disabled: boolean; last_login: Date | null; has_password: boolean; has_email: boolean }>(
-          `SELECT u.subject, u.display_name, u.is_curator, u.disabled, p.user_id IS NOT NULL AS has_password, u.email IS NOT NULL AS has_email,
+        const rows = await db.query<{ subject: string; display_name: string; role: string; disabled: boolean; last_login: Date | null; has_password: boolean; has_email: boolean }>(
+          `SELECT u.subject, u.display_name, u.role, u.disabled, p.user_id IS NOT NULL AS has_password, u.email IS NOT NULL AS has_email,
                   (SELECT max(a.at) FROM ib_audit_log a WHERE a.user_id = u.id AND a.action = 'login') AS last_login
              FROM ib_users u LEFT JOIN ib_passwords p ON p.user_id = u.id
             WHERE u.issuer = $1 ORDER BY u.subject`,
@@ -209,7 +220,7 @@ async function main() {
         );
         if (!rows.length) console.log('no local accounts yet');
         for (const r of rows) {
-          const tags = [r.is_curator && 'admin', r.disabled && 'disabled', !r.has_password && 'no password', r.has_email && 'email'].filter(Boolean).join(', ');
+          const tags = [r.role !== 'maker' && r.role, r.disabled && 'disabled', !r.has_password && 'no password', r.has_email && 'email'].filter(Boolean).join(', ');
           console.log(`${r.subject.padEnd(20)} ${r.display_name}${tags ? `  [${tags}]` : ''}  ${r.last_login ? `last login ${new Date(r.last_login).toISOString().slice(0, 16)}` : 'never logged in'}`);
         }
         return;
@@ -218,7 +229,7 @@ async function main() {
         const [username, name] = args;
         if (!username || !name) usage();
         await newPassword(async (password) => {
-          await db.tx((sql) => createLocalUser(sql, { username, name, password, curator: flags.has('--admin') }));
+          await db.tx((sql) => createLocalUser(sql, { username, name, password, role: flags.has('--admin') ? 'admin' : 'maker' }));
           console.log(`made ${flags.has('--admin') ? 'admin ' : ''}account "${normalizeUsername(username)}" (${name})`);
           return normalizeUsername(username)!;
         });
@@ -248,16 +259,28 @@ async function main() {
         console.log(`${off ? 'disabled' : 'enabled'} "${normalizeUsername(username)}"`);
         return;
       }
+      case 'role': {
+        const [username, role] = args;
+        if (!username || !isRole(role)) usage();
+        const id = (await db.query<{ id: string }>('SELECT id FROM ib_users WHERE issuer = $1 AND subject = $2', [LOCAL_ISSUER, normalizeUsername(username)]))[0]?.id;
+        if (!id) throw new Error(`no local account "${username}"`);
+        await db.tx(async (sql) => {
+          await setRoleColumns(sql, id, role);
+          await audit(sql, null, 'admin_role_set', id, { role, from: 'cli' });
+        });
+        console.log(`"${normalizeUsername(username)}" is now ${role} (one of ${ROLES.join(', ')}); it takes effect on the next request`);
+        return;
+      }
       case 'demo': {
         const [username] = args;
         if (!username) usage();
-        const [u] = await db.query<{ id: string; display_name: string; email: string | null; is_curator: boolean; disabled: boolean }>(
-          'SELECT id, display_name, email, is_curator, disabled FROM ib_users WHERE issuer = $1 AND subject = $2',
+        const [u] = await db.query<UserRow>(
+          `SELECT ${USER_COLUMNS} FROM ib_users WHERE issuer = $1 AND subject = $2`,
           [LOCAL_ISSUER, normalizeUsername(username)],
         );
         if (!u) throw new Error(`no local account "${username}"`);
         if (u.disabled) throw new Error(`"${normalizeUsername(username)}" is disabled`);
-        const res = await addDemoGames(db, { id: u.id, name: u.display_name, email: u.email, isCurator: u.is_curator }, { share: flags.has('--share') });
+        const res = await addDemoGames(db, toSessionUser(u), { share: flags.has('--share') });
         for (const t of res.made) console.log(`made  ${t}`);
         for (const t of res.kept) console.log(`kept  ${t} (the account has a game by this title)`);
         const shared = DEMO_GAMES.find((g) => g.id === SHARED_DEMO)!.title;
@@ -270,7 +293,7 @@ async function main() {
         const username = usernameFromEmail(email);
         if (!username) throw new Error('could not make a username from that email: use add <username> "<name>", then email <username> <work email>');
         await db.tx(async (sql) => {
-          await createLocalUser(sql, { username, name, password: null, curator: flags.has('--admin') });
+          await createLocalUser(sql, { username, name, password: null, role: flags.has('--admin') ? 'admin' : 'maker' });
           await setLocalEmail(sql, username, email);
         });
         console.log(

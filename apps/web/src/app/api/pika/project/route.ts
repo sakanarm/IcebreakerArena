@@ -1,4 +1,4 @@
-import { requireUser } from '@/server/auth';
+import { requirePerm, requireUser } from '@/server/auth';
 import { HttpError, guardMutation, handle, json } from '@/server/http';
 import { ensureProject, existingProject, pikaConfigured } from '@/server/pika';
 
@@ -12,6 +12,7 @@ function emailOf(user: { email: string | null }): string {
 export async function GET(req: Request) {
   return handle(async () => {
     const user = await requireUser(req);
+    requirePerm(user, 'pika');
     const configured = pikaConfigured();
     const project = user.email?.includes('@') ? existingProject(user.email) : null;
     // the key itself never leaves the server
@@ -24,6 +25,7 @@ export async function POST(req: Request) {
   return handle(async () => {
     guardMutation(req);
     const user = await requireUser(req);
+    requirePerm(user, 'pika');
     const project = await ensureProject(emailOf(user), user.name);
     return json({ projectId: project.projectId }, 201);
   });

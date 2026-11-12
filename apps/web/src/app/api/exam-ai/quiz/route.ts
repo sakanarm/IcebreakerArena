@@ -1,7 +1,7 @@
 import { aiConfig, asksLeft, doneAsking, reserveAsk, settleAsk, startAsking } from '@/server/ai';
 import { QUIZ_LIMITS, QuizAborted, QuizDeclined, quizFromText, readQuizRequest, writeQuiz } from '@/server/ai-quiz';
 import { audit } from '@/server/audit';
-import { currentUser, requireUser } from '@/server/auth';
+import { currentUser, requirePerm, requireUser } from '@/server/auth';
 import { getDb } from '@/server/db';
 import { HttpError, guardMutation, handle, json, readJson } from '@/server/http';
 
@@ -26,6 +26,8 @@ export async function GET(req: Request) {
     if (!c) return json({ enabled: false });
     const { user } = await currentUser(req);
     if (!user) return json({ enabled: true, needsLogin: true });
+    // an admin turned it off for this account: no tab (the create page says why, from /auth/me)
+    if (!user.can.aiQuiz) return json({ enabled: false });
     const left = await asksLeft(await getDb(), whoFor(user.id), { perPersonPerDay: c.quizPerPersonPerDay });
     return json({ enabled: true, needsLogin: false, left, perDay: c.quizPerPersonPerDay });
   });
@@ -37,6 +39,7 @@ export async function POST(req: Request) {
     const c = aiConfig();
     if (!c) throw new HttpError(404, 'ai_off');
     const user = await requireUser(req);
+    requirePerm(user, 'aiQuiz');
     const r = readQuizRequest(await readJson(req, 256 * 1024));
 
     const db = await getDb();

@@ -2,6 +2,7 @@ import { audit } from './audit';
 import { authMode } from './config';
 import { getDb, type Sql } from './db';
 import { HttpError } from './http';
+import { USER_COLUMNS, toSessionUser, type Perm, type UserRow } from './roles';
 import {
   clearSessionCookie,
   createSession,
@@ -82,13 +83,25 @@ export async function logOut(req: Request): Promise<string> {
 }
 
 export async function upsertUser(sql: Sql, identity: Identity): Promise<SessionUser> {
-  const rows = await sql.query<{ id: string; display_name: string; email: string | null; is_curator: boolean; disabled: boolean }>(
+  const rows = await sql.query<UserRow>(
     `INSERT INTO ib_users (id, issuer, subject, display_name, email) VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (issuer, subject) DO UPDATE SET display_name = EXCLUDED.display_name, email = EXCLUDED.email, last_login_at = now()
-     RETURNING id, display_name, email, is_curator, disabled`,
+     RETURNING ${USER_COLUMNS}`,
     [newId(), identity.issuer, identity.subject, identity.name, identity.email ?? null],
   );
   const u = rows[0]!;
   if (u.disabled) throw new HttpError(403, 'account_disabled');
-  return { id: u.id, name: u.display_name, email: u.email, isCurator: u.is_curator };
+  return toSessionUser(u);
+}
+
+/** what each feature an admin can turn off is called in a refusal */
+export function requirePerm(user: SessionUser, perm: Perm) {
+  if (!user.can[perm]) throw new HttpError(403, 'not_permitted', { perm });
+}
+
+/** The logged-in admin, or a refusal: 403 admin_only for anyone else logged in. */
+export async function requireAdmin(req: Request): Promise<SessionUser> {
+  const user = await requireUser(req);
+  if (user.role !== 'admin') throw new HttpError(403, 'admin_only');
+  return user;
 }

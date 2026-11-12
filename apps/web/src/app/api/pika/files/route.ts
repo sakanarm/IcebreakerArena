@@ -1,4 +1,4 @@
-import { requireUser } from '@/server/auth';
+import { requirePerm, requireUser } from '@/server/auth';
 import { HttpError, guardMutation, handle, json } from '@/server/http';
 import { INGEST_MAX_BYTES, INGEST_TYPES, existingProject, ingestFile } from '@/server/pika';
 import { cleanFileName, idempotencyKeyOf, ingestType, withIngestSlot } from '@/server/pika-ingest';
@@ -40,6 +40,7 @@ export async function POST(req: Request) {
   return handle(async () => {
     guardMutation(req);
     const user = await requireUser(req);
+    requirePerm(user, 'pika');
     if (!user.email?.includes('@')) throw new HttpError(409, 'no_email');
     const project = existingProject(user.email);
     if (!project) throw new HttpError(409, 'no_project');

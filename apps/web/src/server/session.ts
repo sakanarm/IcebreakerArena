@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { basePath, secureCookies } from './config';
 import type { Sql } from './db';
+import { toSessionUser, type Perms, type Role } from './roles';
 
 /** 128-bit random ids for users, games and catalog entries: nobody can guess someone else's */
 export const newId = () => randomBytes(16).toString('base64url');
@@ -19,7 +20,11 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string | null;
+  role: Role;
+  /** curator or admin: may take down anything in the shared catalog */
   isCurator: boolean;
+  /** the features an admin has left on for this account (roles.ts) */
+  can: Perms;
 }
 
 export async function createSession(sql: Sql, userId: string, now = new Date()): Promise<string> {
@@ -43,10 +48,11 @@ export async function findSession(sql: Sql, token: string, now = new Date()): Pr
     id: string;
     display_name: string;
     email: string | null;
-    is_curator: boolean;
+    role: string;
+    perms: unknown;
     disabled: boolean;
   }>(
-    `SELECT s.last_seen_at, s.expires_at, u.id, u.display_name, u.email, u.is_curator, u.disabled
+    `SELECT s.last_seen_at, s.expires_at, u.id, u.display_name, u.email, u.role, u.perms, u.disabled
        FROM ib_sessions s JOIN ib_users u ON u.id = s.user_id WHERE s.id_hash = $1`,
     [idHash],
   );
@@ -58,7 +64,7 @@ export async function findSession(sql: Sql, token: string, now = new Date()): Pr
     return null;
   }
   if (t - s.last_seen_at.getTime() >= TOUCH_MS) await sql.query('UPDATE ib_sessions SET last_seen_at = $2 WHERE id_hash = $1', [idHash, now]);
-  return { id: s.id, name: s.display_name, email: s.email, isCurator: s.is_curator };
+  return toSessionUser(s);
 }
 
 export async function deleteSession(sql: Sql, token: string) {

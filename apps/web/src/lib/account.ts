@@ -6,10 +6,18 @@ import { api, setPageUser } from './api';
 /** off: no accounts, games stay in the browser. mock: name-only login for development. local: username and password. oidc: company login. */
 export type AuthMode = 'off' | 'mock' | 'local' | 'oidc';
 
+export type Role = 'maker' | 'curator' | 'admin';
+/** features an admin can turn off for one account */
+export type Perm = 'share' | 'aiQuiz' | 'pika';
+
 export interface AccountUser {
   id: string;
   name: string;
+  /** maker: everyone. curator: may also take down catalog games. admin: also runs the admin page */
+  role: Role;
   isCurator: boolean;
+  /** what this account may use; false where an admin turned it off */
+  can: Record<Perm, boolean>;
 }
 
 export type Account =

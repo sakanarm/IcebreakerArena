@@ -1,4 +1,4 @@
-import { requireUser } from '@/server/auth';
+import { requirePerm, requireUser } from '@/server/auth';
 import { HttpError, handle, json } from '@/server/http';
 import { existingProject, getJob } from '@/server/pika';
 
@@ -6,6 +6,7 @@ import { existingProject, getJob } from '@/server/pika';
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const user = await requireUser(req);
+    requirePerm(user, 'pika');
     if (!user.email?.includes('@')) throw new HttpError(409, 'no_email');
     const project = existingProject(user.email);
     if (!project) throw new HttpError(409, 'no_project');

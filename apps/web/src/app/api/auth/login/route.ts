@@ -1,3 +1,4 @@
+import { publicUser } from '@/server/roles';
 import { startSession } from '@/server/auth';
 import { authMode } from '@/server/config';
 import { getDb } from '@/server/db';
@@ -13,6 +14,6 @@ export async function POST(req: Request) {
     // checked before the login transaction, so a failed try stays in the audit log
     const found = await checkLocalLogin(await getDb(), body.username, body.password);
     const { user, setCookie } = await startSession(req, LOCAL_ISSUER, async () => found);
-    return json({ user: { id: user.id, name: user.name, isCurator: user.isCurator } }, 200, { 'set-cookie': setCookie });
+    return json({ user: publicUser(user) }, 200, { 'set-cookie': setCookie });
   });
 }

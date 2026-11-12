@@ -732,8 +732,9 @@ test('local passwords: scrypt hashes that differ every time, and a generated pas
 
 test('local login: right password in any username case, one answer for wrong name or password, a lockout, and disabled accounts', async () => {
   resetLoginThrottle();
-  const made = await db.tx((sql) => createLocalUser(sql, { username: 'Tester1', name: 'คุณทดสอบ', password: 'a-good-password', curator: true }));
+  const made = await db.tx((sql) => createLocalUser(sql, { username: 'Tester1', name: 'คุณทดสอบ', password: 'a-good-password', role: 'admin' }));
   assert.equal(made.isCurator, true);
+  assert.equal(made.role, 'admin');
   await assert.rejects(db.tx((sql) => createLocalUser(sql, { username: 'tester1', name: 'อีกคน', password: 'a-good-password' })), (e: HttpError) => e.code === 'username_taken');
   await assert.rejects(db.tx((sql) => createLocalUser(sql, { username: 'tester2', name: 'สั้น', password: 'short' })), (e: HttpError) => e.code === 'password_too_short');
 
@@ -1065,9 +1066,12 @@ test('upgrading a database from before exam links keeps its games and gives them
     // v3: the last schema before exam links (v4)
     await migrate(old, 3);
     assert.deepEqual(await old.query("SELECT 1 FROM information_schema.tables WHERE table_name = 'ib_exams'"), []);
-    const u = await upsertUser(old, { issuer: 'test', subject: 'before-exams', name: 'Before' });
-    await old.query("INSERT INTO ib_games (id, owner_id, title, data, origin) VALUES ($1, $2, 'เกมเก่า', $3, 'new')", ['g'.repeat(22), u.id, JSON.stringify(examGame('เกมเก่า'))]);
+    // as that version stored a user (the app only reads users after migrating)
+    await old.query("INSERT INTO ib_users (id, issuer, subject, display_name) VALUES ('u-before-exams', 'test', 'before-exams', 'Before')");
+    await old.query("INSERT INTO ib_games (id, owner_id, title, data, origin) VALUES ($1, 'u-before-exams', 'เกมเก่า', $2, 'new')", ['g'.repeat(22), JSON.stringify(examGame('เกมเก่า'))]);
     await migrate(old);
+    const u = await upsertUser(old, { issuer: 'test', subject: 'before-exams', name: 'Before' });
+    assert.equal(u.id, 'u-before-exams');
     assert.equal((await old.query<{ version: number }>('SELECT version FROM ib_schema'))[0]!.version, SCHEMA_VERSION);
     const [rec] = await listGames(old, u.id);
     assert.equal(rec!.game.title, 'เกมเก่า');

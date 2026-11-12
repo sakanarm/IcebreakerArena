@@ -85,6 +85,21 @@ export function AccountChip({ loginLink = true }: { loginLink?: boolean }) {
               เข้าสู่ระบบในชื่อ <span className="font-semibold text-white">{account.user.name}</span>
               {account.mode === 'mock' && <span className="mt-1 block text-xs text-gold">โหมดทดสอบ (ไม่มีรหัสผ่าน)</span>}
             </p>
+            {account.user.role === 'admin' && (
+              <Link
+                href="/admin"
+                role="menuitem"
+                data-testid="nav-admin"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left font-semibold hover:bg-white/10"
+              >
+                <svg viewBox="0 0 20 20" className="size-4 text-brand-2" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 2.5l6 2.5v4.5c0 3.8-2.6 6.6-6 8-3.4-1.4-6-4.2-6-8V5z" />
+                  <path d="M7.5 10l1.8 1.8L12.8 8.3" />
+                </svg>
+                ตั้งค่าระบบ
+              </Link>
+            )}
             <button type="button" role="menuitem" onClick={out} className="w-full rounded-xl px-3 py-2 text-left font-semibold hover:bg-white/10">
               ออกจากระบบ
             </button>

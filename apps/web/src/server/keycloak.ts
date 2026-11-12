@@ -5,6 +5,7 @@ export type Jwk = { kty?: string; use?: string; alg?: string; crv?: string; kid?
 import { basePath, secureCookies, type SsoConfig } from './config';
 import type { Sql } from './db';
 import { HttpError } from './http';
+import { USER_COLUMNS, toSessionUser, type UserRow } from './roles';
 import { parseCookies, type SessionUser } from './session';
 
 /**
@@ -330,8 +331,8 @@ export function emailFrom(claims: Pick<IdClaims, 'email' | 'preferred_username'>
  * sessions at once, which Keycloak alone could not.
  */
 export async function findSsoUser(sql: Sql, email: string): Promise<SessionUser> {
-  const rows = await sql.query<{ id: string; display_name: string; email: string | null; is_curator: boolean; disabled: boolean }>(
-    'SELECT id, display_name, email, is_curator, disabled FROM ib_users WHERE lower(email) = $1 LIMIT 2',
+  const rows = await sql.query<UserRow>(
+    `SELECT ${USER_COLUMNS} FROM ib_users WHERE lower(email) = $1 LIMIT 2`,
     [email.toLowerCase()],
   );
   if (rows.length > 1) {
@@ -342,7 +343,7 @@ export async function findSsoUser(sql: Sql, email: string): Promise<SessionUser>
   const u = rows[0];
   if (!u) throw new HttpError(403, 'no_account');
   if (u.disabled) throw new HttpError(403, 'account_disabled');
-  return { id: u.id, name: u.display_name, email: u.email, isCurator: u.is_curator };
+  return toSessionUser(u);
 }
 
 // ---------- answers for the browser ----------

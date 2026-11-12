@@ -1,4 +1,4 @@
-import { requireUser } from '@/server/auth';
+import { requirePerm, requireUser } from '@/server/auth';
 import { HttpError, guardMutation, handle, json, readJson } from '@/server/http';
 import { existingProject, searchPages } from '@/server/pika';
 
@@ -8,6 +8,7 @@ export async function POST(req: Request) {
   return handle(async () => {
     guardMutation(req);
     const user = await requireUser(req);
+    requirePerm(user, 'pika');
     if (!user.email?.includes('@')) throw new HttpError(409, 'no_email');
     const project = existingProject(user.email);
     if (!project) throw new HttpError(409, 'no_project');

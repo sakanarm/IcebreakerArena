@@ -73,7 +73,7 @@ export function warnOnce(message: string) {
  * The admin's settings, or null when AI is off: no file, a file that can't be read, no key, or
  * accounts off (usage is counted in the database, which needs accounts on).
  */
-export function aiConfig(): AiConfig | null {
+export function aiConfig(opts: { evenIfOff?: boolean } = {}): AiConfig | null {
   if (authMode() === 'off') return null;
   const raw = readSecret('ai.json');
   if (!raw) return null;
@@ -88,6 +88,8 @@ export function aiConfig(): AiConfig | null {
     warnOnce('var/secrets/ai.json must hold one JSON object, AI is off');
     return null;
   }
+  // turned off on the admin page: the key and settings stay for when it is turned back on
+  if (c.enabled === false && !opts.evenIfOff) return null;
   const apiKey = typeof c.apiKey === 'string' ? c.apiKey.trim() : '';
   if (!apiKey) {
     warnOnce('var/secrets/ai.json has no apiKey, AI is off');

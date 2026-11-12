@@ -307,6 +307,16 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (day, who)
   );
   `,
+  // Roles and permissions, set on the admin page (admin.ts, roles.ts). role: maker (everyone), curator
+  // (may take down anything in the shared catalog), admin (that, and the admin page). perms holds only
+  // what an admin has turned off, as {"share": false}; a missing key is allowed. is_curator, which the
+  // first admins were given, becomes role admin and is kept in step (true for curator and admin).
+  `
+  ALTER TABLE ib_users ADD COLUMN role text NOT NULL DEFAULT 'maker';
+  ALTER TABLE ib_users ADD CONSTRAINT ib_users_role CHECK (role IN ('maker', 'curator', 'admin'));
+  ALTER TABLE ib_users ADD COLUMN perms jsonb NOT NULL DEFAULT '{}'::jsonb;
+  UPDATE ib_users SET role = 'admin' WHERE is_curator;
+  `,
 ];
 
 /** The version migrate() brings a database to. */

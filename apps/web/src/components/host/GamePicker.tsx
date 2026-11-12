@@ -327,6 +327,7 @@ function AccountGames({
                     <ShareRow
                       rec={rec}
                       ready={ready}
+                      canShare={user.can.share}
                       disabled={busy}
                       working={working === `share:${rec.id}` || working === `withdraw:${rec.sharedEntryId}`}
                       onShare={() => share(rec)}
@@ -424,6 +425,7 @@ function AccountGames({
 function ShareRow({
   rec,
   ready,
+  canShare,
   disabled,
   working,
   onShare,
@@ -431,6 +433,8 @@ function ShareRow({
 }: {
   rec: GameRecord;
   ready: boolean;
+  /** false when an admin turned sharing off for this account: withdrawing still works */
+  canShare: boolean;
   disabled: boolean;
   working: boolean;
   onShare: () => void;
@@ -446,7 +450,7 @@ function ShareRow({
   if (rec.sharedStatus === 'listed') {
     return (
       <>
-        {!rec.held && (
+        {!rec.held && canShare && (
           <FooterButton disabled={disabled || !ready} onClick={onShare}>
             🔄 อัปเดตในคลัง
           </FooterButton>
@@ -457,6 +461,7 @@ function ShareRow({
       </>
     );
   }
+  if (!canShare) return <span className="text-sm text-slate-500">ผู้ดูแลระบบปิดสิทธิ์แชร์สำหรับบัญชีนี้</span>;
   return ready ? (
     <FooterButton disabled={disabled} onClick={onShare}>
       🌐 แชร์เข้าคลังกลาง

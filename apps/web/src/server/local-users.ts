@@ -4,6 +4,7 @@ import { upsertUser, type SessionUser } from './auth';
 import type { Sql } from './db';
 import { HttpError } from './http';
 import { projectIdFor } from './pika';
+import { toSessionUser, type Role, type UserRow } from './roles';
 
 /**
  * Local accounts (AUTH_MODE=local): a username and password kept in our own database. An admin makes
@@ -87,21 +88,32 @@ function checkPassword(password: string) {
  */
 export async function createLocalUser(
   sql: Sql,
-  opts: { username: string; name: string; password: string | null; curator?: boolean },
+  opts: { username: string; name: string; password: string | null; role?: Role; actorId?: string | null },
 ): Promise<SessionUser> {
   const username = normalizeUsername(opts.username);
   if (!username) throw new HttpError(400, 'bad_username');
-  const name = opts.name.normalize('NFC').replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim();
-  if (name.length < 2 || name.length > 40) throw new HttpError(400, 'bad_name');
+  const name = cleanName(opts.name);
   if (opts.password !== null) checkPassword(opts.password);
   const taken = await sql.query('SELECT 1 FROM ib_users WHERE issuer = $1 AND subject = $2', [LOCAL_ISSUER, username]);
   if (taken.length) throw new HttpError(409, 'username_taken');
   const user = await upsertUser(sql, { issuer: LOCAL_ISSUER, subject: username, name });
-  if (opts.curator) await sql.query('UPDATE ib_users SET is_curator = true WHERE id = $1', [user.id]);
+  const role = opts.role ?? 'maker';
+  if (role !== 'maker') await setRoleColumns(sql, user.id, role);
   if (opts.password !== null) await sql.query('INSERT INTO ib_passwords (user_id, hash) VALUES ($1, $2)', [user.id, await hashPassword(opts.password)]);
-  await audit(sql, null, 'local_user_created', user.id, { username, curator: !!opts.curator, password: opts.password !== null });
-  return { ...user, isCurator: !!opts.curator };
+  await audit(sql, opts.actorId ?? null, 'local_user_created', user.id, { username, role, password: opts.password !== null });
+  return { ...user, role, isCurator: role !== 'maker' };
 }
+
+/** a display name as kept: one line, no control characters, 2–40 characters */
+export function cleanName(raw: string): string {
+  const name = raw.normalize('NFC').replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim();
+  if ([...name].length < 2 || [...name].length > 40) throw new HttpError(400, 'bad_name');
+  return name;
+}
+
+/** role, with is_curator kept in step for anything that still reads it */
+export const setRoleColumns = (sql: Sql, id: string, role: Role) =>
+  sql.query("UPDATE ib_users SET role = $2, is_curator = ($2 <> 'maker') WHERE id = $1", [id, role]);
 
 /** Sets a new password and ends every session the account had. False when there is no such account. */
 export async function setLocalPassword(sql: Sql, username: string, password: string): Promise<boolean> {
@@ -127,11 +139,17 @@ const EMAIL_SHAPE = /^[^\s@<>"]{1,64}@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
  * each could read what the other taught it. False when there is no such account.
  */
 export async function setLocalEmail(sql: Sql, username: string, rawEmail: string | null): Promise<boolean> {
-  const email = rawEmail === null ? null : rawEmail.trim().toLowerCase();
-  if (email !== null && (!EMAIL_SHAPE.test(email) || email.length > 254)) throw new HttpError(400, 'bad_email');
   const rows = await sql.query<{ id: string }>('SELECT id FROM ib_users WHERE issuer = $1 AND subject = $2', [LOCAL_ISSUER, normalizeUsername(username)]);
   const id = rows[0]?.id;
   if (!id) return false;
+  await setUserEmail(sql, id, rawEmail);
+  return true;
+}
+
+/** setLocalEmail for an account named by its id; `actorId` is the admin who did it, for the log */
+export async function setUserEmail(sql: Sql, id: string, rawEmail: string | null, actorId: string | null = null): Promise<void> {
+  const email = rawEmail === null || !rawEmail.trim() ? null : rawEmail.trim().toLowerCase();
+  if (email !== null && (!EMAIL_SHAPE.test(email) || email.length > 254)) throw new HttpError(400, 'bad_email');
   if (email !== null) {
     // the project is named after the part before the @, so a@one.co and a@two.co would share one too
     const mine = projectIdFor(email);
@@ -147,8 +165,7 @@ export async function setLocalEmail(sql: Sql, username: string, rawEmail: string
   }
   await sql.query('UPDATE ib_users SET email = $2 WHERE id = $1', [id, email]);
   // the email itself stays out of the log: who changed and that it changed is enough
-  await audit(sql, null, 'local_email_set', id, { cleared: email === null });
-  return true;
+  await audit(sql, actorId, 'local_email_set', id, { cleared: email === null });
 }
 
 /** The username `users invite` gives a work email: the part before the @, made to fit the username rules. */
@@ -191,8 +208,8 @@ export async function checkLocalLogin(sql: Sql, rawUsername: unknown, rawPasswor
   const password = typeof rawPassword === 'string' ? rawPassword : '';
   if (!username || !password || password.length > PASSWORD_MAX) throw new HttpError(401, 'bad_login');
   if (tooManyTries(username, now)) throw new HttpError(429, 'too_many_tries');
-  const rows = await sql.query<{ id: string; display_name: string; email: string | null; is_curator: boolean; disabled: boolean; hash: string }>(
-    `SELECT u.id, u.display_name, u.email, u.is_curator, u.disabled, p.hash
+  const rows = await sql.query<UserRow & { hash: string }>(
+    `SELECT u.id, u.display_name, u.email, u.role, u.perms, u.disabled, p.hash
        FROM ib_users u JOIN ib_passwords p ON p.user_id = u.id
       WHERE u.issuer = $1 AND u.subject = $2`,
     [LOCAL_ISSUER, username],
@@ -207,5 +224,5 @@ export async function checkLocalLogin(sql: Sql, rawUsername: unknown, rawPasswor
   }
   fails.delete(username);
   if (u.disabled) throw new HttpError(403, 'account_disabled');
-  return { id: u.id, name: u.display_name, email: u.email, isCurator: u.is_curator };
+  return toSessionUser(u);
 }

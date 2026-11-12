@@ -1,3 +1,4 @@
+import { publicUser } from '@/server/roles';
 import { currentUser } from '@/server/auth';
 import { authMode, ssoAvailable } from '@/server/config';
 import { handle, json } from '@/server/http';
@@ -8,7 +9,7 @@ export async function GET(req: Request) {
   return handle(async () => {
     const { user, clearCookie } = await currentUser(req);
     return json(
-      { mode: authMode(), sso: ssoAvailable(), user: user && { id: user.id, name: user.name, isCurator: user.isCurator } },
+      { mode: authMode(), sso: ssoAvailable(), user: user && publicUser(user) },
       200,
       clearCookie ? { 'set-cookie': clearSessionCookie() } : {},
     );
