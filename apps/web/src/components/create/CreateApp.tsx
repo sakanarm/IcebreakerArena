@@ -207,10 +207,10 @@ interface Way {
 }
 
 const TONES = {
-  violet: 'bg-indigo-50 text-brand',
-  cyan: 'bg-cyan-50 text-cyan-700',
-  green: 'bg-emerald-50 text-emerald-700',
-  amber: 'bg-amber-50 text-amber-700',
+  violet: 'bg-brand/20 text-[#a5b4ff] ring-brand/40',
+  cyan: 'bg-brand-2/10 text-brand-2 ring-brand-2/30',
+  green: 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30',
+  amber: 'bg-gold/10 text-gold ring-gold/30',
 };
 
 function WayCard({ way }: { way: Way }) {
@@ -220,25 +220,25 @@ function WayCard({ way }: { way: Way }) {
     <article
       data-testid={`create-${way.key}`}
       data-state={state.kind}
-      className={`relative flex h-full flex-col rounded-2xl bg-white p-5 text-ink shadow-lg ring-1 ring-black/5 transition-shadow sm:p-6 ${
-        open ? 'focus-within:ring-2 focus-within:ring-brand-2 hover:shadow-2xl hover:ring-brand/40' : ''
+      className={`relative flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.05] p-5 text-white shadow-[0_12px_32px_-16px_rgb(0_0_0/0.6)] backdrop-blur-sm transition-colors sm:p-6 ${
+        open ? 'focus-within:border-brand-2/70 hover:border-white/25 hover:bg-white/[0.08]' : ''
       }`}
     >
       <div className="flex items-center gap-4">
-        <span className={`grid size-12 shrink-0 place-items-center rounded-xl ${TONES[way.tone]} ${state.kind === 'off' ? 'opacity-60 grayscale' : ''}`}>{way.icon}</span>
+        <span className={`grid size-12 shrink-0 place-items-center rounded-xl ring-1 ${TONES[way.tone]} ${state.kind === 'off' ? 'opacity-50 grayscale' : ''}`}>{way.icon}</span>
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
           <h2 className="text-xl font-bold">{way.title}</h2>
           <Badge state={state} />
         </div>
       </div>
-      <p className="mt-3 leading-relaxed text-pretty text-slate-600 sm:pl-16">{way.text}</p>
+      <p className="mt-3 leading-relaxed text-pretty text-white/70 sm:pl-16">{way.text}</p>
 
-      <div className="mt-5 border-t border-slate-100 pt-4">
-        <p className="text-xs font-semibold tracking-wide text-slate-500">เหมาะกับ</p>
+      <div className="mt-5 border-t border-white/10 pt-4">
+        <p className="text-xs font-semibold tracking-wide text-white/55">เหมาะกับ</p>
         <ul className="mt-2 grid gap-1.5">
           {way.fits.map((f) => (
-            <li key={f} className="flex gap-2 text-[15px] text-slate-700">
-              <svg viewBox="0 0 16 16" className="mt-1 size-4 shrink-0 text-emerald-600" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <li key={f} className="flex gap-2 text-[15px] text-white/85">
+              <svg viewBox="0 0 16 16" className="mt-1 size-4 shrink-0 text-emerald-300" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m3.5 8.5 3 3 6-7" />
               </svg>
               <span className="min-w-0">{f}</span>
@@ -249,27 +249,27 @@ function WayCard({ way }: { way: Way }) {
 
       <div className="mt-auto pt-5">
         {state.kind === 'off' ? (
-          <div className="flex gap-3 rounded-xl bg-slate-50 p-3.5 ring-1 ring-slate-200" data-testid={`create-${way.key}-why`}>
-            <svg viewBox="0 0 20 20" className="mt-0.5 size-5 shrink-0 text-slate-500" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7">
+          <div className="flex gap-3 rounded-xl bg-black/20 p-3.5 ring-1 ring-white/10" data-testid={`create-${way.key}-why`}>
+            <svg viewBox="0 0 20 20" className="mt-0.5 size-5 shrink-0 text-white/55" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.7">
               <circle cx="10" cy="10" r="7.5" />
               <path d="M10 9v5M10 6.2v.1" strokeLinecap="round" />
             </svg>
-            <p className="min-w-0 text-sm leading-relaxed text-slate-600">
-              <span className="block font-semibold text-ink">{state.title}</span>
+            <p className="min-w-0 text-sm leading-relaxed text-white/70">
+              <span className="block font-semibold text-white">{state.title}</span>
               {state.text}
             </p>
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="min-w-0 text-sm text-slate-500">{state.kind === 'go' && state.note ? state.note : way.meta}</p>
+            <p className="min-w-0 text-sm text-white/60">{state.kind === 'go' && state.note ? state.note : way.meta}</p>
             {state.kind === 'loading' ? (
-              <span className="h-11 w-36 animate-pulse rounded-xl bg-slate-100" aria-label="กำลังตรวจ" />
+              <span className="h-11 w-36 animate-pulse rounded-xl bg-white/10" aria-label="กำลังตรวจ" />
             ) : (
               <Link
                 href={state.href}
                 data-testid={`create-${way.key}-go`}
                 className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 font-semibold transition-colors after:absolute after:inset-0 after:rounded-2xl after:content-[''] ${
-                  state.kind === 'login' ? 'bg-slate-100 text-ink hover:bg-slate-200' : 'bg-brand text-white hover:bg-[#2f48d8]'
+                  state.kind === 'login' ? 'bg-white/10 text-white ring-1 ring-white/20 hover:bg-white/15' : 'bg-brand text-white shadow-[0_6px_20px_-6px_rgb(61_90_254/0.7)] hover:bg-[#5873ff]'
                 }`}
               >
                 {state.kind === 'login' ? 'เข้าสู่ระบบเพื่อใช้' : state.label}
@@ -280,7 +280,7 @@ function WayCard({ way }: { way: Way }) {
             )}
           </div>
         )}
-        {state.kind === 'go' && state.note && <p className="mt-2 text-xs text-slate-400">{way.meta}</p>}
+        {state.kind === 'go' && state.note && <p className="mt-2 text-xs text-white/50">{way.meta}</p>}
       </div>
     </article>
   );
@@ -290,10 +290,10 @@ function Badge({ state }: { state: Way['state'] }) {
   if (state.kind === 'loading') return null;
   const [text, cls] =
     state.kind === 'go'
-      ? ['พร้อมใช้', 'bg-emerald-50 text-emerald-700 ring-emerald-200']
+      ? ['พร้อมใช้', 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/30']
       : state.kind === 'login'
-        ? ['ต้องเข้าสู่ระบบ', 'bg-amber-50 text-amber-800 ring-amber-200']
-        : [state.badge ?? 'ยังไม่เปิดใช้', 'bg-slate-100 text-slate-600 ring-slate-200'];
+        ? ['ต้องเข้าสู่ระบบ', 'bg-gold/10 text-gold ring-gold/30']
+        : [state.badge ?? 'ยังไม่เปิดใช้', 'bg-white/10 text-white/70 ring-white/15'];
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap ring-1 ${cls}`}>{text}</span>;
 }
 
